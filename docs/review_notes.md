@@ -351,3 +351,149 @@ No Critical or High severity findings. One Medium finding regarding the missing 
 1. **Issue #4 (V1 schema)**: Add a single-row constraint to `schema_version` (e.g., `CHECK (id = 1)` on a primary key column) as part of the V1 migration to prevent version-table corruption.
 2. **Future**: Refactor `migrate()` to avoid redundant `_ensure_version_table` calls for minor performance improvement.
 3. **Future**: Consider adding a `--dry-run` mode to the migration runner that reports which migrations would be applied without executing them, useful for deployment verification.
+
+---
+
+# PR #8 Review Notes -- Issue #4: V1 schema migration -- projects, tasks, task_assignees, events
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-02-20
+> Branch: `feature/004-v1-schema`
+
+---
+
+## Code Review
+
+### Acceptance Criteria Checklist
+
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| `projects` table with `ux_projects_shared_name` and `ux_projects_private_owner_name` partial unique indexes | PASS | Table created on lines 18-26, indexes on lines 28-36 of `schema_v1.py`. Partial `WHERE` clauses match PRD exactly. |
+| `tasks` table with section and status CHECK constraints | PASS | Section CHECK on line 43 (`backlog, doing, waiting, done, drop`), status CHECK on line 45 (`open, done, dropped`). Both match PRD spec. |
+| `task_assignees` table with composite PK and secondary index | PASS | Composite `PRIMARY KEY (task_id, assignee_user_id)` on line 57, secondary index `ix_task_assignees_user` on lines 61-64. |
+| `events` audit table created | PASS | Table on lines 66-75. Columns match PRD. |
+| Shared `Inbox` project auto-created (INSERT OR IGNORE) | PASS | Line 78-81 uses `INSERT OR IGNORE` with `('Inbox', 'shared', NULL)`. |
+| `schema_version` = 1 after migration | PASS | Test `test_v1_schema_version` verifies `get_version(conn) == 1`. |
+
+### Required Tests
+
+| Test | Status |
+|------|--------|
+| `test_v1_tables_exist` | PASS -- verifies all four tables exist in `sqlite_master` |
+| `test_v1_inbox_created` | PASS -- verifies name='Inbox', visibility='shared', owner_user_id=None |
+| `test_v1_shared_unique_index_enforced` | PASS -- duplicate shared name raises `IntegrityError` |
+| `test_v1_private_unique_index_enforced` | PASS -- duplicate (owner, name) raises `IntegrityError`; different owner succeeds |
+
+### Findings
+
+#### [High] F1: Foreign keys not enforced -- `PRAGMA foreign_keys=ON` missing
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/db.py`, line 35-37
+- **Description**: SQLite does not enforce `REFERENCES` (foreign key) clauses by default. The `PRAGMA foreign_keys=ON` must be executed on every new connection for FK constraints to be active. Without this, the `REFERENCES projects(id)` on `tasks.project_id` and `REFERENCES tasks(id)` on `task_assignees.task_id` are purely decorative -- you can insert tasks pointing to non-existent projects and assignees pointing to non-existent tasks.
+- **Impact**: Referential integrity is silently not enforced, leading to orphaned rows and data corruption.
+- **Fix applied**: Added `conn.execute("PRAGMA foreign_keys=ON;")` to `get_connection()` in `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/db.py`, line 38. All 19 tests pass after the fix.
+
+#### [Medium] F2: `schema_version` single-row constraint not added in V1
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/migrations.py`, line 27
+- **Description**: The PR #6 review (Medium finding S1) recommended adding a single-row constraint to `schema_version` as part of the V1 migration. This was not addressed. The table still has no PK or CHECK constraint to prevent multiple rows.
+- **Action**: Should be addressed in a follow-up issue. Adding it retroactively in a later migration (e.g., V2) would require recreating the table since SQLite does not support `ALTER TABLE ADD CONSTRAINT`.
+
+#### [Low] F3: Minor PRD deviation on `events.ts` -- NOT NULL DEFAULT added
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/schema_v1.py`, line 69
+- **Description**: The PRD spec for `events.ts` says `ts TEXT` with no nullability or default constraint. The implementation adds `NOT NULL DEFAULT (datetime('now'))`. This is a sensible enhancement (audit timestamps should always be present), but it is a deviation from the spec.
+- **Action**: None needed. The implementation is better than the spec. Consider updating the PRD to match.
+
+#### [Low] F4: `events.id` uses AUTOINCREMENT, PRD says PK only
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/schema_v1.py`, line 68
+- **Description**: PRD says `id INTEGER PK` for the events table. The implementation uses `INTEGER PRIMARY KEY AUTOINCREMENT`. AUTOINCREMENT prevents rowid reuse after deletion, which is actually preferable for an audit log (guarantees monotonically increasing IDs). This is a minor deviation but a positive one.
+- **Action**: None needed. Consider updating the PRD.
+
+#### [Low] F5: No test for `task_assignees` composite PK enforcement
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/tests/test_schema_v1.py`
+- **Description**: The acceptance criteria mention `task_assignees` table with composite PK, but there is no test verifying that inserting a duplicate `(task_id, assignee_user_id)` pair raises `IntegrityError`. The composite PK is created, but its enforcement is untested.
+- **Action**: Add a test in a follow-up to insert a duplicate pair and assert `IntegrityError`.
+
+#### [Low] F6: No test for foreign key enforcement
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/tests/test_schema_v1.py`
+- **Description**: No test verifies that inserting a task with a non-existent `project_id` raises an error, or that inserting a `task_assignee` with a non-existent `task_id` raises an error. With the FK pragma fix (F1), these would now fail correctly, but there is no test coverage for this behavior.
+- **Action**: Add FK enforcement tests in a follow-up.
+
+#### [Info] F7: Test fixture pattern is well-structured
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/tests/test_schema_v1.py`, lines 11-25
+- The `_load_v1_migration` autouse fixture correctly saves, clears, imports, and restores the migration registry. The `conn` fixture properly creates a temp DB, migrates, yields, and closes. This is clean test isolation.
+
+#### [Info] F8: CHECK constraint tests are thorough
+
+- Tests `test_v1_section_check_constraint` and `test_v1_status_check_constraint` go beyond the required tests to verify that invalid enum values are rejected. Good defensive testing.
+
+#### [Info] F9: 8 tests total for V1 schema, all passing
+
+- `test_v1_tables_exist`, `test_v1_schema_version`, `test_v1_inbox_created`, `test_v1_shared_unique_index_enforced`, `test_v1_private_unique_index_enforced`, `test_v1_section_check_constraint`, `test_v1_status_check_constraint` (7 tests in `test_schema_v1.py`). Plus the rollback test verifies `conn.rollback()` is correctly called after each constraint violation test.
+
+### Code Quality Summary
+
+The implementation is clean, correct, and closely follows the PRD spec:
+
+- All four tables are created with the correct columns, types, and constraints.
+- Partial unique indexes use the correct `WHERE` clause syntax.
+- CHECK constraints enumerate exactly the values specified in the PRD.
+- `INSERT OR IGNORE` for the Inbox seed is idempotent.
+- Parameterized queries are not needed here (all DDL uses string literals with no interpolation).
+- The `@register` decorator integrates seamlessly with the migration framework from Issue #3.
+- Test coverage is good, with 7 tests covering table existence, version, seed data, unique indexes, and CHECK constraints.
+
+**Verdict: APPROVE with one fix applied** -- the `PRAGMA foreign_keys=ON` fix (High, F1) has been applied directly. Medium/Low findings are noted for follow-up.
+
+---
+
+## Security Findings
+
+### [High] S1: Foreign key constraints not enforced (FIXED)
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/db.py`, line 35-37
+- **Description**: Without `PRAGMA foreign_keys=ON`, all `REFERENCES` clauses in the V1 schema are ignored. This means a future command handler could insert tasks referencing non-existent projects or assignees referencing non-existent tasks, leading to data integrity violations that are silent and hard to debug. In a multi-user Slack plugin, this could allow one user's actions to create orphaned records that cause errors for other users.
+- **Severity**: High (data integrity violation in a multi-user context; silent failure mode)
+- **Fix**: Added `conn.execute("PRAGMA foreign_keys=ON;")` to `get_connection()`. All 19 tests pass.
+
+### [Medium] S2: `schema_version` table remains unprotected against multi-row corruption
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/migrations.py`, line 27
+- **Description**: Carried forward from PR #6 review. The `schema_version` table has no constraint preventing insertion of additional rows. If a separate vulnerability allows arbitrary SQL execution, an attacker could manipulate the schema version to skip or re-run migrations.
+- **Severity**: Medium (requires a chained vulnerability to exploit)
+- **Recommendation**: Address in a future migration that recreates the table with a single-row constraint.
+
+### [Info] S3: No SQL injection risk in V1 migration
+
+- All SQL in `schema_v1.py` uses hardcoded string literals. No user input, no string interpolation, no parameterized queries needed. The `INSERT OR IGNORE` for the Inbox seed uses literal values only.
+
+### [Info] S4: No hardcoded secrets or credentials
+
+- No API keys, tokens, or secrets found in `schema_v1.py` or `test_schema_v1.py`.
+
+### [Info] S5: No new dependencies introduced
+
+- The V1 migration uses only Python standard library (`sqlite3`, `logging`). No new entries in `pyproject.toml`.
+
+### [Info] S6: CHECK constraints provide defense-in-depth
+
+- The `section` and `status` CHECK constraints on the `tasks` table prevent invalid enum values at the database level, not just the application level. This is a security-positive pattern that prevents data corruption even if the application layer has a bug.
+
+### Security Summary
+
+One High severity finding (S1: missing `PRAGMA foreign_keys=ON`) was identified and fixed directly in `db.py`. One Medium finding (S2: `schema_version` single-row constraint) is carried forward from the previous review. No Critical findings.
+
+---
+
+## Follow-up Issues (proposed)
+
+1. **Test coverage**: Add tests for `task_assignees` composite PK enforcement (duplicate pair should raise `IntegrityError`).
+2. **Test coverage**: Add tests for foreign key enforcement (task with non-existent `project_id`, assignee with non-existent `task_id` should raise `IntegrityError` now that FK pragma is enabled).
+3. **Schema version constraint**: Address the `schema_version` single-row constraint in a future migration (V2 or later) by recreating the table with `CHECK (id = 1)`.
+4. **PRD sync**: Update PRD section 6.3 to add `NOT NULL DEFAULT (datetime('now'))` to `events.ts` and `AUTOINCREMENT` to `events.id` to match the implementation.
+5. **DB module**: Add a test for `PRAGMA foreign_keys` returning `1` in `test_db.py` to prevent regression.
