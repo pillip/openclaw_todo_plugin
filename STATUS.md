@@ -17,6 +17,7 @@
 | M4 | Project commands (list/set-private/set-shared) | Not started | #13, #14, #15 |
 | M5 | Tests (parser/unit + sqlite E2E) | Not started | #18, #19 |
 | M6 | Packaging / deployment | Not started | #20 |
+| DevOps | GitHub Actions CI | **Done** | #21 |
 
 ## Critical Path
 

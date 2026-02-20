@@ -26,6 +26,8 @@ All notable changes to this project will be documented in this file.
 - `cmd_add.py`: `/todo add` command handler with project resolution, assignee defaults, private-project validation, event logging
 - `add` handler registered in dispatcher (replaces stub)
 - cmd_add tests (10 tests): default Inbox, explicit options, private rejection, assignee defaults, multiple assignees, event logging, edge cases
+- `.github/workflows/ci.yml`: GitHub Actions CI pipeline (push + PR on main, Python 3.11 + uv + pytest)
+- Branch protection: `test` job as required status check on main
 
 ### Fixed
 - Enable `PRAGMA foreign_keys=ON` in `get_connection()` for referential integrity
