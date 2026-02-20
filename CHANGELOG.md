@@ -21,6 +21,9 @@ All notable changes to this project will be documented in this file.
 - `dispatcher.py`: command dispatcher with two-level routing (top-level + project subcommands), handler registry, DB init
 - Plugin `handle_message` delegates to dispatcher instead of placeholder response
 - Dispatcher tests (20 tests): command routing, project sub-routing, unknown commands, parse errors, DB init
+- `cmd_add.py`: `/todo add` command handler with project resolution, assignee defaults, private-project validation, event logging
+- `add` handler registered in dispatcher (replaces stub)
+- cmd_add tests (10 tests): default Inbox, explicit options, private rejection, assignee defaults, multiple assignees, event logging, edge cases
 
 ### Fixed
 - Enable `PRAGMA foreign_keys=ON` in `get_connection()` for referential integrity
