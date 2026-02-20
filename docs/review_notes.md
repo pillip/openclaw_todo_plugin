@@ -1027,6 +1027,130 @@ No Critical, High, or Medium severity security findings. All SQL parameterized. 
 
 ---
 
+# PR #18 Review Notes -- Issue #6: /todo add command
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-02-20
+> Branch: `feature/006-cmd-add`
+
+---
+
+## Code Review
+
+### Acceptance Criteria Checklist
+
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| Task inserted with correct project_id, section, due, status='open', created_by | PASS | `test_add_default_inbox` and `test_add_with_project_section_due` verify all fields in DB |
+| Assignees default to sender when no mentions | PASS | `test_add_assignee_defaults_to_sender` verifies `task_assignees` row matches sender |
+| Multiple mentions create multiple task_assignee rows | PASS | `test_add_multiple_assignees` verifies two rows inserted and present in response |
+| Private project + non-owner assignee returns warning and does NOT insert | PASS | `test_add_private_rejects_other_assignee` verifies warning message and zero task rows |
+| Non-existent project: `Inbox` auto-created; others return error | PASS | `test_add_default_inbox` uses seeded Inbox; `test_add_nonexistent_project_returns_error` verifies error |
+| Response format: `Added #<id> (<project>/<section>) due:<due\|-> assignees:<mentions> -- <title>` | PASS | All happy-path tests assert on this format |
+| Event row written to `events` table | PASS | `test_event_logged` verifies actor, action, task_id, and JSON payload fields |
+
+### Required Tests
+
+| Test | Status |
+|------|--------|
+| `test_add_default_inbox` | PASS |
+| `test_add_with_project_section_due` | PASS |
+| `test_add_private_rejects_other_assignee` | PASS |
+| `test_add_assignee_defaults_to_sender` | PASS |
+| `test_add_multiple_assignees` | PASS |
+
+All 5 required tests present and passing. 5 additional tests (`test_add_private_allows_owner_assignee`, `test_event_logged`, `test_add_empty_title_returns_error`, `test_add_nonexistent_project_returns_error`, `test_add_due_clear_sentinel_stored_as_null`). 10 tests total.
+
+### Findings
+
+#### [Info] F1: No explicit transaction wrapping for multi-statement write
+
+- **File**: `src/openclaw_todo/cmd_add.py`, lines 52-80
+- **Description**: The handler performs three sequential writes (task INSERT, assignee INSERTs, event INSERT) followed by a single `conn.commit()` at line 80. If any write after the task INSERT raises (e.g., duplicate assignee PK violation), partial writes remain uncommitted. SQLite's implicit rollback-on-close in the dispatcher's `finally` block protects data integrity.
+- **Action**: Consider wrapping in `with conn:` (context manager) for explicit transaction semantics in a future refactor. No functional bug today.
+
+#### [Info] F2: Missing `sender_id` key would raise unhandled KeyError
+
+- **File**: `src/openclaw_todo/cmd_add.py`, line 22
+- **Description**: `context["sender_id"]` raises `KeyError` if the key is absent. The dispatcher contract requires `sender_id` in context, so this is defensive-coding territory.
+- **Action**: Acceptable. Could be improved with `.get()` + early return, but low priority given the documented contract.
+
+#### [Info] F3: Test gap -- non-owner sender adding to another user's private project
+
+- **File**: `tests/test_cmd_add.py`
+- **Description**: No test covers the case where sender U2 tries to add a task to a private project owned by U1. The `resolve_project()` function would return `ProjectNotFoundError` (it only matches private projects of the sender), which is correct behavior. However, there is no explicit test verifying this path through `add_handler`.
+- **Action**: Follow-up item. Add a test for "non-owner sender cannot resolve another user's private project."
+
+#### [Info] F4: Title length is unbounded
+
+- **File**: `src/openclaw_todo/cmd_add.py`, line 23
+- **Description**: No max-length check on `title`. Slack messages cap at ~4000 chars, providing natural limits. The DB column is `TEXT NOT NULL` with no length constraint.
+- **Action**: Consider adding a max-length check if the handler is exposed outside Slack.
+
+#### [Info] F5: Dispatcher test correctly updated
+
+- **File**: `tests/test_dispatcher.py`, lines 34-51
+- **Description**: The parametrized stub test removed `"add"` from the stub-check list and added a dedicated `test_add_routes_to_handler` test that asserts `"Added #"` in the result. This correctly reflects that `add` is no longer a stub.
+
+### Code Quality Summary
+
+The implementation is clean, minimal, and correct:
+
+- Uses `resolve_project()` for project resolution following PRD Option A (private-first).
+- Private assignee validation correctly rejects non-owner assignees with a descriptive warning.
+- All SQL uses parameterized queries (`?` placeholders).
+- Event payload is well-structured JSON with title, project, section, due, and assignees.
+- Response format matches the PRD/UX spec exactly.
+- 10 tests with thorough assertions on both the response string and DB state.
+- No unnecessary complexity or over-engineering.
+
+**Verdict: APPROVE** -- no blocking issues. No fixes required.
+
+---
+
+## Security Findings
+
+### [Info] S1: SQL injection -- No risk
+
+- **File**: `src/openclaw_todo/cmd_add.py`, lines 52-78
+- **Description**: All three SQL statements (task INSERT, assignee INSERT, event INSERT) use `?` parameter placeholders. No string interpolation or f-strings in SQL. Title, project_id, section, due, sender_id, and assignee values are all passed as parameters.
+- **Severity**: Info (no risk found)
+
+### [Info] S2: Authorization model is sound
+
+- **File**: `src/openclaw_todo/cmd_add.py`, lines 41-49
+- **Description**: Private project constraint correctly checks that all assignees match the project owner. The `resolve_project()` function provides implicit access control by only resolving the sender's own private projects (scoped by `owner_user_id = sender_id` in the SQL query). A non-owner sender cannot resolve another user's private project by name. The explicit assignee check in `cmd_add.py` is an additional layer for when the owner assigns tasks to others within their private project.
+- **Severity**: Info (no bypass possible)
+
+### [Info] S3: No hardcoded secrets or credentials
+
+- No API keys, tokens, or secrets found in any changed files.
+
+### [Info] S4: No new dependencies introduced
+
+- `cmd_add.py` uses only standard library (`json`, `logging`, `sqlite3`) plus internal modules (`parser`, `project_resolver`). No new entries in `pyproject.toml`.
+
+### [Info] S5: Input validation adequate
+
+- Empty title returns error (line 25-26).
+- Non-existent project returns error via `ProjectNotFoundError` (lines 30-33).
+- Section validation handled by parser upstream (`VALID_SECTIONS` check).
+- Due date validation handled by parser upstream (`_normalise_due`).
+- Mention format constrained by parser regex (`<@U[A-Z0-9]+>`).
+
+### Security Summary
+
+No Critical, High, Medium, or Low severity findings. The implementation has a minimal attack surface -- three parameterized INSERT statements, project resolution with sender-scoped authorization, and input validation at both the parser and handler layers. The code is secure for the current Slack DM context.
+
+---
+
+## Follow-up Items
+
+1. **Test coverage**: Add a test for non-owner sender attempting to add a task to another user's private project (should get `ProjectNotFoundError` via resolver).
+2. **Transaction explicitness**: Consider wrapping the three DB writes in `with conn:` for explicit transaction semantics.
+3. **Title length**: Consider adding a max-length validation (e.g., 500 chars) as defense-in-depth.
+4. **Permissions module**: Consider extracting the inline private-assignee validation to use the shared `validate_private_assignees()` function from Issue #17.
+
 ## Review Pass 2
 
 > Reviewer: Claude Opus 4.6 (automated review)
