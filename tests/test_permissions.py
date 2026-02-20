@@ -73,6 +73,12 @@ class TestCanWriteTask:
         tid = _create_task(conn, pid, "task1", "U_CREATOR")
         assert can_write_task(conn, tid, "U_CREATOR") is True
 
+    def test_shared_creator_and_assignee_can_write(self, conn):
+        pid = _create_project(conn, "TeamProject2", "shared")
+        tid = _create_task(conn, pid, "task1", "U_BOTH")
+        _assign(conn, tid, "U_BOTH")
+        assert can_write_task(conn, tid, "U_BOTH") is True
+
     def test_shared_unrelated_rejected(self, conn):
         pid = _create_project(conn, "TeamProject", "shared")
         tid = _create_task(conn, pid, "task1", "U_CREATOR")
