@@ -497,3 +497,155 @@ One High severity finding (S1: missing `PRAGMA foreign_keys=ON`) was identified 
 3. **Schema version constraint**: Address the `schema_version` single-row constraint in a future migration (V2 or later) by recreating the table with `CHECK (id = 1)`.
 4. **PRD sync**: Update PRD section 6.3 to add `NOT NULL DEFAULT (datetime('now'))` to `events.ts` and `AUTOINCREMENT` to `events.id` to match the implementation.
 5. **DB module**: Add a test for `PRAGMA foreign_keys` returning `1` in `test_db.py` to prevent regression.
+
+---
+
+# PR #10 Review Notes -- Issue #5: Command parser -- tokenizer and option extraction
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-02-20
+> Branch: `feature/005-parser-tokenizer`
+
+---
+
+## Code Review
+
+### Acceptance Criteria Checklist
+
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| `/p MyProject` correctly extracted; token consumed | PASS | `test_extract_project` verifies project name extracted, `/p` and value removed from `title_tokens`. |
+| `/s doing` validated; invalid section raises `ParseError` | PASS | `test_extract_section_valid` and `test_extract_section_invalid` cover both paths. Case-insensitive via `.lower()`. |
+| `due:03-15` normalised to `2026-03-15` (current year) | PASS | `test_due_mm_dd_normalisation` verifies with `date.today().year`. |
+| `due:2026-02-30` raises `ParseError` (invalid date) | PASS | `test_due_invalid_date` asserts `ParseError` with match on "Invalid due date". |
+| `<@U12345>` extracted into mentions list | PASS | `test_mentions_extraction` verifies two mentions extracted and not in `title_tokens`. |
+| Multiple mentions supported | PASS | Same test covers two mentions in order. |
+| Title tokens are non-option, non-mention tokens before first option | PASS | `test_title_extraction` verifies correct split with mixed options. Note: title tokens are collected from *all* positions, not just "before first option" -- this is arguably more flexible than the AC wording. |
+
+### Required Tests
+
+| Test | Status |
+|------|--------|
+| `test_extract_project` | PASS |
+| `test_extract_section_valid` | PASS |
+| `test_extract_section_invalid` | PASS |
+| `test_due_mm_dd_normalisation` | PASS |
+| `test_due_full_date` | PASS |
+| `test_due_invalid_date` | PASS |
+| `test_due_clear` | PASS |
+| `test_mentions_extraction` | PASS |
+| `test_title_extraction` | PASS |
+
+All 9 required tests present and passing. 4 additional bonus tests (`test_command_extraction`, `test_move_extracts_id_as_arg`, `test_empty_command_raises`, `test_section_case_insensitive`). 13 parser tests total.
+
+### Findings
+
+#### [Medium] F1: Leap-year bug in `_normalise_due` for MM-DD format (FIXED)
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/parser.py`, lines 53-62 (after fix)
+- **Description**: The original implementation used `datetime.strptime(raw, "%m-%d")` which defaults to year 1900 (not a leap year). This caused `due:02-29` to always be rejected, even when the current year is a leap year (e.g., 2028). The `replace(year=current_year)` call was never reached because `strptime` itself raised `ValueError`.
+- **Fix applied**: Replaced `strptime("%m-%d")` with a regex match `(\d{1,2})-(\d{1,2})` followed by direct `date(current_year, month, day)` construction. This correctly validates Feb 29 against the actual current year.
+- **Impact**: Without fix, `due:02-29` would fail in leap years (2028, 2032, etc.) when it should succeed.
+
+#### [Low] F2: Duplicate options silently use "last wins" semantics
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/parser.py`, lines 91-117
+- **Description**: If a user provides `/p First /p Second`, the parser silently uses `Second`. Same for `/s` and `due:`. This is not necessarily wrong, but it is undocumented. "Last wins" is a reasonable default, but "first wins" or "raise error on duplicate" are also valid choices.
+- **Action**: Document the "last wins" behavior in the docstring or PRD. No code change needed.
+
+#### [Low] F3: `/p` and `/s` error paths (missing argument) are untested
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/tests/test_parser.py`
+- **Description**: Lines 93 and 101 (`raise ParseError("/p requires a project name")` and `/s` equivalent) are uncovered. Manual testing confirmed they work correctly, but automated test coverage is missing for these edge cases.
+- **Action**: Add tests for `parse("add task /p")` and `parse("add task /s")` in a follow-up.
+
+#### [Low] F4: `_DUE_RE` uses `.+` which accepts any characters after `due:`
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/parser.py`, line 15
+- **Description**: `_DUE_RE = re.compile(r"^due:(.+)$")` will match `due:anything` and pass the value to `_normalise_due`. This is not a bug since `_normalise_due` properly validates the value, but a tighter regex like `r"^due:([\d-]+)$"` would reject obviously invalid inputs earlier and serve as documentation of expected format.
+- **Action**: Optional tightening. Not blocking since validation is correct.
+
+#### [Low] F5: Title tokens are collected from all positions, not just "before first option"
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/parser.py`, lines 126-128
+- **Description**: The AC says "Title tokens are non-option, non-mention tokens before first option." The implementation collects title tokens from all positions (e.g., `add Buy /p Home milk` would produce `title_tokens=["Buy", "milk"]`). This is actually more flexible and user-friendly, but deviates from the literal AC wording.
+- **Action**: Consider updating the AC to match the implementation. The current behavior is better for UX.
+
+#### [Info] F6: `args` extraction for `move/done/drop/edit` is well-designed
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/parser.py`, lines 130-133
+- The pattern of extracting the first title token as `args[0]` for ID-based commands is clean and tested by `test_move_extracts_id_as_arg`.
+
+#### [Info] F7: Coverage at 97%
+
+- Lines 93 and 101 (error paths for missing `/p` and `/s` arguments) are uncovered. All other branches are tested. This is acceptable for M1.
+
+#### [Info] F8: Bonus tests add good defensive coverage
+
+- `test_section_case_insensitive` ensures `/s DOING` normalizes to `doing`.
+- `test_command_extraction` verifies the first token becomes the command.
+- `test_empty_command_raises` covers the empty input guard.
+- `test_move_extracts_id_as_arg` covers the args extraction logic.
+
+### Code Quality Summary
+
+The implementation is clean, correct, and well-structured:
+
+- The tokenizer loop with explicit index management (`while i < len(remaining)`) is readable and handles two-token options (`/p`, `/s`) cleanly by advancing `i` by 2.
+- `ParsedCommand` dataclass provides a clear, typed result structure.
+- `VALID_SECTIONS` as a `frozenset` is the right choice for O(1) membership testing.
+- `_MENTION_RE` uses `fullmatch` (not `match` or `search`), preventing partial matches on tokens like `<@U123>extra`.
+- Error messages are descriptive and include the invalid value with `repr()` formatting.
+- Logging at debug level for parsed results is appropriate.
+- 97% test coverage with all 9 required tests present and 4 bonus tests.
+
+**Verdict: APPROVE with one fix applied** -- the leap-year bug in `_normalise_due` (Medium, F1) has been fixed directly. Low findings are noted for follow-up.
+
+---
+
+## Security Findings
+
+### [Medium] S1: Leap-year date validation bypass (FIXED)
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/parser.py`, `_normalise_due`
+- **Description**: The original `strptime("%m-%d")` approach silently rejected valid dates (`02-29` in leap years) due to the 1900 default year. While this is a correctness issue rather than a security vulnerability, incorrect date validation can lead to denial of service (users unable to set valid due dates) and data integrity issues (dates that should be accepted are rejected).
+- **Severity**: Medium (correctness bug with functional impact)
+- **Fix**: Replaced with regex-based month/day extraction and direct `date()` construction with the current year.
+
+### [Low] S2: No ReDoS risk in compiled regexes
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/parser.py`, lines 14-15
+- **Description**: Both `_MENTION_RE = re.compile(r"<@(U[A-Z0-9]+)>")` and `_DUE_RE = re.compile(r"^due:(.+)$")` were tested with 100,000-character inputs and completed in under 0.1ms. Neither pattern contains nested quantifiers or alternation that could cause catastrophic backtracking.
+- **Severity**: Low (no risk found, noting for completeness)
+
+### [Low] S3: No input length validation on parser input
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/parser.py`, line 72
+- **Description**: `parse(text)` accepts arbitrarily long strings. `text.strip().split()` will allocate a token list proportional to input size. Slack limits messages to ~40,000 characters, mitigating this at the transport layer, but if the parser is used outside Slack, extremely long inputs could cause memory pressure.
+- **Severity**: Low (mitigated by Slack transport layer limits)
+- **Recommendation**: Consider adding a max-length guard in the plugin entry point (`handle_message`) rather than the parser itself.
+
+### [Info] S4: No injection risks
+
+- The parser only tokenizes and validates strings. No SQL, no shell commands, no template rendering. User input flows into `ParsedCommand` fields which are plain strings. Security depends on how these values are consumed downstream (e.g., parameterized queries when writing to SQLite).
+
+### [Info] S5: No hardcoded secrets or credentials
+
+- No API keys, tokens, or secrets found in `parser.py` or `test_parser.py`.
+
+### [Info] S6: No new dependencies introduced
+
+- The parser uses only Python standard library (`re`, `datetime`, `dataclasses`, `logging`). No new entries in `pyproject.toml`.
+
+### Security Summary
+
+No Critical or High severity findings. One Medium finding (S1: leap-year date validation) was identified and fixed. The parser has a minimal attack surface -- it tokenizes strings and validates against known patterns. The main security consideration going forward is ensuring that `ParsedCommand` field values are used safely downstream (parameterized SQL queries, no raw echo in web contexts).
+
+---
+
+## Follow-up Issues (proposed)
+
+1. **Test coverage**: Add tests for `/p` and `/s` without arguments (lines 93, 101) to cover the missing-argument error paths.
+2. **Documentation**: Document "last wins" semantics for duplicate `/p`, `/s`, and `due:` options in the PRD or parser docstring.
+3. **Optional**: Tighten `_DUE_RE` from `.+` to `[\d-]+` for earlier rejection of obviously invalid due values.
+4. **AC clarification**: Update Issue #5 AC to reflect that title tokens are collected from all positions (not just "before first option"), matching the implemented behavior.

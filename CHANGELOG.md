@@ -14,8 +14,12 @@ All notable changes to this project will be documented in this file.
 - Shared `Inbox` project auto-seeded
 - V1 schema tests (7 tests): tables, indexes, CHECK constraints, Inbox
 
+- `parser.py`: command tokenizer with `/p`, `/s`, `due:`, `<@U...>` extraction and `ParsedCommand` dataclass
+- Parser tests (13 tests): project, section, due normalisation, mentions, title extraction
+
 ### Fixed
 - Enable `PRAGMA foreign_keys=ON` in `get_connection()` for referential integrity
+- Leap-year `due:02-29` parsing in MM-DD format (strptime year-1900 bug)
 
 ## [0.1.0] - 2026-02-20
 
