@@ -11,7 +11,7 @@
 | Milestone | Description | Status | Issues |
 |-----------|-------------|--------|--------|
 | M0 | Plugin skeleton + `/todo` command registration | **Done** | #1 |
-| M1 | DB init + migrations + schema_version | In progress (#2 done) | #2, #3, #4 |
+| M1 | DB init + migrations + schema_version | In progress (#2, #3 done) | #2, #3, #4 |
 | M2 | Parser (Slack mention, /p, /s, due correction) | Not started | #5 |
 | M3 | Commands (add/list/board/move/done/drop/edit) | Not started | #6–#12, #16, #17 |
 | M4 | Project commands (list/set-private/set-shared) | Not started | #13, #14, #15 |
@@ -27,9 +27,9 @@
 
 ## Next Issues to Work On
 
-1. **#3** — Schema migration framework (M1)
+1. **#4** — V1 schema migration (M1)
 2. **#5** — Command parser / tokenizer (M2, parallelizable)
-3. **#4** — V1 schema migration (M1)
+3. **#7** — Project resolver helper (M3)
 
 ## Risks
 

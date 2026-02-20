@@ -7,6 +7,8 @@ All notable changes to this project will be documented in this file.
 ### Added
 - `db.py`: `get_connection(db_path)` helper with recursive directory creation, WAL mode, busy_timeout=3000
 - DB connection tests (4 tests)
+- `migrations.py`: sequential schema migration framework with `@register`, `migrate()`, `get_version()`
+- Migration tests (4 tests): fresh DB, sequential apply, idempotent rerun, rollback on failure
 
 ## [0.1.0] - 2026-02-20
 
