@@ -1,0 +1,25 @@
+[project]
+name = "openclaw-todo-plugin"
+version = "0.1.0"
+description = "OpenClaw TODO plugin for Slack — team/personal task management via DM"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/openclaw_todo"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
