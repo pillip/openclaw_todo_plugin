@@ -18,6 +18,9 @@ All notable changes to this project will be documented in this file.
 - Parser tests (13 tests): project, section, due normalisation, mentions, title extraction
 - `project_resolver.py`: project name resolution with private-first (PRD 3.2 Option A), Inbox auto-create
 - Project resolver tests (6 tests): private priority, shared fallback, Inbox auto-create, unknown error
+- `dispatcher.py`: command dispatcher with two-level routing (top-level + project subcommands), handler registry, DB init
+- Plugin `handle_message` delegates to dispatcher instead of placeholder response
+- Dispatcher tests (20 tests): command routing, project sub-routing, unknown commands, parse errors, DB init
 
 ### Fixed
 - Enable `PRAGMA foreign_keys=ON` in `get_connection()` for referential integrity
