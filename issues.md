@@ -11,12 +11,12 @@
 |-------------|----------------------------------------|
 | Track       | Backend                                |
 | Milestone   | M0                                     |
-| Status      | TODO                                   |
+| Status      | done                                   |
 | Priority    | P0                                     |
 | Estimate    | 1d                                     |
 | Branch      | `feature/001-plugin-skeleton`          |
 | GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/1 |
-| PR          | --                                     |
+| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/2 |
 
 **Description**
 Create the Python project scaffold: `pyproject.toml` (uv), `src/openclaw_todo/` package layout, and the plugin entry-point that the OpenClaw gateway will load. The plugin must expose a callable that receives raw Slack DM text and a sender context dict.

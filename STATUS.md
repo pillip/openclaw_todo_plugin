@@ -10,7 +10,7 @@
 
 | Milestone | Description | Status | Issues |
 |-----------|-------------|--------|--------|
-| M0 | Plugin skeleton + `/todo` command registration | Not started | #1 |
+| M0 | Plugin skeleton + `/todo` command registration | **Done** | #1 |
 | M1 | DB init + migrations + schema_version | Not started | #2, #3, #4 |
 | M2 | Parser (Slack mention, /p, /s, due correction) | Not started | #5 |
 | M3 | Commands (add/list/board/move/done/drop/edit) | Not started | #6–#12, #16, #17 |
@@ -27,9 +27,9 @@
 
 ## Next Issues to Work On
 
-1. **#1** — Plugin skeleton and project scaffold (M0)
-2. **#2** — DB connection manager with WAL + busy_timeout (M1)
-3. **#5** — Command parser / tokenizer (M2, parallelizable)
+1. **#2** — DB connection manager with WAL + busy_timeout (M1)
+2. **#5** — Command parser / tokenizer (M2, parallelizable)
+3. **#3** — Schema migration framework (M1)
 
 ## Risks
 
