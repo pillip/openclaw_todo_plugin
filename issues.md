@@ -87,12 +87,12 @@ Revert module; no schema changes yet.
 |-------------|----------------------------------------|
 | Track       | Backend / Data                         |
 | Milestone   | M1                                     |
-| Status      | doing                                  |
+| Status      | done                                   |
 | Priority    | P0                                     |
 | Estimate    | 1d                                     |
 | Branch      | `feature/003-schema-migration`         |
 | GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/5 |
-| PR          | --                                     |
+| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/6 |
 
 **Description**
 Implement a simple sequential migration runner. On startup, read `schema_version` (create if missing), compare to available migrations list, and apply outstanding migrations in order inside a transaction.
