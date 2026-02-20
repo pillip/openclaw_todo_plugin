@@ -21,6 +21,8 @@ All notable changes to this project will be documented in this file.
 - `dispatcher.py`: command dispatcher with two-level routing (top-level + project subcommands), handler registry, DB init
 - Plugin `handle_message` delegates to dispatcher instead of placeholder response
 - Dispatcher tests (20 tests): command routing, project sub-routing, unknown commands, parse errors, DB init
+- `permissions.py`: `can_write_task()` (private: owner only, shared: assignee/creator) and `validate_private_assignees()` helpers
+- Permission tests (11 tests): private/shared write checks, creator+assignee overlap, private assignee validation
 - `cmd_add.py`: `/todo add` command handler with project resolution, assignee defaults, private-project validation, event logging
 - `add` handler registered in dispatcher (replaces stub)
 - cmd_add tests (10 tests): default Inbox, explicit options, private rejection, assignee defaults, multiple assignees, event logging, edge cases
