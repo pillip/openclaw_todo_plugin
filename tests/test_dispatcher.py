@@ -45,7 +45,7 @@ class TestRoutesKnownCommands:
 
         result = dispatch(text, {"sender_id": "U1"}, db_path=db_path)
         # Stub handlers return "not yet implemented"
-        assert "not yet implemented" in result.lower() or isinstance(result, str)
+        assert "not yet implemented" in result.lower()
 
     def test_registered_handler_called(self, db_path):
         """A registered handler is called instead of the stub."""
