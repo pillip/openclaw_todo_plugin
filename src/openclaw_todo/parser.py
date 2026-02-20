@@ -43,15 +43,23 @@ def _normalise_due(raw: str) -> str:
     if raw == DUE_CLEAR:
         return DUE_CLEAR
 
-    # Try full date first
-    for fmt in ("%Y-%m-%d", "%m-%d"):
+    # Try full date first (YYYY-MM-DD)
+    try:
+        parsed = datetime.strptime(raw, "%Y-%m-%d").date()
+        return parsed.isoformat()
+    except ValueError:
+        pass
+
+    # Try MM-DD / M-D -- parse month and day as integers and construct with
+    # the current year directly. Using strptime("%m-%d") would fail for Feb 29
+    # because its default year (1900) is not a leap year.
+    match = re.fullmatch(r"(\d{1,2})-(\d{1,2})", raw)
+    if match:
         try:
-            parsed = datetime.strptime(raw, fmt).date()
-            if fmt == "%m-%d":
-                parsed = parsed.replace(year=date.today().year)
+            parsed = date(date.today().year, int(match.group(1)), int(match.group(2)))
             return parsed.isoformat()
         except ValueError:
-            continue
+            pass
 
     raise ParseError(f"Invalid due date: {raw!r}")
 
