@@ -649,3 +649,144 @@ No Critical or High severity findings. One Medium finding (S1: leap-year date va
 2. **Documentation**: Document "last wins" semantics for duplicate `/p`, `/s`, and `due:` options in the PRD or parser docstring.
 3. **Optional**: Tighten `_DUE_RE` from `.+` to `[\d-]+` for earlier rejection of obviously invalid due values.
 4. **AC clarification**: Update Issue #5 AC to reflect that title tokens are collected from all positions (not just "before first option"), matching the implemented behavior.
+
+---
+
+# PR #12 Review Notes -- Issue #7: Project resolver helper
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-02-20
+> Branch: `feature/007-project-resolver`
+
+---
+
+## Code Review
+
+### Acceptance Criteria Checklist
+
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| Private project of sender matched first | PASS | Query on line 38-42 filters by `visibility = 'private' AND owner_user_id = ?`. Test `test_private_takes_priority` verifies. |
+| Falls back to shared if no private match | PASS | Second query on line 52-56 filters by `visibility = 'shared'`. Test `test_falls_back_to_shared` verifies. |
+| Returns error when neither exists (except Inbox auto-created) | PASS | `ProjectNotFoundError` raised on line 84. Inbox auto-created on lines 66-81. Tests `test_unknown_project_error` and `test_inbox_auto_created` verify. |
+| Returns project row with id, name, visibility, owner_user_id | PASS | `Project` dataclass on lines 17-23 with all four fields. All tests assert on these fields. |
+
+### Required Tests
+
+| Test | Status |
+|------|--------|
+| `test_private_takes_priority` | PASS -- creates both shared and private "Work", verifies private is returned for owner U1 |
+| `test_falls_back_to_shared` | PASS -- creates shared "Team" only, verifies shared returned for U1 |
+| `test_inbox_auto_created` | PASS -- deletes seeded Inbox, verifies auto-creation as shared with null owner |
+| `test_unknown_project_error` | PASS -- verifies `ProjectNotFoundError` raised with descriptive message |
+
+All 4 required tests present and passing. 2 additional bonus tests (`test_inbox_already_exists`, `test_private_different_owner_not_matched`). 6 tests total.
+
+### Findings
+
+#### [Low] F1: Project name matching is case-sensitive
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-007-project-resolver/src/openclaw_todo/project_resolver.py`, lines 39-42
+- **Description**: The SQL queries use `WHERE name = ?` which is case-sensitive in SQLite by default (for ASCII). If a user types `/p work` but the project is named `Work`, it will not match. The PRD does not specify case-sensitivity behavior, so this is not a bug per se, but it could cause user confusion.
+- **Action**: Document the case-sensitive behavior. Consider adding `COLLATE NOCASE` in a future iteration if case-insensitive matching is desired.
+
+#### [Low] F2: Repeated `Project(id=row[0], ...)` construction pattern
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-007-project-resolver/src/openclaw_todo/project_resolver.py`, lines 44, 58, 76
+- **Description**: The same `Project(id=row[0], name=row[1], visibility=row[2], owner_user_id=row[3])` pattern appears three times. This could be extracted to a helper (e.g., `Project._from_row(row)` classmethod or a module-level `_row_to_project` function) to reduce duplication and ensure consistency if columns change.
+- **Action**: Optional refactor. Not blocking for M1.
+
+#### [Low] F3: `conn.commit()` called inside resolver for Inbox auto-creation
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-007-project-resolver/src/openclaw_todo/project_resolver.py`, line 71
+- **Description**: The resolver calls `conn.commit()` directly after the `INSERT OR IGNORE` for Inbox auto-creation. This commits any pending transaction state on the connection, which could be surprising if the caller has uncommitted changes. In the current codebase this is not an issue (resolver is called early in command handling), but it couples the resolver to transaction management.
+- **Action**: Consider whether the caller should be responsible for committing. For M1 this is acceptable since the auto-creation is a one-time idempotent operation.
+
+#### [Low] F4: No test for Inbox auto-creation when a private Inbox exists
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-007-project-resolver/tests/test_project_resolver.py`
+- **Description**: If a user has a private project named "Inbox", `resolve_project(conn, "Inbox", user_id)` will return the private project (step 1 matches). The auto-creation path (step 3) is only reached if neither private nor shared "Inbox" exists. This behavior is correct per the resolution order, but there is no test covering the scenario where a user has a private "Inbox" and the shared "Inbox" also exists -- the test should verify that the private one is returned.
+- **Action**: Add a test for this edge case in a follow-up.
+
+#### [Info] F5: `INSERT OR IGNORE` is the correct pattern for Inbox auto-creation
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-007-project-resolver/src/openclaw_todo/project_resolver.py`, lines 67-70
+- `INSERT OR IGNORE` handles the race condition where two concurrent requests try to auto-create Inbox simultaneously. The `ux_projects_shared_name` unique index on `(name) WHERE visibility = 'shared'` ensures only one shared Inbox can exist. The subsequent `SELECT` on lines 72-75 guarantees we return the correct row regardless of whether this request or another one performed the insert. This is well-designed.
+
+#### [Info] F6: Bonus tests add good defensive coverage
+
+- `test_inbox_already_exists` verifies that the seeded Inbox (from V1 migration) resolves without triggering auto-creation.
+- `test_private_different_owner_not_matched` verifies that a private project owned by U2 is not visible to U1, correctly raising `ProjectNotFoundError`.
+
+#### [Info] F7: Coverage at 100%
+
+- All 31 statements in `project_resolver.py` are covered by the 6 tests. No untested branches.
+
+#### [Info] F8: Test fixture pattern is consistent with prior PRs
+
+- The `_load_v1` autouse fixture and `conn` fixture follow the same save-clear-restore pattern established in prior PRs. Good consistency.
+
+### Code Quality Summary
+
+The implementation is clean, correct, and follows the PRD resolution order exactly:
+
+- Three-step resolution (private -> shared -> Inbox auto-create) with clear fallthrough logic.
+- All SQL queries use parameterized placeholders (`?`), preventing SQL injection.
+- `Project` dataclass provides a typed result with the four required fields.
+- `ProjectNotFoundError` is a well-named custom exception with descriptive message.
+- Logging at debug level for each resolution path aids troubleshooting.
+- `INSERT OR IGNORE` handles concurrent Inbox auto-creation safely.
+- 100% test coverage with all 4 required tests and 2 valuable bonus tests.
+- The code is 85 lines total -- minimal and readable.
+
+**Verdict: APPROVE** -- no Critical or High findings. All Low findings are noted for follow-up.
+
+---
+
+## Security Findings
+
+### [Low] S1: No SQL injection risk -- parameterized queries used throughout
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-007-project-resolver/src/openclaw_todo/project_resolver.py`, lines 38-42, 52-56
+- **Description**: All SQL queries use `?` parameter placeholders for user-supplied values (`name` and `sender_id`). The Inbox auto-creation on lines 67-75 uses hardcoded string literals only. No string interpolation or f-strings are used in any SQL statement.
+- **Severity**: Low (no risk found, noting for completeness)
+
+### [Low] S2: `name` parameter is not length-validated
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-007-project-resolver/src/openclaw_todo/project_resolver.py`, line 27
+- **Description**: `resolve_project(conn, name, sender_id)` accepts arbitrarily long `name` strings. While SQLite handles this safely (TEXT has no inherent length limit), an extremely long name would result in unnecessary query execution against the database. The parser upstream (Issue #5) extracts project names from `/p <name>` tokens, and Slack limits message length to ~40,000 characters, providing transport-layer mitigation.
+- **Severity**: Low (mitigated by upstream constraints)
+- **Recommendation**: Consider adding a max-length check for project names in the parser or a future validation layer.
+
+### [Low] S3: Inbox auto-creation commits transaction implicitly
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-007-project-resolver/src/openclaw_todo/project_resolver.py`, line 71
+- **Description**: `conn.commit()` inside the resolver commits all pending changes on the connection, not just the Inbox insert. If a future caller has uncommitted writes before calling `resolve_project`, those writes would be committed as a side effect. This is not exploitable but could lead to partial commits in error scenarios.
+- **Severity**: Low (no current exploit path; architectural concern)
+- **Recommendation**: Consider using a savepoint pattern (`SAVEPOINT` / `RELEASE`) for the Inbox auto-creation to isolate its transaction from any outer transaction.
+
+### [Info] S4: No hardcoded secrets or credentials
+
+- No API keys, tokens, or secrets found in `project_resolver.py` or `test_project_resolver.py`.
+
+### [Info] S5: No new dependencies introduced
+
+- The module uses only Python standard library (`sqlite3`, `dataclasses`, `logging`). No new entries in `pyproject.toml`.
+
+### [Info] S6: Authorization model is correctly scoped
+
+- The `sender_id` parameter is used correctly in the private-project query to scope visibility. User U1 cannot resolve another user's private projects. Test `test_private_different_owner_not_matched` explicitly verifies this isolation. The shared-project query correctly omits owner filtering, as shared projects are visible to all users.
+
+### Security Summary
+
+No Critical, High, or Medium severity findings. The implementation has a minimal attack surface -- three read queries and one idempotent insert, all using parameterized queries. The authorization model (private scoped to sender, shared visible to all) is correctly implemented and tested. Three Low findings are noted for awareness but require no immediate action.
+
+---
+
+## Follow-up Issues (proposed)
+
+1. **Refactor**: Extract `Project(id=row[0], ...)` into a `_row_to_project(row)` helper or `Project.from_row(row)` classmethod to reduce the triple duplication.
+2. **Test coverage**: Add a test for the edge case where a user has a private "Inbox" project and the shared "Inbox" also exists, verifying the private one is returned.
+3. **Transaction safety**: Consider using `SAVEPOINT` / `RELEASE` for Inbox auto-creation instead of bare `conn.commit()` to avoid committing unrelated pending changes.
+4. **Case sensitivity**: Document that project name matching is case-sensitive. Consider `COLLATE NOCASE` if case-insensitive matching is desired in a future iteration.
+5. **Input validation**: Add a max-length check for project names in the parser or validation layer to prevent unnecessarily large queries.
