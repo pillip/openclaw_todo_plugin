@@ -13,6 +13,8 @@ from openclaw_todo.parser import ParsedCommand, ParseError, parse
 
 import openclaw_todo.schema_v1 as _schema_v1  # noqa: F401 — registers migrations
 
+from openclaw_todo.cmd_add import add_handler as _add_handler  # noqa: E402
+
 # Type alias for command handler functions.
 HandlerFn = Callable[[ParsedCommand, sqlite3.Connection, dict], str]
 
@@ -50,8 +52,9 @@ def _stub_handler(command: str, parsed: ParsedCommand, conn: sqlite3.Connection,
 
 
 # Handler registry: command name -> callable(parsed, conn, context) -> str
-# Stubs will be replaced as handlers are implemented in later issues.
-_handlers: dict[str, HandlerFn] = {}
+_handlers: dict[str, HandlerFn] = {
+    "add": _add_handler,
+}
 
 
 def _get_handler(command: str) -> HandlerFn:
