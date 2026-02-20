@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import logging
 
+from openclaw_todo.dispatcher import USAGE, dispatch
+
 logger = logging.getLogger(__name__)
 
 _TODO_PREFIX = "/todo"
 
 
-def handle_message(text: str, context: dict) -> str | None:
+def handle_message(text: str, context: dict, db_path: str | None = None) -> str | None:
     """Process an incoming Slack DM message.
 
     Returns a response string for ``/todo`` commands, or ``None`` if the
@@ -26,7 +28,6 @@ def handle_message(text: str, context: dict) -> str | None:
     remainder = stripped[len(_TODO_PREFIX) :].strip()
 
     if not remainder:
-        return "Usage: /todo <command> [options]\nCommands: add, list, board, move, done, drop, edit, project"
+        return USAGE
 
-    # Placeholder: will be replaced by dispatcher in Issue #16
-    return f"TODO command received: {remainder}"
+    return dispatch(remainder, context, db_path=db_path)

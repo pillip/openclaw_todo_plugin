@@ -657,6 +657,11 @@ No Critical or High severity findings. One Medium finding (S1: leap-year date va
 > Reviewer: Claude Opus 4.6 (automated review)
 > Date: 2026-02-20
 > Branch: `feature/007-project-resolver`
+# PR #14 Review Notes -- Issue #16: Command dispatcher and routing
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-02-20
+> Branch: `feature-016-dispatcher`
 
 ---
 
@@ -740,6 +745,107 @@ The implementation is clean, correct, and follows the PRD resolution order exact
 - The code is 85 lines total -- minimal and readable.
 
 **Verdict: APPROVE** -- no Critical or High findings. All Low findings are noted for follow-up.
+### Changed Files
+
+| File | Change | Lines |
+|------|--------|-------|
+| `src/openclaw_todo/dispatcher.py` | NEW | 116 |
+| `src/openclaw_todo/plugin.py` | MODIFIED | 33 |
+| `tests/test_dispatcher.py` | NEW | 152 |
+| `tests/test_plugin.py` | MODIFIED | 39 |
+
+### Architecture Overview
+
+The dispatcher implements a two-level routing architecture:
+
+1. **Plugin layer** (`plugin.py`): Strips `/todo` prefix, returns USAGE for bare `/todo`, delegates remainder to `dispatch()`.
+2. **Dispatcher layer** (`dispatcher.py`): Parses the remainder via the parser, validates command name against `_VALID_COMMANDS`, opens a DB connection with migration, routes to the appropriate handler (or stub), and closes the connection in a `finally` block.
+3. **Project sub-routing**: `project` command delegates to `_dispatch_project()` which extracts the subcommand from `parsed.title_tokens` and routes to `project_<subcommand>` handlers in the registry.
+
+### Findings
+
+#### [Low] F1: Weak test assertion on stub handler (FIXED)
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-016-dispatcher/tests/test_dispatcher.py`, line 48
+- **Description**: The original assertion was:
+  ```python
+  assert "not yet implemented" in result.lower() or isinstance(result, str)
+  ```
+  The `isinstance(result, str)` clause makes this trivially true since `dispatch()` always returns `str`. The test does not actually verify that the stub handler was invoked -- any string return would pass.
+- **Fix applied**: Removed the `or isinstance(result, str)` fallback. The assertion now strictly verifies that the stub handler message is present:
+  ```python
+  assert "not yet implemented" in result.lower()
+  ```
+- **Impact**: Test now correctly fails if the stub handler message format changes or if a different code path is taken.
+
+#### [Low] F2: `_stub_handler` signature differs from `HandlerFn` type alias
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-016-dispatcher/src/openclaw_todo/dispatcher.py`, lines 17, 47
+- **Description**: The `HandlerFn` type alias is `Callable[[ParsedCommand, Connection, dict], str]` (3 args), but `_stub_handler` takes 4 args: `(command, parsed, conn, context)`. This works because `_stub_handler` is never registered directly in `_handlers` -- it is always called via a lambda wrapper in `_get_handler` (line 59) and `_dispatch_project` (line 115) that captures `command` via closure. However, the mismatch makes the code harder to follow at a glance.
+- **Action**: Consider refactoring `_stub_handler` to accept `(parsed, conn, context)` and derive the command name from `parsed.command`. Not blocking since the current approach is correct.
+
+#### [Low] F3: Long line in `_dispatch_project`
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-016-dispatcher/src/openclaw_todo/dispatcher.py`, line 115
+- **Description**: Line 115 is 116 characters, exceeding typical line length limits (88 for black, 100 for many projects). The lambda + `_handlers.get` + `_stub_handler` call is dense.
+- **Action**: Consider breaking into multiple lines for readability. Not blocking.
+
+#### [Low] F4: Global mutable `_handlers` dict shared across tests
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-016-dispatcher/src/openclaw_todo/dispatcher.py`, line 54
+- **Description**: The `_handlers` dict is module-level mutable state. The test fixture `_clean_handlers` (test file line 22-28) correctly saves and restores it between tests. However, if the test suite were run in parallel (e.g., `pytest-xdist`), the shared state could cause flaky tests.
+- **Action**: For a single-process Slack plugin this is fine. Document the limitation if parallel test execution is ever introduced.
+
+#### [Info] F5: DB connection lifecycle is correct
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-016-dispatcher/src/openclaw_todo/dispatcher.py`, lines 86-94
+- The `dispatch()` function opens the DB connection *after* validating the command name (line 80-82 returns early for unknown commands without touching the DB). The connection is always closed in a `finally` block (line 94), ensuring no leaks even if handlers raise exceptions. This is good resource management.
+
+#### [Info] F6: Unknown commands do not open a DB connection
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-016-dispatcher/src/openclaw_todo/dispatcher.py`, line 80-82
+- The `if command not in _VALID_COMMANDS` check returns before `_init_db()` is called. This avoids unnecessary DB initialization for typos and invalid commands. Good design.
+
+#### [Info] F7: Parse errors are caught and returned as user-facing messages
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-016-dispatcher/src/openclaw_todo/dispatcher.py`, lines 73-76
+- `ParseError` is caught and formatted as `f"Parse error: {exc}"`. The parser's error messages are descriptive (e.g., "Invalid section: 'xyz'") and do not leak internal details. This is appropriate for a Slack DM context.
+
+#### [Info] F8: Plugin entry-point correctly wired to dispatcher
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-016-dispatcher/src/openclaw_todo/plugin.py`
+- The `handle_message()` function now delegates to `dispatch()` instead of the previous placeholder response. The prefix matching logic is unchanged and still correct. The `db_path` parameter flows through to `dispatch()` for testability.
+
+#### [Info] F9: Schema import triggers migration registration
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-016-dispatcher/src/openclaw_todo/dispatcher.py`, line 14
+- `import openclaw_todo.schema_v1 as _schema_v1` with `# noqa: F401` ensures the `@register` decorator in `schema_v1.py` runs at import time, populating the migration registry before any `migrate()` call. This is the correct pattern for the decorator-based migration system.
+
+#### [Info] F10: Test coverage is comprehensive
+
+- 20 dispatcher + plugin tests covering:
+  - All 7 non-project commands routed to stubs (parametrized)
+  - Custom handler registration and invocation
+  - All 3 project subcommands routed correctly
+  - Project with no subcommand returns usage
+  - Unknown project subcommand returns error
+  - Unknown top-level command returns error with usage
+  - Parse error propagation
+  - DB initialization with schema migration
+  - Plugin prefix matching (non-todo, todo, whitespace, bare /todo)
+
+### Code Quality Summary
+
+The dispatcher implementation is clean, well-structured, and follows good design principles:
+
+- **Separation of concerns**: Plugin handles prefix matching; dispatcher handles parsing, validation, DB init, and routing. Each has a single responsibility.
+- **Resource safety**: DB connection opened late (only for valid commands) and closed in `finally`.
+- **Extensibility**: The `register_handler()` function provides a clean API for future command implementations to plug in without modifying the dispatcher.
+- **Defensive routing**: Unknown commands and parse errors return helpful user-facing messages without touching the DB or raising unhandled exceptions.
+- **Project sub-routing**: The `project_<subcommand>` naming convention with `replace('-', '_')` is a clean pattern for hyphenated subcommands.
+- **Test isolation**: The `_clean_handlers` autouse fixture properly saves and restores the handler registry between tests.
+
+**Verdict: APPROVE with one fix applied** -- the weak test assertion (Low, F1) has been strengthened. No Critical or High code quality issues found.
 
 ---
 
@@ -780,6 +886,49 @@ The implementation is clean, correct, and follows the PRD resolution order exact
 ### Security Summary
 
 No Critical, High, or Medium severity findings. The implementation has a minimal attack surface -- three read queries and one idempotent insert, all using parameterized queries. The authorization model (private scoped to sender, shared visible to all) is correctly implemented and tested. Three Low findings are noted for awareness but require no immediate action.
+### [Low] S1: User input reflected in error messages
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-016-dispatcher/src/openclaw_todo/dispatcher.py`, lines 76, 82, 110
+- **Description**: Three error paths echo user-supplied values back in responses:
+  - `f"Parse error: {exc}"` (line 76) -- parser error messages may contain raw user input
+  - `f"Unknown command: '{command}'\n{USAGE}"` (line 82) -- the command name is user input
+  - `f"Unknown project subcommand: '{sub}'\n{PROJECT_USAGE}"` (line 110) -- the subcommand is user input
+- **Severity**: Low. In the Slack DM context, Slack handles message escaping. The reflected values are single tokens (no spaces, limited characters after `split()` tokenization). No HTML/JS injection is possible in this context.
+- **Recommendation**: If the plugin ever serves responses in a web context (e.g., dashboard, webhook response viewer), sanitize reflected values. No fix needed for current Slack-only usage.
+
+### [Low] S2: No input length validation at dispatcher level
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-016-dispatcher/src/openclaw_todo/dispatcher.py`, line 67
+- **Description**: `dispatch(text, ...)` accepts arbitrarily long strings, which flow to `parse()` for tokenization. Slack limits messages to approximately 40,000 characters, providing transport-layer mitigation.
+- **Severity**: Low (mitigated by Slack transport layer)
+- **Recommendation**: Consider adding a max-length guard in `handle_message()` if the plugin is ever exposed outside Slack.
+
+### [Low] S3: Handler exception propagation
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/.worktrees/feature-016-dispatcher/src/openclaw_todo/dispatcher.py`, lines 91-92
+- **Description**: If a registered handler raises an unhandled exception, it propagates up through `dispatch()`. The `finally` block ensures the DB connection is closed, but the exception itself is not caught. In the current architecture, the caller (`handle_message` in `plugin.py`) does not catch exceptions either, so an unhandled handler error would propagate to the gateway framework.
+- **Severity**: Low. The stub handlers cannot raise exceptions (they return strings). Future handler implementations should handle their own errors. A catch-all `except Exception` in `dispatch()` could provide defense-in-depth but would also mask bugs during development.
+- **Recommendation**: Consider adding a top-level exception handler in `dispatch()` that logs the error and returns a generic "Internal error" message, once real handlers are implemented. During development, letting exceptions propagate is acceptable.
+
+### [Info] S4: No SQL injection risk
+
+- The dispatcher does not execute any SQL directly. DB interaction is limited to `_init_db()` which calls `get_connection()` and `migrate()` -- both use hardcoded SQL or parameterized queries. User input flows through `ParsedCommand` fields to handlers, which are responsible for using parameterized queries.
+
+### [Info] S5: No hardcoded secrets or credentials
+
+- No API keys, tokens, or secrets found in `dispatcher.py`, `plugin.py`, or their test files.
+
+### [Info] S6: `db_path` parameter is configuration-controlled
+
+- The `db_path` parameter in `dispatch()` and `handle_message()` flows from the caller (gateway framework), not from user input. In tests, it comes from `tmp_path`. There is no code path where a user's message text influences the DB path.
+
+### [Info] S7: No new dependencies introduced
+
+- The dispatcher uses only Python standard library (`sqlite3`, `logging`, `typing`) plus internal modules (`db`, `migrations`, `parser`, `schema_v1`). No new entries in `pyproject.toml`.
+
+### Security Summary
+
+No Critical or High severity findings. Three Low findings related to input reflection, length validation, and exception propagation are noted. The dispatcher has a minimal attack surface -- it validates commands against a whitelist, delegates parsing to the parser, and routes to registered handlers. The main security consideration for future work is ensuring that handler implementations use parameterized queries and handle their own exceptions gracefully.
 
 ---
 
@@ -790,3 +939,8 @@ No Critical, High, or Medium severity findings. The implementation has a minimal
 3. **Transaction safety**: Consider using `SAVEPOINT` / `RELEASE` for Inbox auto-creation instead of bare `conn.commit()` to avoid committing unrelated pending changes.
 4. **Case sensitivity**: Document that project name matching is case-sensitive. Consider `COLLATE NOCASE` if case-insensitive matching is desired in a future iteration.
 5. **Input validation**: Add a max-length check for project names in the parser or validation layer to prevent unnecessarily large queries.
+1. **Exception handling**: Add a top-level `try/except` in `dispatch()` that catches unexpected handler exceptions, logs them at error level, and returns a generic user-facing error message. Defer until real handlers are implemented.
+2. **Refactor `_stub_handler`**: Align `_stub_handler` signature with `HandlerFn` type alias by deriving the command name from `parsed.command` instead of passing it as a separate argument. This also eliminates the lambda wrappers in `_get_handler` and `_dispatch_project`.
+3. **Line length**: Break the long line 115 in `_dispatch_project` for readability.
+4. **Context typing**: Introduce a `TypedDict` or dataclass for the `context` parameter (e.g., `class DispatchContext(TypedDict): sender_id: str`) to enable static type checking.
+5. **Input length guard**: Add a max-length check (e.g., 5000 chars) in `handle_message()` as defense-in-depth against oversized inputs.
