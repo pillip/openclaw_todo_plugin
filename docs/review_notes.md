@@ -1024,3 +1024,34 @@ No Critical, High, or Medium severity security findings. All SQL parameterized. 
 
 1. **Defensive guard**: Consider adding a log warning in `validate_private_assignees` when `visibility == "private"` and `owner_id is None`.
 2. **Test consistency**: Align `_create_project` helper to use `last_insert_rowid()` like `_create_task`.
+
+---
+
+## Review Pass 2
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-02-20
+> Commit range: ff87515..594cad4
+
+### Purpose
+
+Second review pass to verify the F3 fix (commit 594cad4) and confirm no remaining Critical/High issues.
+
+### F3 Fix Verification: `test_shared_creator_and_assignee_can_write`
+
+- **Status**: VERIFIED CORRECT
+- The test creates a shared project, a task where `U_BOTH` is the creator, assigns `U_BOTH` as an assignee, and asserts `can_write_task` returns `True`.
+- This exercises the creator short-circuit path, which returns `True` before the assignee query is reached.
+
+### Prior Findings Status
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| F1: Shared project owner has no implicit write | Medium | CLOSED -- Confirmed intentional by user. |
+| F2: `validate_private_assignees` with `owner_id=None` | Low | OPEN -- non-blocking. |
+| F3: Missing creator+assignee overlap test | Low | FIXED in 594cad4. Verified correct. |
+| F4: `_create_project` helper uses complex SELECT | Low | OPEN -- non-blocking. |
+
+### Verdict
+
+**APPROVE -- ready to merge.** All 49 tests pass. No Critical or High issues.
