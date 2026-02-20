@@ -23,6 +23,9 @@ All notable changes to this project will be documented in this file.
 - Dispatcher tests (20 tests): command routing, project sub-routing, unknown commands, parse errors, DB init
 - `permissions.py`: `can_write_task()` (private: owner only, shared: assignee/creator) and `validate_private_assignees()` helpers
 - Permission tests (11 tests): private/shared write checks, creator+assignee overlap, private assignee validation
+- `cmd_add.py`: `/todo add` command handler with project resolution, assignee defaults, private-project validation, event logging
+- `add` handler registered in dispatcher (replaces stub)
+- cmd_add tests (10 tests): default Inbox, explicit options, private rejection, assignee defaults, multiple assignees, event logging, edge cases
 - `.github/workflows/ci.yml`: GitHub Actions CI pipeline (push + PR on main, Python 3.11 + uv + pytest)
 - Branch protection: `test` job as required status check on main
 
