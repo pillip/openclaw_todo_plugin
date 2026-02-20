@@ -9,6 +9,13 @@ All notable changes to this project will be documented in this file.
 - DB connection tests (4 tests)
 - `migrations.py`: sequential schema migration framework with `@register`, `migrate()`, `get_version()`
 - Migration tests (4 tests): fresh DB, sequential apply, idempotent rerun, rollback on failure
+- `schema_v1.py`: V1 migration creating projects, tasks, task_assignees, events tables
+- Partial unique indexes for shared/private project name constraints
+- Shared `Inbox` project auto-seeded
+- V1 schema tests (7 tests): tables, indexes, CHECK constraints, Inbox
+
+### Fixed
+- Enable `PRAGMA foreign_keys=ON` in `get_connection()` for referential integrity
 
 ## [0.1.0] - 2026-02-20
 
