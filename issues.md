@@ -870,7 +870,7 @@ Build artifact size logged; CI publishes wheel as artifact.
 |-------------|----------------------------------------|
 | Track       | DevOps                                 |
 | Milestone   | M0                                     |
-| Status      | doing                                  |
+| Status      | done                                   |
 | Priority    | P0                                     |
 | Estimate    | 0.5d                                   |
 | Branch      | `feature/021-ci-workflow`              |

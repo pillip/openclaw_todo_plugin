@@ -23,6 +23,8 @@ All notable changes to this project will be documented in this file.
 - Dispatcher tests (20 tests): command routing, project sub-routing, unknown commands, parse errors, DB init
 - `permissions.py`: `can_write_task()` (private: owner only, shared: assignee/creator) and `validate_private_assignees()` helpers
 - Permission tests (11 tests): private/shared write checks, creator+assignee overlap, private assignee validation
+- `.github/workflows/ci.yml`: GitHub Actions CI pipeline (push + PR on main, Python 3.11 + uv + pytest)
+- Branch protection: `test` job as required status check on main
 
 ### Fixed
 - Enable `PRAGMA foreign_keys=ON` in `get_connection()` for referential integrity
