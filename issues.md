@@ -859,4 +859,31 @@ Build artifact size logged; CI publishes wheel as artifact.
 
 #19 E2E tests    (all commands)
 #20 Packaging    (#19)
+#21 CI workflow   (standalone)
 ```
+
+---
+
+## Issue #21: GitHub Actions CI 워크플로우
+
+| Field       | Value                                  |
+|-------------|----------------------------------------|
+| Track       | DevOps                                 |
+| Milestone   | M0                                     |
+| Status      | doing                                  |
+| Priority    | P0                                     |
+| Estimate    | 0.5d                                   |
+| Branch      | `feature/021-ci-workflow`              |
+| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/19 |
+| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/20 |
+
+**Description**
+PR 머지 전 자동 테스트 검증을 위한 GitHub Actions CI 파이프라인을 추가합니다. push (main) + pull_request (main) 트리거로 Python 3.11 + uv + pytest 기반 테스트를 실행합니다.
+
+**Acceptance Criteria**
+- [ ] `.github/workflows/ci.yml` 생성
+- [ ] PR 생성 시 CI가 자동 실행됨
+- [ ] `uv run pytest -q --tb=short` 통과가 머지 조건
+
+**Dependencies**
+None.
