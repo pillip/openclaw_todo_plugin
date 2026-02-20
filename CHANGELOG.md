@@ -16,6 +16,8 @@ All notable changes to this project will be documented in this file.
 
 - `parser.py`: command tokenizer with `/p`, `/s`, `due:`, `<@U...>` extraction and `ParsedCommand` dataclass
 - Parser tests (13 tests): project, section, due normalisation, mentions, title extraction
+- `project_resolver.py`: project name resolution with private-first (PRD 3.2 Option A), Inbox auto-create
+- Project resolver tests (6 tests): private priority, shared fallback, Inbox auto-create, unknown error
 
 ### Fixed
 - Enable `PRAGMA foreign_keys=ON` in `get_connection()` for referential integrity
