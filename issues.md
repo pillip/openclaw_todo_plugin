@@ -49,11 +49,11 @@ None.
 |-------------|----------------------------------------|
 | Track       | Backend / Data                         |
 | Milestone   | M1                                     |
-| Status      | TODO                                   |
+| Status      | doing                                  |
 | Priority    | P0                                     |
 | Estimate    | 0.5d                                   |
 | Branch      | `feature/002-db-connection`            |
-| GH-Issue    | --                                     |
+| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/3 |
 | PR          | --                                     |
 
 **Description**
