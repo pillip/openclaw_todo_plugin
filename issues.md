@@ -168,11 +168,11 @@ Log table creation counts.
 |-------------|----------------------------------------|
 | Track       | Backend                                |
 | Milestone   | M2                                     |
-| Status      | TODO                                   |
+| Status      | doing                                  |
 | Priority    | P0                                     |
 | Estimate    | 1d                                     |
 | Branch      | `feature/005-parser-tokenizer`         |
-| GH-Issue    | --                                     |
+| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/9 |
 | PR          | --                                     |
 
 **Description**
