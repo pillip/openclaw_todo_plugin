@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- `db.py`: `get_connection(db_path)` helper with recursive directory creation, WAL mode, busy_timeout=3000
+- DB connection tests (4 tests)
+
 ## [0.1.0] - 2026-02-20
 
 ### Added
