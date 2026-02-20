@@ -12,7 +12,7 @@
 |-----------|-------------|--------|--------|
 | M0 | Plugin skeleton + `/todo` command registration | **Done** | #1 |
 | M1 | DB init + migrations + schema_version | **Done** | #2, #3, #4 |
-| M2 | Parser (Slack mention, /p, /s, due correction) | Not started | #5 |
+| M2 | Parser (Slack mention, /p, /s, due correction) | **Done** | #5 |
 | M3 | Commands (add/list/board/move/done/drop/edit) | Not started | #6–#12, #16, #17 |
 | M4 | Project commands (list/set-private/set-shared) | Not started | #13, #14, #15 |
 | M5 | Tests (parser/unit + sqlite E2E) | Not started | #18, #19 |
@@ -27,9 +27,9 @@
 
 ## Next Issues to Work On
 
-1. **#5** — Command parser / tokenizer (M2)
-2. **#7** — Project resolver helper (M3)
-3. **#17** — Permission helper module (M3)
+1. **#7** — Project resolver helper (M3)
+2. **#17** — Permission helper module (M3)
+3. **#16** — Command dispatcher and routing (M3)
 
 ## Risks
 
