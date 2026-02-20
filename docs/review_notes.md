@@ -944,3 +944,83 @@ No Critical or High severity findings. Three Low findings related to input refle
 3. **Line length**: Break the long line 115 in `_dispatch_project` for readability.
 4. **Context typing**: Introduce a `TypedDict` or dataclass for the `context` parameter (e.g., `class DispatchContext(TypedDict): sender_id: str`) to enable static type checking.
 5. **Input length guard**: Add a max-length check (e.g., 5000 chars) in `handle_message()` as defense-in-depth against oversized inputs.
+
+---
+
+# PR #16 Review Notes -- Issue #17: Permission helper module
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-02-20
+> Branch: `feature-017-permissions`
+
+---
+
+## Code Review
+
+### Acceptance Criteria Checklist
+
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| `can_write_task(conn, task_id, sender_id) -> bool` exists | PASS | Function defined on line 11 of `permissions.py` with correct signature. |
+| Private project: only owner can write | PASS | Lines 34-40 check `sender_id == owner_user_id` when `visibility == "private"`. Tests `test_private_owner_can_write` and `test_private_non_owner_rejected` verify. |
+| Shared project: assignee or creator can write | PASS | Lines 43-60 check creator first, then query `task_assignees`. Tests `test_shared_assignee_can_write`, `test_shared_creator_can_write`, and `test_shared_unrelated_rejected` verify. |
+| Nonexistent task returns False | PASS | Lines 28-29 return `False` when row is None. Test `test_nonexistent_task` verifies. |
+| `validate_private_assignees(visibility, assignees, owner_id) -> str or None` exists | PASS | Function defined on line 63 with correct signature. |
+| Returns warning for non-owner assignees on private project | PASS | Lines 75-81. Test `test_validate_private_assignees_warning` verifies. |
+| Returns None for shared projects | PASS | Lines 72-73. Test `test_shared_always_ok` verifies. |
+| Returns None when all assignees are the owner | PASS | Lines 76-77. Test `test_private_all_owner_ok` verifies. |
+
+### Required Tests
+
+| Test | Status |
+|------|--------|
+| `test_private_owner_can_write` | PASS |
+| `test_private_non_owner_rejected` | PASS |
+| `test_shared_assignee_can_write` | PASS |
+| `test_shared_creator_can_write` | PASS |
+| `test_shared_unrelated_rejected` | PASS |
+| `test_nonexistent_task` | PASS |
+| `test_validate_private_assignees_warning` | PASS |
+| `test_private_all_owner_ok` | PASS |
+| `test_shared_always_ok` | PASS |
+| `test_private_empty_assignees_ok` | PASS |
+
+All 10 tests present and passing. 48 tests total in the suite.
+
+### Findings
+
+#### [Medium] F1: Shared project owner cannot modify tasks they did not create or get assigned to — CONFIRMED INTENTIONAL
+
+- **Description**: In a shared project, only the task creator and assignees are allowed to write. The project owner has no special privileges. User confirmed this is intentional: only task creator and assignees should have task write access.
+- **Status**: CLOSED as intentional design.
+
+#### [Low] F2: `validate_private_assignees` with `owner_id=None` marks all assignees as non-owner
+
+- **Description**: When `owner_id` is `None` on a private project (data integrity issue), all assignees would be flagged as non-owner. Function short-circuits for shared projects, so this only affects corrupted data.
+- **Status**: OPEN, non-blocking.
+
+#### [Low] F3: No test for shared project where sender is both creator and assignee — FIXED
+
+- **Description**: Added `test_shared_creator_and_assignee_can_write` in commit 594cad4. Creator short-circuit handles this correctly.
+- **Status**: FIXED.
+
+#### [Low] F4: `_create_project` helper uses complex SELECT instead of `last_insert_rowid()`
+
+- **Status**: OPEN, non-blocking.
+
+### Code Quality Summary
+
+**Verdict: APPROVE** -- no Critical or High findings. F1 confirmed intentional, F3 fixed.
+
+---
+
+## Security Findings
+
+No Critical, High, or Medium severity security findings. All SQL parameterized. Fail-closed design. Three Low findings noted for awareness.
+
+---
+
+## Follow-up Issues (proposed)
+
+1. **Defensive guard**: Consider adding a log warning in `validate_private_assignees` when `visibility == "private"` and `owner_id is None`.
+2. **Test consistency**: Align `_create_project` helper to use `last_insert_rowid()` like `_create_task`.
