@@ -127,12 +127,12 @@ Drop `schema_version` table; revert module.
 |-------------|----------------------------------------|
 | Track       | Backend / Data                         |
 | Milestone   | M1                                     |
-| Status      | TODO                                   |
+| Status      | done                                   |
 | Priority    | P0                                     |
 | Estimate    | 1d                                     |
 | Branch      | `feature/004-v1-schema`                |
-| GH-Issue    | --                                     |
-| PR          | --                                     |
+| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/7 |
+| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/8 |
 
 **Description**
 Register migration v1 that creates the four tables (`projects`, `tasks`, `task_assignees`, `events`) with all columns, CHECK constraints, and partial unique indexes as specified in PRD section 6.3. Also seed shared project `Inbox`.

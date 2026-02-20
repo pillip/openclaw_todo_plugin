@@ -35,6 +35,7 @@ def get_connection(db_path: str | Path | None = None) -> sqlite3.Connection:
     conn = sqlite3.connect(str(db_path))
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA busy_timeout=3000;")
+    conn.execute("PRAGMA foreign_keys=ON;")
 
     if is_new:
         logger.info("Created new database: %s", db_path)
