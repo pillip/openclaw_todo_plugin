@@ -1,11 +1,11 @@
 {
   "name": "openclaw-todo",
   "version": "0.1.0",
-  "description": "Bridge plugin that forwards !todo commands to the Python HTTP server",
+  "description": "Bridge plugin that forwards todo: commands to the Python HTTP server",
   "main": "dist/index.js",
   "triggers": {
     "dm": {
-      "pattern": "^!todo(\\s|$)"
+      "pattern": "^todo:(\\s|$)"
     }
   }
 }

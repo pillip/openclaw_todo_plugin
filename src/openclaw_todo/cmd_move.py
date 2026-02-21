@@ -23,7 +23,7 @@ def move_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
 
     # --- Validate task ID ---
     if not parsed.args:
-        return "Error: task ID required. Usage: !todo move <id> /s <section>"
+        return "Error: task ID required. Usage: todo: move <id> /s <section>"
 
     try:
         task_id = int(parsed.args[0])
@@ -33,7 +33,7 @@ def move_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
     # --- Validate target section ---
     target_section = parsed.section
     if not target_section:
-        return "Error: target section required. Usage: !todo move <id> /s <section>"
+        return "Error: target section required. Usage: todo: move <id> /s <section>"
 
     # --- Check task exists ---
     row = conn.execute(
