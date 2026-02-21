@@ -1710,3 +1710,141 @@ No Critical or High severity findings. Two Low findings (S1, S2) are consistent 
 1. **Error message format alignment**: Update the error message in `_convert_shared_to_private` to match UX spec Section 5.3 format.
 2. **Transaction explicitness**: Wrap multi-statement DB writes in `with conn:` blocks.
 3. **Context typing**: Introduce a `TypedDict` for `context` parameter to prevent `KeyError` on missing `sender_id` (carried forward from prior reviews).
+
+---
+---
+
+# PR #37 Review Notes -- Issue #15: `/todo project set-shared` command
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-02-21
+> Branch: `feature/015-cmd-project-set-shared`
+
+---
+
+## Verdict: APPROVE
+
+The implementation is clean, correct, consistent with its mirror (`cmd_project_set_private.py`), and all 9 tests pass. There are no blocking issues. A few minor observations and one medium-severity concern are noted below.
+
+---
+
+## Code Review
+
+### Correctness and Resolution Flow
+
+The three resolution paths are implemented correctly:
+
+1. **Shared project already exists** -- returns noop message. Verified by `test_already_shared_noop` and `test_already_shared_inbox`.
+2. **Sender owns a private project with that name** -- converts to shared by setting `visibility = 'shared'` and `owner_user_id = NULL`. The `updated_at` timestamp is refreshed. Verified by `test_convert_private_to_shared`, `test_convert_private_updated_at`, and `test_event_logged_on_conversion`.
+3. **Neither exists** -- creates a new shared project with `owner_user_id = NULL`. Verified by `test_creates_new_shared` and `test_event_logged_on_create`.
+
+### DB Unique Index (`ux_projects_shared_name`)
+
+The unique index `ux_projects_shared_name ON projects(name) WHERE visibility = 'shared'` enforces that only one shared project can exist per name. The handler correctly checks for an existing shared project in Step 1 before attempting creation or conversion. However, see Finding [Medium-1] below regarding a TOCTOU race condition.
+
+### Task Accessibility After Conversion
+
+When a private project is converted to shared (Step 2), the UPDATE only changes `visibility` and `owner_user_id` on the `projects` row. Tasks reference `project_id` via a foreign key, so they remain fully accessible after conversion. This is correct.
+
+### Consistency with `cmd_project_set_private.py`
+
+The code structure, naming, and patterns are consistent with the mirror handler:
+
+| Aspect | `set-private` | `set-shared` | Consistent? |
+|--------|--------------|-------------|-------------|
+| Name extraction from `title_tokens[1:]` | Yes | Yes | Yes |
+| Missing name error message format | Yes | Yes | Yes |
+| Parameterized SQL (no injection) | Yes | Yes | Yes |
+| Event logging with JSON payload | Yes | Yes | Yes |
+| `conn.commit()` placement | Yes | Yes | Yes |
+| `_convert_*` helper pattern | Yes | Yes | Yes |
+
+**Notable asymmetry (intentional and correct):** `set-private` checks for non-owner assignees before conversion and may reject. `set-shared` does not need this guard because making a project shared is non-restrictive -- it expands access rather than limiting it.
+
+### Findings
+
+#### [Medium-1] TOCTOU race: concurrent `set-shared` could violate unique index
+
+- **File:** `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_project_set_shared.py`, lines 33-68
+- **Description:** The handler checks for an existing shared project (Step 1), then later either converts or inserts (Steps 2-3) without holding a transaction lock between the check and the write. If two users concurrently call `set-shared` for a name that does not yet exist as shared, both could pass Step 1 and both attempt an INSERT or UPDATE to `visibility = 'shared'`, causing a `sqlite3.IntegrityError` on the `ux_projects_shared_name` unique index.
+- **Severity:** Medium. SQLite's default locking model makes this unlikely in practice (especially with WAL mode), and the error would surface as an unhandled 500 rather than data corruption. But it is still unhandled.
+- **Recommendation:** Wrap the check-and-write in an explicit transaction (`BEGIN IMMEDIATE`) or catch `sqlite3.IntegrityError` and return a graceful message. This same issue exists in `cmd_project_set_private.py` (carried forward).
+
+#### [Low-1] No handling of multi-word project names
+
+- **File:** `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_project_set_shared.py`, line 30
+- **Description:** `project_name = name_tokens[0]` takes only the first token. A project name like "My Project" would be interpreted as just "My", with "Project" silently ignored.
+- **Severity:** Low. This matches the behavior in `cmd_project_set_private.py` and appears to be a design decision (project names are single tokens). However, there is no test asserting this behavior or warning the user.
+- **Recommendation:** Either join all tokens (`" ".join(name_tokens)`) or add a test documenting the single-token expectation.
+
+#### [Info-1] No test for tasks surviving conversion
+
+- **File:** `/Users/pillip/project/practice/openclaw_todo_plugin/tests/test_cmd_project_set_shared.py`
+- **Description:** While the code correctly preserves tasks during private-to-shared conversion (only the projects row changes), there is no test that creates tasks in a private project, converts it, and asserts the tasks are still queryable under the now-shared project.
+- **Recommendation:** Add a test to `TestSetSharedConvertPrivate` that inserts a task before conversion and verifies it remains accessible afterward.
+
+#### [Info-2] Duplicated fixture boilerplate
+
+- **File:** `/Users/pillip/project/practice/openclaw_todo_plugin/tests/test_cmd_project_set_shared.py`, lines 15-35
+- **Description:** The `_load_v1` and `conn` fixtures are identical across `test_cmd_project_set_private.py` and `test_cmd_project_set_shared.py` (and likely other test modules). This is a maintenance burden.
+- **Recommendation:** Extract these fixtures into `tests/conftest.py`. (Carried forward from prior reviews.)
+
+---
+
+## Security Findings
+
+### [Medium] Unhandled IntegrityError on unique index violation (TOCTOU)
+
+- **Severity:** Medium
+- **Location:** `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_project_set_shared.py`, lines 54-66
+- **Description:** As described in [Medium-1] above. A concurrent request could trigger an unhandled `sqlite3.IntegrityError`, potentially leaking a stack trace to the caller depending on the plugin host's error handling.
+- **Recommendation:** Catch `sqlite3.IntegrityError` around the INSERT/UPDATE and return a user-friendly message like "Project already exists as shared."
+
+### [Low] No input length or character validation on project name
+
+- **Severity:** Low
+- **Location:** `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_project_set_shared.py`, line 30
+- **Description:** The project name is taken directly from parsed tokens with no length cap or character validation. While SQL injection is prevented by parameterized queries, an extremely long name or names with special characters could cause display issues or unexpected behavior.
+- **Recommendation:** Add a length check (e.g., max 100 characters) and optionally restrict to alphanumeric/hyphen/underscore. This applies equally to `cmd_project_set_private.py`.
+
+### SQL Injection: Not vulnerable
+
+All SQL queries use parameterized placeholders (`?`). No string interpolation is used in SQL construction.
+
+### Hardcoded Secrets: None found
+
+No API keys, credentials, or secrets in the code.
+
+### Authentication/Authorization: Adequate
+
+The handler correctly scopes the private project lookup to `owner_user_id = sender_id`, preventing one user from converting another user's private project. This is verified by `test_other_users_private_not_converted`.
+
+---
+
+## Test Coverage Assessment
+
+| Scenario | Covered? |
+|----------|----------|
+| Already shared (noop) | Yes |
+| Already shared (Inbox seed) | Yes |
+| Private-to-shared conversion | Yes |
+| updated_at refreshed on conversion | Yes |
+| Event logged on conversion | Yes |
+| Other user's private not converted | Yes |
+| New shared project created | Yes |
+| Event logged on creation | Yes |
+| Missing project name | Yes |
+| Tasks survive conversion | No (see Info-1) |
+| Concurrent set-shared race | No (see Medium-1) |
+
+9 tests total, all passing. Coverage is good for the core paths.
+
+---
+
+## Follow-up Issues (proposed)
+
+1. ~~**TOCTOU race handling**~~: **Fixed** — added `IntegrityError` catch on both INSERT (Step 3) and UPDATE (conversion) paths in `cmd_project_set_shared.py`. `cmd_project_set_private.py` has the same pattern but lower risk (private projects are per-user, so concurrent conflicts are less likely).
+2. **Task survival test**: Add a test that creates tasks in a private project, converts to shared, and asserts the tasks remain accessible.
+3. **Shared fixture extraction**: Move `_load_v1` and `conn` fixtures to `tests/conftest.py` to eliminate duplication across test modules (carried forward).
+4. **Input validation layer**: Add project name length and character validation, shared across all project subcommands.
+5. **Multi-word project name policy**: Document or test the single-token assumption for project names.

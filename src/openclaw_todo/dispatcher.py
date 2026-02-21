@@ -22,6 +22,7 @@ from openclaw_todo.cmd_board import board_handler as _board_handler  # noqa: E40
 from openclaw_todo.cmd_edit import edit_handler as _edit_handler  # noqa: E402
 from openclaw_todo.cmd_project_list import project_list_handler as _project_list_handler  # noqa: E402
 from openclaw_todo.cmd_project_set_private import set_private_handler as _set_private_handler  # noqa: E402
+from openclaw_todo.cmd_project_set_shared import set_shared_handler as _set_shared_handler  # noqa: E402
 
 # Type alias for command handler functions.
 HandlerFn = Callable[[ParsedCommand, sqlite3.Connection, dict], str]
@@ -70,6 +71,7 @@ _handlers: dict[str, HandlerFn] = {
     "edit": _edit_handler,
     "project_list": _project_list_handler,
     "project_set_private": _set_private_handler,
+    "project_set_shared": _set_shared_handler,
 }
 
 
