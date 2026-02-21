@@ -51,6 +51,7 @@ All notable changes to this project will be documented in this file.
 - `project_set_shared` handler registered in dispatcher via project sub-routing
 - cmd_project_set_shared tests (9 tests): already-shared noop, Inbox detection, private→shared conversion, updated_at, event logging, other user isolation, new creation, edge cases
 - Comprehensive parser unit tests (Issue #18): expanded from 13 to 50 tests, achieving 100% line coverage on `parser.py`. Covers: options in any order, due date boundaries, empty titles, unicode, whitespace, mixed mentions/options, missing option args, ID extraction, case-insensitive commands, all valid sections
+- SQLite E2E integration tests (Issue #19): 20 tests exercising full `handle_message` flows with real SQLite via `tmp_path`. Covers: add→list, add→move→board, done/drop, edit, private project isolation, set-private rejection, due normalisation, set-shared flow, full lifecycle, cross-user write denial on private tasks
 - `.github/workflows/ci.yml`: GitHub Actions CI pipeline (push + PR on main, Python 3.11 + uv + pytest)
 - Branch protection: `test` job as required status check on main
 

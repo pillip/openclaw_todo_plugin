@@ -1927,3 +1927,196 @@ No security issues. This PR contains only test code.
 3. **Add test for `due:` with empty value** — verify `ParseError` is raised for `parse("add Task due:")`.
 4. **Add test for non-matching mention patterns** — verify `<@lowercase>` becomes a title token.
 5. **Add `__pycache__/` and `*.pyc` to `.gitignore`** — bytecode files should not be tracked.
+
+---
+
+# PR #41 Review Notes -- Issue #19: SQLite end-to-end integration tests
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-02-21
+> Branch: `feature/019-e2e-tests`
+> File under review: `tests/test_e2e.py` (337 lines, 19 tests)
+
+---
+
+## Verdict: APPROVE
+
+All 19 tests pass (0.12s). The test file is well-structured, correctly isolated, and covers the major user-facing flows. The findings below are all Low severity suggestions for improvement; none warrant blocking the PR.
+
+---
+
+## Code Review
+
+### Overall Assessment
+
+The test file is solid. Each test gets a fresh SQLite database via `tmp_path`, ensuring isolation. The helper functions `_msg()` and `_extract_task_id()` reduce boilerplate effectively. The use of class-based grouping by scenario is clear and readable.
+
+### Finding 1: SQLite connections not closed on assertion failure (Low)
+
+**Location**: Multiple tests (lines 107-114, 129-135, 160-163, 173-175, 183-185, 210-214, 225-227, 327-334)
+
+**Description**: Direct `sqlite3.connect()` / `conn.close()` pattern without a context manager means the connection leaks if an assertion between `connect` and `close` fails. While this is harmless for tests (pytest tears down `tmp_path` anyway and SQLite handles this gracefully), it is a code quality concern.
+
+**Recommendation**: Use `with sqlite3.connect(db_path) as conn:` context manager pattern for consistency and good practice. Example:
+
+```python
+with sqlite3.connect(db_path) as conn:
+    row = conn.execute("SELECT status FROM tasks WHERE id = ?;", (int(task_id),)).fetchone()
+assert row is not None
+assert row[0] == "done"
+```
+
+**Severity**: Low -- no functional impact in test code.
+
+### Finding 2: `_extract_task_id` is fragile against format changes (Low)
+
+**Location**: Line 33-35
+
+```python
+def _extract_task_id(add_result: str) -> str:
+    return add_result.split("#")[1].split(" ")[0]
+```
+
+**Description**: This depends on the exact response format `"Added #N ..."`. If the format ever changes (e.g., to include backticks or newlines), all tests using this helper would break silently or with confusing errors. The string splitting also does not handle edge cases like `#` appearing in the task title.
+
+**Recommendation**: Consider adding a regex with a named group for clarity, and a more descriptive assertion on failure:
+
+```python
+import re
+_TASK_ID_RE = re.compile(r"#(\d+)")
+
+def _extract_task_id(add_result: str) -> str:
+    m = _TASK_ID_RE.search(add_result)
+    assert m is not None, f"Could not extract task ID from: {add_result!r}"
+    return m.group(1)
+```
+
+**Severity**: Low -- current implementation works with the current format.
+
+### Finding 3: `pytest` unused import (Informational)
+
+**Location**: Line 10
+
+```python
+import pytest
+```
+
+**Description**: `pytest` is imported but never used in the file. No `pytest.raises`, `pytest.mark`, or `pytest.param` calls exist.
+
+**Recommendation**: Remove the unused import, or add it intentionally if `pytest.mark.integration` is planned (see Follow-up Issue 1 below).
+
+**Severity**: Informational.
+
+### Finding 4: Assertions on response strings are loosely coupled (Low)
+
+**Location**: Multiple tests use `or` patterns like:
+
+```python
+assert "Moved" in move_result or "moved" in move_result.lower()  # line 87
+assert "Done" in done_result or "done" in done_result.lower()    # line 107
+assert "Drop" in drop_result or "drop" in drop_result.lower()    # line 127
+```
+
+**Description**: These `or` patterns are defensive but redundant. When the second branch uses `.lower()`, it will always match whenever the first branch matches. The first condition is effectively dead code.
+
+**Recommendation**: Simplify to just the case-insensitive check:
+
+```python
+assert "moved" in move_result.lower()
+```
+
+**Severity**: Low -- cosmetic.
+
+### Finding 5: No negative / error-path tests (Low)
+
+**Description**: All 19 tests exercise the happy path. There are no tests for:
+- Editing/moving/completing a task that does not exist
+- Operating on another user's task in a shared project (permission denied)
+- Invalid commands or malformed input through the full `handle_message` path
+- Double-done or double-drop of the same task
+
+**Recommendation**: These can be added as follow-up work (see Follow-up Issues). The current scope of "E2E happy path" is reasonable for a first pass.
+
+**Severity**: Low -- scope limitation, not a defect.
+
+### Finding 6: Direct DB verification is good practice (Positive)
+
+Tests like `test_add_then_done`, `test_add_then_drop`, `test_edit_title`, `test_edit_due`, and `test_task_lifecycle` verify state both through the API response AND by querying the database directly. This dual verification approach catches bugs where the response message is correct but the DB write is not, or vice versa. Well done.
+
+---
+
+## Security Findings
+
+Since these are test files, the security audit focuses on whether security-relevant behaviors are adequately tested.
+
+### SF-1: Private project visibility isolation -- adequately tested (Positive)
+
+**Tests**: `TestPrivateProjectIsolation` (2 tests)
+
+The tests verify:
+- Private project tasks are hidden from non-owner users via `list all`
+- Private projects do not appear in other users' `project list`
+
+This is the most important security boundary in the application and it is covered.
+
+### SF-2: Foreign assignee rejection on set-private -- adequately tested (Positive)
+
+**Test**: `TestSetPrivateRejectsForeignAssignees::test_set_private_rejected_with_foreign_assignee`
+
+Verifies that a shared project with foreign assignees cannot be converted to private. This prevents data access issues.
+
+### SF-3: Missing -- cross-user write permission test (Medium)
+
+**Description**: There is no E2E test verifying that User B cannot edit/move/done/drop a task owned by User A in a private project. The unit tests in `test_permissions.py` likely cover `can_write_task()`, but the E2E layer should also verify that the full `handle_message` path enforces it.
+
+**Recommendation**: Add a test like:
+
+```python
+def test_other_user_cannot_edit_private_task(self, db_path):
+    _msg("project set-private Secret", "U001", db_path)
+    add_result = _msg("add private task /p Secret", "U001", db_path)
+    task_id = _extract_task_id(add_result)
+    # U002 tries to edit -- should fail or return error
+    result = handle_message(f"/todo edit {task_id} hacked", {"sender_id": "U002"}, db_path=db_path)
+    # Verify task title unchanged in DB
+```
+
+**Severity**: Medium -- important security boundary not exercised at the integration level.
+
+### SF-4: Missing -- shared project cross-user write authorization (Low)
+
+**Description**: No test verifies that a non-assignee, non-creator user in a shared project is blocked from modifying tasks. The `can_write_task` function restricts writes to creators and assignees, but this is not tested end-to-end.
+
+**Severity**: Low -- lower risk than private project bypass, but still a gap.
+
+### SF-5: No SQL injection risk in test code (Positive)
+
+All direct DB queries in tests use parameterized queries (`?` placeholders). No string interpolation of user input into SQL. Good practice.
+
+---
+
+## Follow-up Issues
+
+1. **Add `pytest.mark.integration` marker**: Mark E2E tests with `@pytest.mark.integration` so they can be run or skipped independently from unit tests. This requires registering the marker in `pyproject.toml` and removing the unused `import pytest` or using it for the marker.
+
+2. **Add negative / error-path E2E tests**: Cover scenarios such as:
+   - Edit/move/done/drop a non-existent task ID
+   - Cross-user write attempts on private projects (SF-3)
+   - Cross-user write attempts on shared projects by non-assignees (SF-4)
+   - Double-done and double-drop behavior
+   - Malformed command input through full `handle_message`
+
+3. **Extract DB verification into a helper**: Several tests repeat the pattern of `sqlite3.connect(db_path)` + execute + close. A helper like `_db_query(db_path, sql, params)` or a `_get_task(db_path, task_id)` fixture would reduce duplication and ensure connections are always properly closed.
+
+4. **Use context managers for SQLite connections**: Replace manual `conn.close()` calls with `with` blocks to prevent connection leaks on assertion failures (Finding 1).
+
+5. **Board command coverage for private projects**: No test verifies that `board` output respects private project visibility. A user calling `/todo board` should not see tasks from other users' private projects.
+
+---
+
+### Fixes Applied (Review Round)
+
+1. **Added `_query_task()` helper** with `sqlite3.connect` context manager — replaces all manual `conn.execute`/`conn.close()` patterns (addresses F1, F4, follow-up #3, #4).
+2. **Simplified assertion patterns** — replaced `"X" in r or "x" in r.lower()` with just `"x" in r.lower()` (addresses F4).
+3. **Added `test_private_task_write_denied_for_non_owner`** — verifies that U002 cannot edit a task in U001's private project through the full `handle_message` path (addresses SF-3 Medium security finding).
+4. Total tests: 20 (19 original + 1 new security test). All passing.
