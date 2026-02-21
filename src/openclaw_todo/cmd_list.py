@@ -41,6 +41,8 @@ def list_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
         elif low.startswith("limit:"):
             try:
                 limit = int(low.split(":", 1)[1])
+                if limit < 1:
+                    return f"Error: limit must be a positive integer, got: {tok!r}"
             except ValueError:
                 return f"Error: invalid limit value: {tok!r}"
         else:

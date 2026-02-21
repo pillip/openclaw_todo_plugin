@@ -244,6 +244,24 @@ class TestListLimit:
         assert "Error" in result
         assert "limit" in result.lower()
 
+    def test_list_zero_limit(self, conn):
+        parsed = _make_parsed(title_tokens=["limit:0"])
+        ctx = {"sender_id": "U001"}
+
+        result = list_handler(parsed, conn, ctx)
+
+        assert "Error" in result
+        assert "positive" in result.lower()
+
+    def test_list_negative_limit(self, conn):
+        parsed = _make_parsed(title_tokens=["limit:-5"])
+        ctx = {"sender_id": "U001"}
+
+        result = list_handler(parsed, conn, ctx)
+
+        assert "Error" in result
+        assert "positive" in result.lower()
+
 
 class TestListSectionFilter:
     """Section filter via /s option."""
