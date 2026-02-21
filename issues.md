@@ -709,12 +709,12 @@ Revert module.
 |-------------|----------------------------------------|
 | Track       | QA                                     |
 | Milestone   | M5                                     |
-| Status      | TODO                                   |
+| Status      | done                                   |
 | Priority    | P1                                     |
 | Estimate    | 1d                                     |
 | Branch      | `feature/018-parser-tests`             |
-| GH-Issue    | --                                     |
-| PR          | --                                     |
+| GH-Issue    | issues/39                              |
+| PR          | pull/40                                |
 
 **Description**
 Expand parser test coverage to include edge cases: multiple options in varied order, due at year boundary, empty title, mentions mixed with options, unicode in titles, extra whitespace handling.
@@ -749,11 +749,11 @@ CI coverage report.
 |-------------|----------------------------------------|
 | Track       | QA                                     |
 | Milestone   | M5                                     |
-| Status      | TODO                                   |
+| Status      | done                                   |
 | Priority    | P1                                     |
 | Estimate    | 1.5d                                   |
 | Branch      | `feature/019-e2e-tests`               |
-| GH-Issue    | --                                     |
+| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/38 |
 | PR          | --                                     |
 
 **Description**
