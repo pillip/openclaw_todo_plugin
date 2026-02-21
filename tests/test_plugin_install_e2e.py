@@ -45,11 +45,26 @@ def _extract_task_id(add_result: str) -> str:
     return add_result.split("#")[1].split(" ")[0]
 
 
+_ALLOWED_COLUMNS = frozenset({
+    "*", "id", "title", "status", "section", "due",
+    "project_id", "created_by", "closed_at", "created_at", "updated_at",
+})
+
+
 def _query_task(db_path: str, task_id: str, columns: str = "*") -> tuple | None:
-    """Query a task row by ID."""
+    """Query a task row by ID.
+
+    ``columns`` must be a comma-separated list of column names drawn from
+    ``_ALLOWED_COLUMNS`` to prevent SQL injection in test helpers.
+    """
+    parts = [c.strip() for c in columns.split(",")]
+    disallowed = set(parts) - _ALLOWED_COLUMNS
+    if disallowed:
+        raise ValueError(f"Disallowed columns: {disallowed}")
+    safe_columns = ", ".join(parts)
     with sqlite3.connect(db_path) as conn:
         return conn.execute(
-            f"SELECT {columns} FROM tasks WHERE id = ?;",
+            f"SELECT {safe_columns} FROM tasks WHERE id = ?;",
             (int(task_id),),
         ).fetchone()
 
