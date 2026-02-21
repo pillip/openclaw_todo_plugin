@@ -31,7 +31,6 @@ def test_extract_section_invalid():
 
 def test_due_mm_dd_normalisation():
     """due:03-15 should be normalised to current-year YYYY-MM-DD."""
-
     result = parse("add Task due:03-15")
     expected = f"{date.today().year}-03-15"
     assert result.due == expected
