@@ -16,6 +16,9 @@ import openclaw_todo.schema_v1 as _schema_v1  # noqa: F401 — registers migrati
 from openclaw_todo.cmd_add import add_handler as _add_handler  # noqa: E402
 from openclaw_todo.cmd_list import list_handler as _list_handler  # noqa: E402
 from openclaw_todo.cmd_move import move_handler as _move_handler  # noqa: E402
+from openclaw_todo.cmd_done_drop import done_handler as _done_handler  # noqa: E402
+from openclaw_todo.cmd_done_drop import drop_handler as _drop_handler  # noqa: E402
+from openclaw_todo.cmd_project_list import project_list_handler as _project_list_handler  # noqa: E402
 
 # Type alias for command handler functions.
 HandlerFn = Callable[[ParsedCommand, sqlite3.Connection, dict], str]
@@ -58,6 +61,9 @@ _handlers: dict[str, HandlerFn] = {
     "add": _add_handler,
     "list": _list_handler,
     "move": _move_handler,
+    "done": _done_handler,
+    "drop": _drop_handler,
+    "project_list": _project_list_handler,
 }
 
 
