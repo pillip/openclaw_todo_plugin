@@ -348,12 +348,12 @@ Revert handler; read-only operation.
 |-------------|----------------------------------------|
 | Track       | Backend                                |
 | Milestone   | M3                                     |
-| Status      | TODO                                   |
+| Status      | done                                   |
 | Priority    | P1                                     |
 | Estimate    | 1d                                     |
 | Branch      | `feature/009-cmd-board`                |
-| GH-Issue    | --                                     |
-| PR          | --                                     |
+| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/30 |
+| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/31 |
 
 **Description**
 Implement the `board` subcommand. Groups tasks by section in fixed order (BACKLOG, DOING, WAITING, DONE, DROP), applies scope/project/status filters, and limits per section. Format: section headers with task lines underneath.

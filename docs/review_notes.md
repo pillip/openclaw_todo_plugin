@@ -1415,6 +1415,94 @@ No Critical, High, or Medium severity findings. Three Low findings (S3, S4, S5) 
 
 ---
 
+# PR #31 Review Notes -- Issue #9: /todo board kanban view
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-02-21
+> Branch: `feature/009-cmd-board`
+
+---
+
+## Code Review
+
+### Verdict: APPROVE
+
+The implementation is clean, well-structured, and consistent with the existing `cmd_list.py` pattern. All 17 board tests and 16 dispatcher tests pass (33 total).
+
+### Findings
+
+#### [Info] Duplicated filtering/scope logic with `cmd_list.py`
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_board.py`, lines 46-93
+- The scope resolution logic (mine/all/user), project filtering, visibility checks, and query building are nearly identical between `cmd_board.py` and `cmd_list.py`. This is approximately 45 lines of duplicated code.
+- **Action**: Acceptable for now (two consumers). If a third command reuses this pattern, extract a shared `build_task_query()` helper. Propose as follow-up issue.
+
+#### [Info] N+1 query for assignees in board rendering
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_board.py`, lines 128-131
+- For each displayed task, an individual query fetches assignees. With `limitPerSection=10` and 5 sections, this is up to 50 extra queries per board call. The same pattern exists in `cmd_list.py` so this is consistent.
+- **Action**: Not a problem at current scale (SQLite, local, small datasets). If performance becomes a concern, batch-fetch assignees in a single query using `WHERE task_id IN (...)`. Propose as follow-up.
+
+#### [Info] `OrderedDict` unnecessary on Python 3.11+
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_board.py`, line 7, 99
+- Since Python 3.7+, regular `dict` preserves insertion order. `OrderedDict` is not needed here since the code initializes sections in `SECTION_ORDER` order. However, using `OrderedDict` is explicit about the intent, so this is a stylistic choice, not a bug.
+- **Action**: None required.
+
+#### [Info] Board ignores `/s` section filter for non-done/drop sections
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_board.py`, lines 50-53
+- Unlike `cmd_list.py` which applies `parsed.section` as a section filter (e.g., `/s doing` shows only tasks in the "doing" section), `cmd_board.py` only checks `parsed.section` for status switching (done/drop). If a user passes `/s doing`, the board still shows all 5 sections but filtered to `status='open'`. This may be intentional (board always shows all sections) but differs from how `cmd_list.py` uses `parsed.section`.
+- **Action**: Clarify whether `/s <section>` on `/todo board` should filter to a single section or is intentionally ignored. Document the design decision if intentional.
+
+#### [Good] Negative/zero limitPerSection validation
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_board.py`, lines 37-40
+- Properly validates that `limitPerSection` is a positive integer and returns clear error messages for zero, negative, and non-numeric values. Tests cover both cases.
+
+#### [Good] Test coverage is thorough
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/tests/test_cmd_board.py`
+- 17 tests covering: section order, empty sections, task grouping, header format, section counts, limit capping, overflow messages, invalid/zero limits, scope filtering (mine/all/project), private project visibility, task line format (with and without due), and fully empty board. Well organized into 5 test classes.
+
+#### [Minor] Missing test for mention-based scope
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/tests/test_cmd_board.py`
+- The `scope="user"` path (triggered by `parsed.mentions`) is tested indirectly via private project filtering but has no dedicated test where `mentions=["UOTHER"]` is passed and the result shows only that user's tasks.
+- **Action**: Consider adding a test for mention-based user scope filtering.
+
+---
+
+## Security Findings
+
+### No Critical or High findings.
+
+#### [Low] No upper bound on `limitPerSection`
+
+- **Severity**: Low
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_board.py`, line 36
+- A user could pass `limitPerSection:999999` which would display all tasks without any cap. Since this is a read-only operation on SQLite and the main query already fetches all rows regardless of the limit (the limit is applied in Python slicing at line 125), the impact is negligible -- the database work is the same either way. The only effect is a longer output string.
+- **Action**: None required. If output length becomes a concern, add a `MAX_LIMIT_PER_SECTION` constant.
+
+#### [Info] SQL queries use parameterized statements -- no injection risk
+
+All SQL in `cmd_board.py` uses parameterized queries (`?` placeholders with params list). The `where_clause` is constructed from hardcoded condition strings with user values passed as parameters. This is consistent with `cmd_list.py` and is safe.
+
+#### [Info] Visibility/authorization correctly enforced
+
+Private project tasks are correctly hidden from non-owners via the `(p.visibility = 'shared' OR p.owner_user_id = ?)` condition across all scope modes (mine, all, user). Test `test_private_project_hidden_from_others` validates this.
+
+---
+
+## Follow-up Issues (proposed)
+
+1. **Refactor**: Extract shared scope/filtering/query-building logic from `cmd_board.py` and `cmd_list.py` into a common helper module to reduce duplication.
+2. **Performance**: Batch-fetch assignees for displayed tasks instead of N+1 individual queries (applies to both `cmd_board.py` and `cmd_list.py`).
+3. **Test coverage**: Add a dedicated test for mention-based user scope (`parsed.mentions=["UOTHER"]`) in `test_cmd_board.py`.
+4. **Design clarification**: Document whether `/s <section>` on `/todo board` should filter to a single section or is intentionally a no-op for non-done/drop sections.
+
+---
+
 # PR #33 Review Notes -- Issue #14: `/todo project set-private` command
 
 > Reviewer: Claude Opus 4.6 (automated review)
@@ -1424,6 +1512,10 @@ No Critical, High, or Medium severity findings. Three Low findings (S3, S4, S5) 
 ---
 
 ## Code Review
+
+### Verdict: APPROVE
+
+The implementation is clean, well-structured, and follows established handler patterns. All 11 set-private tests pass alongside the full suite (131 total).
 
 ### Acceptance Criteria Checklist
 
@@ -1446,44 +1538,31 @@ No Critical, High, or Medium severity findings. Three Low findings (S3, S4, S5) 
 
 #### [Medium] F1: Error message format deviates from UX spec Section 5.3
 
-- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_project_set_private.py`, lines 121-124
-- **Description**: The actual error message format is:
-  ```
-  Cannot make 'Backend' private: tasks [#1, #2] have non-owner assignees [U002, U003].
-  ```
-  The UX spec (Section 5.3) prescribes:
-  ```
-  :x: Cannot set project "Backend" to private: found tasks assigned to non-owner users.
-  e.g. #12 assignees:@alice, #18 assignees:@carol
-  Please reassign or remove these assignees first.
-  ```
-  Key differences: (a) missing `:x:` emoji prefix, (b) different wording ("Cannot make" vs "Cannot set project ... to"), (c) task-assignee pairs are not grouped per-task (e.g., `#12 assignees:@alice`), (d) missing "Please reassign or remove" guidance line, (e) truncation message differs ("(+N more tasks)" vs "... and N more tasks with external assignees.").
-- **Impact**: Functional behavior is correct; only the user-facing message text differs. This is a UX polish issue, not a logic bug.
-- **Recommendation**: Align the message format with the UX spec in a follow-up. Not blocking since the AC tests check for the essential information (task IDs, assignee IDs) and pass.
+- **File**: `src/openclaw_todo/cmd_project_set_private.py`, lines 121-124
+- **Description**: The actual error message format differs from the UX spec. Key differences: (a) missing `:x:` emoji prefix, (b) different wording ("Cannot make" vs "Cannot set project ... to"), (c) task-assignee pairs are not grouped per-task, (d) missing "Please reassign or remove" guidance line, (e) truncation message differs.
+- **Impact**: Functional behavior is correct; only the user-facing message text differs. UX polish issue, not a logic bug.
+- **Recommendation**: Align the message format with the UX spec in a follow-up.
 
 #### [Low] F2: No explicit transaction wrapping for multi-statement DB writes
 
-- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_project_set_private.py`, lines 127-145 and 57-69
-- **Description**: Both the conversion path (UPDATE + INSERT event) and the creation path (INSERT project + INSERT event) perform two DB writes followed by `conn.commit()`. If the second statement fails, the first write remains uncommitted in the implicit transaction. While SQLite's default behavior handles this correctly (both are in the same implicit transaction and neither is committed until `conn.commit()`), using `with conn:` would make the transactional intent explicit and guard against future refactoring that might introduce intermediate commits.
+- **File**: `src/openclaw_todo/cmd_project_set_private.py`, lines 127-145 and 57-69
+- **Description**: Both the conversion path (UPDATE + INSERT event) and the creation path (INSERT project + INSERT event) perform two DB writes followed by `conn.commit()`. Using `with conn:` would make the transactional intent explicit.
 - **Impact**: Low. Current behavior is correct under SQLite's default autocommit=False mode.
-- **Recommendation**: Wrap multi-statement writes in `with conn:` for clarity. Consistent with follow-up item from prior reviews.
+- **Recommendation**: Wrap multi-statement writes in `with conn:` for clarity.
 
 #### [Low] F3: `task_ids` deduplication uses linear scan
 
-- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_project_set_private.py`, lines 97-101
-- **Description**: `if task_id not in task_ids` performs O(n) membership checks on a list. For the typical case (small number of violations), this is fine. If performance ever matters, a seen-set could be added.
-- **Impact**: Negligible for practical workloads (capped at task count per project).
-- **Recommendation**: No change needed now. The `_MAX_VIOLATIONS = 10` cap limits output anyway.
+- **File**: `src/openclaw_todo/cmd_project_set_private.py`, lines 97-101
+- **Description**: `if task_id not in task_ids` performs O(n) membership checks on a list. Negligible for practical workloads (capped at `_MAX_VIOLATIONS = 10`).
+- **Recommendation**: No change needed now.
 
 #### [Info] F4: Dispatcher registration is clean
 
-- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/dispatcher.py`, line 22 and 68
-- **Description**: Import and handler registration follow the established pattern. The `project_set_private` key in `_handlers` matches the dynamic lookup in `_dispatch_project` (line 129: `f"project_{sub.replace('-', '_')}"`). This is correct and consistent.
+- Import and handler registration follow the established pattern. The `project_set_private` key in `_handlers` matches the dynamic lookup in `_dispatch_project`.
 
 #### [Info] F5: Test helper `_make_parsed` correctly simulates parser output
 
-- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/tests/test_cmd_project_set_private.py`, lines 38-47
-- **Description**: `title_tokens=["set-private", project_name]` matches the expected parser output for `/todo project set-private <name>`. The handler's `parsed.title_tokens[1:]` extraction on line 30 of the handler correctly skips the subcommand token.
+- `title_tokens=["set-private", project_name]` matches the expected parser output for `/todo project set-private <name>`.
 
 ---
 
@@ -1491,36 +1570,32 @@ No Critical, High, or Medium severity findings. Three Low findings (S3, S4, S5) 
 
 ### [Low] S1: User-supplied project name reflected in response messages
 
-- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_project_set_private.py`, lines 43, 72, 122, 148
-- **Description**: The project name from user input is included directly in response strings (e.g., `f"Project '{project_name}' is already private for you."`). In the Slack context, message content is auto-escaped by the Slack API, preventing XSS. If the output context ever changes to raw HTML, this would need sanitization.
 - **Severity**: Low (safe in Slack; review if output context changes)
+- Project name from user input is included directly in response strings. Slack auto-escapes message content, preventing XSS.
 
 ### [Low] S2: No authorization check for shared-to-private conversion
 
-- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_project_set_private.py`, lines 52-54
-- **Description**: Any user can convert any shared project to private (becoming the owner). The PRD does not specify any restriction on who can perform this conversion -- the assignee validation is the only gate. This is by-design per the current requirements but worth noting: in a multi-team environment, this could allow a user to "claim" a shared project.
 - **Severity**: Low (matches current PRD; flag if requirements evolve)
+- Any user can convert any shared project to private. The assignee validation is the only gate. This is by-design per the current requirements.
 
 ### [Info] S3: All SQL queries use parameterized statements
 
-- All database queries in `cmd_project_set_private.py` use `?` placeholders with parameter tuples. No string interpolation or f-string SQL construction found. SQL injection risk is mitigated.
+- No string interpolation or f-string SQL construction found. SQL injection risk is mitigated.
 
 ### [Info] S4: No hardcoded secrets or credentials
 
-- No API keys, tokens, or secrets found in `cmd_project_set_private.py` or `test_cmd_project_set_private.py`.
-
 ### [Info] S5: No new dependencies introduced
 
-- `cmd_project_set_private.py` uses only standard library (`json`, `logging`, `sqlite3`) plus internal module (`parser`). No new entries in `pyproject.toml`.
+- Uses only standard library (`json`, `logging`, `sqlite3`) plus internal module (`parser`).
 
 ### Security Summary
 
-No Critical or High severity findings. Two Low findings (S1, S2) are consistent with patterns already accepted in prior handler reviews. The implementation follows established security patterns: parameterized queries, no hardcoded secrets, and standard library only.
+No Critical or High severity findings. Two Low findings (S1, S2) are consistent with patterns already accepted in prior handler reviews.
 
 ---
 
 ## Follow-up Issues (proposed)
 
-1. **Error message format alignment**: Update the error message in `_convert_shared_to_private` to match UX spec Section 5.3 format (`:x:` prefix, per-task assignee grouping, "Please reassign or remove" guidance line, spec-matching truncation text). Reference: finding F1.
-2. **Transaction explicitness**: Wrap multi-statement DB writes in `with conn:` blocks in `set_private_handler` and `_convert_shared_to_private`. Consistent with the same follow-up item from prior reviews (cmd_add, cmd_done_drop).
+1. **Error message format alignment**: Update the error message in `_convert_shared_to_private` to match UX spec Section 5.3 format.
+2. **Transaction explicitness**: Wrap multi-statement DB writes in `with conn:` blocks.
 3. **Context typing**: Introduce a `TypedDict` for `context` parameter to prevent `KeyError` on missing `sender_id` (carried forward from prior reviews).
