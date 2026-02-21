@@ -29,6 +29,9 @@ All notable changes to this project will be documented in this file.
 - `cmd_move.py`: `/todo move` command handler with section validation, permission checks (private: owner only, shared: assignee/creator), updated_at, event logging
 - `move` handler registered in dispatcher
 - cmd_move tests (13 tests): valid moves, updated_at, event logging, same-section noop, missing section/ID, invalid ID, nonexistent task, permission checks
+- `cmd_list.py`: `/todo list` command handler with scope filtering (mine/all/<@USER>), project/section/status filters, sorting (due ASC NULLs last, id DESC), configurable limit
+- `list` handler registered in dispatcher
+- cmd_list tests (12 tests): mine default, all scope, private visibility, project/section filters, sorting, limit, edge cases
 - `.github/workflows/ci.yml`: GitHub Actions CI pipeline (push + PR on main, Python 3.11 + uv + pytest)
 - Branch protection: `test` job as required status check on main
 
