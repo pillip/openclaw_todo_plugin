@@ -1243,3 +1243,159 @@ No Critical, High, or Medium findings.
 ### Verdict
 
 **APPROVE -- ready to merge.** All 98 tests pass. One Low finding fixed (F3). No blocking issues.
+
+---
+
+# PR #29 Review Notes -- Issue #13: /todo project list command
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-02-21
+> Branch: `feature/013-cmd-project-list`
+
+---
+
+## Code Review
+
+### Changed Files
+
+| File | Change | Lines |
+|------|--------|-------|
+| `src/openclaw_todo/cmd_project_list.py` | NEW | 60 |
+| `src/openclaw_todo/cmd_done_drop.py` | NEW | 102 |
+| `tests/test_cmd_project.py` | NEW | 152 |
+| `tests/test_cmd_done_drop.py` | NEW | 225 |
+| `src/openclaw_todo/dispatcher.py` | MODIFIED | +6 lines (3 imports + 3 registry entries) |
+| `tests/test_dispatcher.py` | MODIFIED | +12/-1 lines (routing tests for done/drop, parametrize trim) |
+
+### Acceptance Criteria Checklist -- /todo project list (Issue #13)
+
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| Shared projects listed regardless of sender | PASS | SQL WHERE: `p.visibility = 'shared'`. `test_project_list_shows_shared` verifies with sender `U001` seeing both `Inbox` and `Backend`. |
+| Sender's private projects listed | PASS | SQL WHERE: `OR (p.visibility = 'private' AND p.owner_user_id = ?)` with parameterized `sender_id`. `test_project_list_shows_own_private` verifies U001 sees `MyStuff`. |
+| Other users' private projects NOT shown | PASS | `test_project_list_hides_others_private` verifies `Secret` (owned by U002) absent for U001. `test_other_user_sees_own_private` confirms U002 sees `Secret` but not `MyStuff` -- bidirectional verification. |
+| Each project shows name, visibility, task count | PASS | Output format: `  <name> (<count> tasks)` grouped under `Shared:` / `Private:` headers. `test_shared_projects_show_task_count` verifies `Inbox (2 tasks)` and `Backend (1 tasks)`. |
+
+### Acceptance Criteria Checklist -- /todo done and /todo drop (Issue #11, bundled in this PR)
+
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| `done` sets section=done, status=done, closed_at | PASS | `test_done_sets_fields` verifies all three DB columns. |
+| `drop` sets section=drop, status=dropped, closed_at | PASS | `test_drop_sets_fields` verifies all three DB columns. |
+| Already-closed task returns informational message | PASS | `test_already_done`, `test_already_dropped`, `test_done_on_dropped_task` cover all combinations. |
+| Private project: only owner can close | PASS | `test_done_private_owner_allowed`, `test_done_private_non_owner_rejected`. |
+| Shared project: only assignee or creator can close | PASS | `test_drop_shared_assignee_allowed`, `test_drop_shared_unrelated_rejected`. |
+| Event logged with old/new section and status | PASS | `test_done_logs_event`, `test_drop_logs_event` verify JSON payload. |
+| Dispatcher routes done and drop to real handlers | PASS | `test_done_routes_to_handler`, `test_drop_routes_to_handler`. |
+
+### Required Tests
+
+| Test | Status |
+|------|--------|
+| `test_project_list_shows_shared` | PASS |
+| `test_shared_projects_show_task_count` | PASS |
+| `test_project_list_shows_own_private` | PASS |
+| `test_project_list_hides_others_private` | PASS |
+| `test_other_user_sees_own_private` | PASS |
+| `test_default_inbox_shown` | PASS |
+
+6 project list tests + 14 done/drop tests + 2 dispatcher routing tests = 22 new tests. 120 total tests passing.
+
+### Findings
+
+#### [Low] F1: "1 tasks" pluralization is grammatically incorrect
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_project_list.py`, line 39
+- **Description**: The format string `f"  {name} ({task_count} tasks)"` always uses the plural "tasks", even when `task_count == 1`. This produces `Backend (1 tasks)` instead of `Backend (1 task)`. The test on line 101 of `tests/test_cmd_project.py` asserts this incorrect pluralization (`assert "Backend (1 tasks)" in result`).
+- **Impact**: UX polish issue only. No functional impact.
+- **Action**: Follow-up item. Fix would be: `f"  {name} ({task_count} {'task' if task_count == 1 else 'tasks'})"`. Not applied now to avoid changing test expectations in a review pass.
+
+#### [Low] F2: `context["sender_id"]` raises unhandled KeyError if key absent
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_project_list.py`, line 17; `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_done_drop.py`, line 28
+- **Description**: Same pattern as `cmd_add.py`, `cmd_move.py`. The dispatcher contract requires `sender_id` in context, so this is consistent across the codebase.
+- **Action**: None. Consistent with established pattern.
+
+#### [Low] F3: No dispatcher integration test for `project list` with real handler
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/tests/test_dispatcher.py`
+- **Description**: The existing `test_project_list_routes` test (line 95) uses a fake handler registered via `register_handler`. There is no integration test that dispatches `"project list"` through the real `project_list_handler`. Other commands like `add` and `list` have such integration tests (lines 50-58).
+- **Action**: Follow-up item.
+
+#### [Low] F4: Stale comment in dispatcher test parametrize
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/tests/test_dispatcher.py`, line 41
+- **Description**: The comment says "For move/done/drop/edit, provide an id-like arg" but the parametrize list now only contains `["board", "edit"]`. The conditional `if command in ("move", "done", "drop", "edit")` on line 41 is unreachable for move/done/drop.
+- **Action**: Follow-up item. Simplify conditional to `if command == "edit"`.
+
+#### [Info] F5: SQL query in `cmd_project_list.py` is correct and efficient
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_project_list.py`, lines 19-29
+- **Description**: `LEFT JOIN tasks` with `COUNT(t.id)` correctly produces 0 for empty projects. `GROUP BY p.id` is correct. `ORDER BY p.visibility, p.name` gives deterministic output.
+
+#### [Info] F6: `_close_task` shared helper in `cmd_done_drop.py` is well-factored
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_done_drop.py`, lines 15-82
+- **Description**: Keyword-only arguments (`action`, `target_section`, `target_status`) make the call sites self-documenting. Validation chain (missing ID -> invalid ID -> not found -> already closed -> permission -> update) is correct and consistent with `cmd_move.py`.
+
+#### [Info] F7: Bidirectional privacy tests provide strong confidence
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/tests/test_cmd_project.py`
+- **Description**: `test_project_list_hides_others_private` and `test_other_user_sees_own_private` test from both U001 and U002 perspectives, verifying the WHERE clause from both sides. This is thorough.
+
+### Code Quality Summary
+
+Both implementations are clean, correct, and consistent with established codebase patterns:
+
+- **cmd_project_list.py** (60 lines): Single parameterized SQL query with LEFT JOIN, correct visibility filtering, grouped output.
+- **cmd_done_drop.py** (102 lines): Well-factored `_close_task` helper, full validation chain, permission enforcement via `can_write_task()`.
+- **22 new tests** covering all acceptance criteria plus edge cases (already-closed cross-states, zero-task projects, bidirectional privacy).
+- All 120 tests pass.
+
+**Verdict: APPROVE** -- no Critical, High, or Medium findings. Four Low findings noted. No fixes required.
+
+---
+
+## Security Findings
+
+### [Info] S1: SQL injection -- No risk
+
+- **Files**: `cmd_project_list.py` line 28, `cmd_done_drop.py` lines 42, 59-62, 72-75
+- **Description**: All SQL queries use `?` parameter placeholders. `task_id` is converted to `int` before DB use. Visibility literals are hardcoded strings. No string interpolation in SQL.
+- **Severity**: Info (no risk found)
+
+### [Info] S2: Private project visibility correctly enforced -- no leakage
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_project_list.py`, lines 24-25
+- **Description**: `WHERE p.visibility = 'shared' OR (p.visibility = 'private' AND p.owner_user_id = ?)` correctly restricts private projects to sender. Verified bidirectionally in tests.
+- **Severity**: Info (correct, well-tested)
+
+### [Info] S3: Authorization in done/drop follows established permission model
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_done_drop.py`, line 54
+- **Description**: `can_write_task()` enforces private-owner and shared-assignee/creator rules. Four permission tests verify allow and deny paths.
+- **Severity**: Info (correctly implemented)
+
+### [Low] S4: Task existence disclosed before permission check in done/drop
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_done_drop.py`, lines 44-45
+- **Description**: "Task not found" returned before permission check. Same pattern as `cmd_move.py`.
+- **Severity**: Low (acceptable in Slack team context)
+
+### [Info] S5: No hardcoded secrets, no new dependencies
+
+- No API keys, tokens, or secrets. Both modules use only stdlib + internal modules.
+
+### Security Summary
+
+No Critical, High, or Medium severity findings. One Low finding (S4: task ID enumeration in done/drop) consistent with established codebase pattern. Private project visibility is correctly enforced with no leakage. All SQL is parameterized.
+
+---
+
+## Follow-up Issues (proposed)
+
+1. **UX polish**: Fix "1 tasks" pluralization in `cmd_project_list.py` line 39.
+2. **Test coverage**: Add a dispatcher integration test for `project list` with real handler.
+3. **Test cleanup**: Simplify stale conditional in `test_dispatcher.py` line 41.
+4. **Test helper dedup**: Extract shared `_seed_task` from `test_cmd_done_drop.py` and `test_cmd_move.py` into `conftest.py`.
+5. **Context typing**: Introduce `TypedDict` for `context` parameter (carried forward).
