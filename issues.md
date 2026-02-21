@@ -797,7 +797,7 @@ CI test results and coverage delta.
 | Estimate    | 1d                                     |
 | Branch      | `feature/020-packaging`               |
 | GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/42 |
-| PR          | --                                     |
+| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/43 |
 
 **Description**
 Finalise `pyproject.toml` metadata (name, version, description, license, entry-points), add a `Makefile` with targets for lint/test/build, and document installation instructions in README. Ensure the plugin can be installed as a package and discovered by the OpenClaw gateway.
