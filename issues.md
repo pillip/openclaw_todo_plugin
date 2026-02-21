@@ -887,3 +887,45 @@ PR 머지 전 자동 테스트 검증을 위한 GitHub Actions CI 파이프라�
 
 **Dependencies**
 None.
+
+---
+
+## Issue #22: Plugin install E2E tests via entry-point discovery
+
+| Field       | Value                                  |
+|-------------|----------------------------------------|
+| Track       | QA                                     |
+| Milestone   | M5                                     |
+| Status      | doing                                  |
+| Priority    | P1                                     |
+| Estimate    | 0.5d                                   |
+| Branch      | `feature/022-plugin-install-e2e`       |
+| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/44 |
+| PR          | --                                     |
+
+**Description**
+Add E2E tests that discover the plugin via `importlib.metadata.entry_points(group="openclaw.plugins")`, load the `todo` entry-point, and exercise the full command flow through the discovered function. Unlike `test_e2e.py` which imports `handle_message` directly, these tests verify that the package installation and entry-point registration work correctly.
+
+**Acceptance Criteria**
+- [ ] `openclaw.plugins` group contains `todo` entry-point after `uv sync`
+- [ ] Loaded function is callable with correct signature (text, context, db_path)
+- [ ] Full command flow works via entry-point-loaded function (add, list, move, edit, done)
+- [ ] Private project isolation verified via entry-point path
+- [ ] Multi-user shared project collaboration verified
+- [ ] Tests marked with `@pytest.mark.install` for selective execution
+
+**Tests**
+- `tests/test_plugin_install_e2e.py::TestEntryPointDiscovery::test_todo_entry_point_exists`
+- `tests/test_plugin_install_e2e.py::TestEntryPointDiscovery::test_loaded_function_is_callable`
+- `tests/test_plugin_install_e2e.py::TestEntryPointDiscovery::test_loaded_function_signature`
+- `tests/test_plugin_install_e2e.py::TestPluginViaEntryPoint::test_non_todo_returns_none`
+- `tests/test_plugin_install_e2e.py::TestPluginViaEntryPoint::test_add_and_list_roundtrip`
+- `tests/test_plugin_install_e2e.py::TestPluginViaEntryPoint::test_full_lifecycle`
+- `tests/test_plugin_install_e2e.py::TestPluginViaEntryPoint::test_private_project_isolation`
+- `tests/test_plugin_install_e2e.py::TestPluginViaEntryPoint::test_multiple_users_shared_project`
+
+**Rollback**
+Revert test file; no production code change.
+
+**Dependencies**
+#20
