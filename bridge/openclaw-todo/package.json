@@ -1,0 +1,13 @@
+{
+  "name": "openclaw-todo",
+  "version": "0.1.0",
+  "description": "OpenClaw bridge plugin for the Python TODO server",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

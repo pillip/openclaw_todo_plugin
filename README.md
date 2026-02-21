@@ -85,6 +85,45 @@ All commands are prefixed with `/todo`:
 | `due:-` | Clear due date | `due:-` |
 | `<@USER>` | Assign user | `<@U12345>` |
 
+## HTTP Bridge (for JS/TS OpenClaw gateway)
+
+If your OpenClaw gateway only supports JS/TS plugins, use the HTTP bridge to connect the Python plugin:
+
+```
+Slack DM → OpenClaw Gateway → JS Bridge Plugin (fetch)
+                                    ↓
+                              Python HTTP Server (:8200)
+                                    ↓
+                              handle_message() → SQLite
+```
+
+### 1. Start the Python server
+
+```bash
+# Via CLI entry point
+uv run openclaw-todo-server
+
+# Or via python -m
+uv run python -m openclaw_todo
+```
+
+### 2. Install the JS bridge plugin
+
+```bash
+cd bridge/openclaw-todo
+npm install
+npm run build
+# Copy or symlink the plugin into your OpenClaw gateway plugins directory
+```
+
+### 3. Environment variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OPENCLAW_TODO_PORT` | Python server port | `8200` |
+| `OPENCLAW_TODO_DB_PATH` | SQLite database path | `~/.openclaw/workspace/.todo/todo.sqlite3` |
+| `OPENCLAW_TODO_URL` | Server URL (JS bridge side) | `http://127.0.0.1:8200` |
+
 ## Development
 
 ```bash

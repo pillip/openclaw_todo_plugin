@@ -18,6 +18,9 @@ classifiers = [
 ]
 dependencies = []
 
+[project.scripts]
+openclaw-todo-server = "openclaw_todo.server:run"
+
 [project.entry-points."openclaw.plugins"]
 todo = "openclaw_todo.plugin:handle_message"
 
