@@ -428,12 +428,12 @@ Revert handler.
 |-------------|----------------------------------------|
 | Track       | Backend                                |
 | Milestone   | M3                                     |
-| Status      | TODO                                   |
+| Status      | done                                   |
 | Priority    | P1                                     |
 | Estimate    | 0.5d                                   |
 | Branch      | `feature/011-cmd-done-drop`            |
-| GH-Issue    | --                                     |
-| PR          | --                                     |
+| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/26 |
+| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/27 |
 
 **Description**
 Implement `done` and `drop` subcommands. Both set section and status accordingly, record `closed_at`, validate permissions same as `move`, and log event.
@@ -513,11 +513,11 @@ Revert handler.
 |-------------|----------------------------------------|
 | Track       | Backend                                |
 | Milestone   | M4                                     |
-| Status      | TODO                                   |
+| Status      | doing                                  |
 | Priority    | P1                                     |
 | Estimate    | 0.5d                                   |
 | Branch      | `feature/013-cmd-project-list`         |
-| GH-Issue    | --                                     |
+| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/28 |
 | PR          | --                                     |
 
 **Description**
