@@ -749,7 +749,7 @@ CI coverage report.
 |-------------|----------------------------------------|
 | Track       | QA                                     |
 | Milestone   | M5                                     |
-| Status      | doing                                  |
+| Status      | done                                   |
 | Priority    | P1                                     |
 | Estimate    | 1.5d                                   |
 | Branch      | `feature/019-e2e-tests`               |
