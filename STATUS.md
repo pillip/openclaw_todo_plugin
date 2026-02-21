@@ -14,7 +14,7 @@
 | M1 | DB init + migrations + schema_version | **Done** | #2, #3, #4 |
 | M2 | Parser (Slack mention, /p, /s, due correction) | **Done** | #5 |
 | M3 | Commands (add/list/board/move/done/drop/edit) | **In progress** | #6 ✅, #16 ✅, #7 ✅, #17 ✅, #10 ✅, #8 ✅, #11 ✅, #9 ✅, #12 |
-| M4 | Project commands (list/set-private/set-shared) | Not started | #13, #14, #15 |
+| M4 | Project commands (list/set-private/set-shared) | **In progress** | #13 ✅, #14, #15 |
 | M5 | Tests (parser/unit + sqlite E2E) | Not started | #18, #19 |
 | M6 | Packaging / deployment | Not started | #20 |
 | DevOps | GitHub Actions CI | **Done** | #21 |

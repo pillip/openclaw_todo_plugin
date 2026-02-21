@@ -38,6 +38,9 @@ All notable changes to this project will be documented in this file.
 - `cmd_board.py`: `/todo board` kanban view command grouping tasks by section (BACKLOG/DOING/WAITING/DONE/DROP), scope/project/status filters, limitPerSection with overflow
 - `board` handler registered in dispatcher
 - cmd_board tests (17 tests): section order, counts, empty sections, limit/overflow, scope filters, project filter, private visibility, task line format, edge cases
+- `cmd_project_list.py`: `/todo project list` subcommand showing shared + sender's private projects with task counts
+- `project_list` handler registered in dispatcher via project sub-routing
+- cmd_project_list tests (6 tests): shared visibility, task counts, own private shown, others hidden, bidirectional privacy, default Inbox
 - `.github/workflows/ci.yml`: GitHub Actions CI pipeline (push + PR on main, Python 3.11 + uv + pytest)
 - Branch protection: `test` job as required status check on main
 
