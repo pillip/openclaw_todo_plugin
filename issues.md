@@ -468,12 +468,12 @@ Revert handler.
 |-------------|----------------------------------------|
 | Track       | Backend                                |
 | Milestone   | M3                                     |
-| Status      | TODO                                   |
+| Status      | done                                   |
 | Priority    | P1                                     |
 | Estimate    | 1.5d                                   |
 | Branch      | `feature/012-cmd-edit`                 |
-| GH-Issue    | --                                     |
-| PR          | --                                     |
+| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/34 |
+| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/35 |
 
 **Description**
 Implement the `edit` subcommand (v1 replace semantics). Supports changing title, assignees (full replace), project, section, and due. Validates private-project assignee constraint on both source and target project. Logs event with old/new diff in payload.
