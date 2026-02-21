@@ -6,7 +6,6 @@ import json
 
 from openclaw_todo.cmd_done_drop import done_handler, drop_handler
 from openclaw_todo.parser import ParsedCommand
-
 from tests.conftest import seed_task as _seed_task
 
 
@@ -29,9 +28,7 @@ class TestDoneSetsFields:
         assert f"#{task_id}" in result
         assert "done" in result
 
-        row = conn.execute(
-            "SELECT section, status, closed_at FROM tasks WHERE id = ?", (task_id,)
-        ).fetchone()
+        row = conn.execute("SELECT section, status, closed_at FROM tasks WHERE id = ?", (task_id,)).fetchone()
         assert row[0] == "done"
         assert row[1] == "done"
         assert row[2] is not None  # closed_at set
@@ -40,9 +37,7 @@ class TestDoneSetsFields:
         task_id = _seed_task(conn)
         done_handler(_make_parsed("done", args=[str(task_id)]), conn, {"sender_id": "U001"})
 
-        event = conn.execute(
-            "SELECT actor_user_id, action, payload FROM events WHERE action = 'task.done'"
-        ).fetchone()
+        event = conn.execute("SELECT actor_user_id, action, payload FROM events WHERE action = 'task.done'").fetchone()
         assert event is not None
         assert event[0] == "U001"
 
@@ -63,9 +58,7 @@ class TestDropSetsFields:
         assert f"#{task_id}" in result
         assert "dropped" in result
 
-        row = conn.execute(
-            "SELECT section, status, closed_at FROM tasks WHERE id = ?", (task_id,)
-        ).fetchone()
+        row = conn.execute("SELECT section, status, closed_at FROM tasks WHERE id = ?", (task_id,)).fetchone()
         assert row[0] == "drop"
         assert row[1] == "dropped"
         assert row[2] is not None
@@ -74,9 +67,7 @@ class TestDropSetsFields:
         task_id = _seed_task(conn)
         drop_handler(_make_parsed("drop", args=[str(task_id)]), conn, {"sender_id": "U001"})
 
-        event = conn.execute(
-            "SELECT action, payload FROM events WHERE action = 'task.drop'"
-        ).fetchone()
+        event = conn.execute("SELECT action, payload FROM events WHERE action = 'task.drop'").fetchone()
         assert event is not None
 
         payload = json.loads(event[1])
@@ -89,37 +80,37 @@ class TestPermissionCheck:
 
     def test_done_private_owner_allowed(self, conn):
         task_id = _seed_task(
-            conn, project_name="MyPrivate", visibility="private",
-            owner="UOWNER", created_by="UOWNER", assignees=["UOWNER"],
+            conn,
+            project_name="MyPrivate",
+            visibility="private",
+            owner="UOWNER",
+            created_by="UOWNER",
+            assignees=["UOWNER"],
         )
-        result = done_handler(
-            _make_parsed("done", args=[str(task_id)]), conn, {"sender_id": "UOWNER"}
-        )
+        result = done_handler(_make_parsed("done", args=[str(task_id)]), conn, {"sender_id": "UOWNER"})
         assert "done" in result
         assert "Error" not in result
 
     def test_done_private_non_owner_rejected(self, conn):
         task_id = _seed_task(
-            conn, project_name="MyPrivate", visibility="private",
-            owner="UOWNER", created_by="UOWNER", assignees=["UOWNER"],
+            conn,
+            project_name="MyPrivate",
+            visibility="private",
+            owner="UOWNER",
+            created_by="UOWNER",
+            assignees=["UOWNER"],
         )
-        result = done_handler(
-            _make_parsed("done", args=[str(task_id)]), conn, {"sender_id": "UOTHER"}
-        )
+        result = done_handler(_make_parsed("done", args=[str(task_id)]), conn, {"sender_id": "UOTHER"})
         assert "permission denied" in result
 
     def test_drop_shared_assignee_allowed(self, conn):
         task_id = _seed_task(conn, created_by="UCREATOR", assignees=["UASSIGNEE"])
-        result = drop_handler(
-            _make_parsed("drop", args=[str(task_id)]), conn, {"sender_id": "UASSIGNEE"}
-        )
+        result = drop_handler(_make_parsed("drop", args=[str(task_id)]), conn, {"sender_id": "UASSIGNEE"})
         assert "dropped" in result
 
     def test_drop_shared_unrelated_rejected(self, conn):
         task_id = _seed_task(conn, created_by="UCREATOR", assignees=["UASSIGNEE"])
-        result = drop_handler(
-            _make_parsed("drop", args=[str(task_id)]), conn, {"sender_id": "URANDOM"}
-        )
+        result = drop_handler(_make_parsed("drop", args=[str(task_id)]), conn, {"sender_id": "URANDOM"})
         assert "permission denied" in result
 
 
@@ -130,27 +121,21 @@ class TestAlreadyClosed:
         task_id = _seed_task(conn)
         done_handler(_make_parsed("done", args=[str(task_id)]), conn, {"sender_id": "U001"})
 
-        result = done_handler(
-            _make_parsed("done", args=[str(task_id)]), conn, {"sender_id": "U001"}
-        )
+        result = done_handler(_make_parsed("done", args=[str(task_id)]), conn, {"sender_id": "U001"})
         assert "already done" in result
 
     def test_already_dropped(self, conn):
         task_id = _seed_task(conn)
         drop_handler(_make_parsed("drop", args=[str(task_id)]), conn, {"sender_id": "U001"})
 
-        result = drop_handler(
-            _make_parsed("drop", args=[str(task_id)]), conn, {"sender_id": "U001"}
-        )
+        result = drop_handler(_make_parsed("drop", args=[str(task_id)]), conn, {"sender_id": "U001"})
         assert "already dropped" in result
 
     def test_done_on_dropped_task(self, conn):
         task_id = _seed_task(conn)
         drop_handler(_make_parsed("drop", args=[str(task_id)]), conn, {"sender_id": "U001"})
 
-        result = done_handler(
-            _make_parsed("done", args=[str(task_id)]), conn, {"sender_id": "U001"}
-        )
+        result = done_handler(_make_parsed("done", args=[str(task_id)]), conn, {"sender_id": "U001"})
         assert "already dropped" in result
 
 

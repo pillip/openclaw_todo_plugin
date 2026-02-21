@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from openclaw_todo.cmd_board import board_handler
 from openclaw_todo.parser import ParsedCommand
-
 from tests.conftest import seed_task as _seed_task
 
 
@@ -51,8 +50,8 @@ class TestBoardSectionOrder:
         result = board_handler(parsed, conn, {"sender_id": "U001"})
 
         lines = result.splitlines()
-        backlog_idx = next(i for i, l in enumerate(lines) if "BACKLOG" in l)
-        doing_idx = next(i for i, l in enumerate(lines) if "DOING" in l)
+        backlog_idx = next(i for i, line in enumerate(lines) if "BACKLOG" in line)
+        doing_idx = next(i for i, line in enumerate(lines) if "DOING" in line)
 
         backlog_content = "\n".join(lines[backlog_idx:doing_idx])
         assert "backlog task" in backlog_content
@@ -81,8 +80,8 @@ class TestBoardSectionOrder:
         result = board_handler(parsed, conn, {"sender_id": "U001"})
 
         lines = result.splitlines()
-        backlog_line = next(l for l in lines if "BACKLOG" in l)
-        doing_line = next(l for l in lines if "DOING" in l)
+        backlog_line = next(line for line in lines if "BACKLOG" in line)
+        doing_line = next(line for line in lines if "DOING" in line)
         assert "(2)" in backlog_line
         assert "(1)" in doing_line
 
@@ -98,10 +97,10 @@ class TestBoardLimitPerSection:
         result = board_handler(parsed, conn, {"sender_id": "U001"})
 
         lines = result.splitlines()
-        backlog_idx = next(i for i, l in enumerate(lines) if "BACKLOG" in l)
-        doing_idx = next(i for i, l in enumerate(lines) if "DOING" in l)
+        backlog_idx = next(i for i, line in enumerate(lines) if "BACKLOG" in line)
+        doing_idx = next(i for i, line in enumerate(lines) if "DOING" in line)
 
-        backlog_lines = [l for l in lines[backlog_idx + 1:doing_idx] if l.strip().startswith("#")]
+        backlog_lines = [ln for ln in lines[backlog_idx + 1 : doing_idx] if ln.strip().startswith("#")]
         assert len(backlog_lines) == 2
 
     def test_overflow_message(self, conn):
@@ -167,8 +166,12 @@ class TestBoardScopeFilter:
 
     def test_private_project_hidden_from_others(self, conn):
         _seed_task(
-            conn, title="private task", project_name="Secret",
-            visibility="private", owner="UOWNER", created_by="UOWNER",
+            conn,
+            title="private task",
+            project_name="Secret",
+            visibility="private",
+            owner="UOWNER",
+            created_by="UOWNER",
             assignees=["UOWNER"],
         )
         parsed = _make_parsed(title_tokens=["all"])

@@ -23,9 +23,7 @@ def register(fn: MigrationFn) -> MigrationFn:
 
 def _ensure_version_table(conn: sqlite3.Connection) -> None:
     """Create ``schema_version`` table with version=0 if it does not exist."""
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);"
-    )
+    conn.execute("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);")
     row = conn.execute("SELECT version FROM schema_version;").fetchone()
     if row is None:
         conn.execute("INSERT INTO schema_version (version) VALUES (0);")
@@ -59,15 +57,11 @@ def migrate(conn: sqlite3.Connection) -> int:
         logger.info("Migrating from version %d to %d", idx, version_to_apply)
         try:
             migration_fn(conn)
-            conn.execute(
-                "UPDATE schema_version SET version = ?;", (version_to_apply,)
-            )
+            conn.execute("UPDATE schema_version SET version = ?;", (version_to_apply,))
             conn.commit()
         except Exception as exc:
             conn.rollback()
-            raise RuntimeError(
-                f"Migration to version {version_to_apply} failed: {exc}"
-            ) from exc
+            raise RuntimeError(f"Migration to version {version_to_apply} failed: {exc}") from exc
 
     final = get_version(conn)
     logger.info("Migrations complete. Schema at version %d", final)

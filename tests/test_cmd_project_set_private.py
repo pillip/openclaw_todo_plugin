@@ -36,10 +36,7 @@ class TestSetPrivateAlreadyPrivate:
     """If sender already has a private project with the name, return noop."""
 
     def test_set_private_already_private(self, conn):
-        conn.execute(
-            "INSERT INTO projects (name, visibility, owner_user_id) "
-            "VALUES ('MyProj', 'private', 'U001');"
-        )
+        conn.execute("INSERT INTO projects (name, visibility, owner_user_id) " "VALUES ('MyProj', 'private', 'U001');")
         conn.commit()
 
         result = set_private_handler(_make_parsed("MyProj"), conn, {"sender_id": "U001"})
@@ -52,9 +49,7 @@ class TestSetPrivateSharedSuccess:
     """Shared -> private succeeds when all task assignees are the owner."""
 
     def test_set_private_shared_success(self, conn):
-        conn.execute(
-            "INSERT INTO projects (name, visibility) VALUES ('Backend', 'shared');"
-        )
+        conn.execute("INSERT INTO projects (name, visibility) VALUES ('Backend', 'shared');")
         pid = conn.execute("SELECT id FROM projects WHERE name = 'Backend'").fetchone()[0]
 
         # Add a task assigned to sender (owner-to-be)
@@ -75,17 +70,13 @@ class TestSetPrivateSharedSuccess:
         assert "now private" in result.lower()
 
         # Verify DB state
-        row = conn.execute(
-            "SELECT visibility, owner_user_id FROM projects WHERE name = 'Backend';"
-        ).fetchone()
+        row = conn.execute("SELECT visibility, owner_user_id FROM projects WHERE name = 'Backend';").fetchone()
         assert row[0] == "private"
         assert row[1] == "U001"
 
     def test_set_private_shared_no_tasks(self, conn):
         """Shared project with no tasks can be converted."""
-        conn.execute(
-            "INSERT INTO projects (name, visibility) VALUES ('EmptyProj', 'shared');"
-        )
+        conn.execute("INSERT INTO projects (name, visibility) VALUES ('EmptyProj', 'shared');")
         conn.commit()
 
         result = set_private_handler(_make_parsed("EmptyProj"), conn, {"sender_id": "U001"})
@@ -93,9 +84,7 @@ class TestSetPrivateSharedSuccess:
         assert "now private" in result.lower()
 
     def test_event_logged_on_conversion(self, conn):
-        conn.execute(
-            "INSERT INTO projects (name, visibility) VALUES ('Team', 'shared');"
-        )
+        conn.execute("INSERT INTO projects (name, visibility) VALUES ('Team', 'shared');")
         conn.commit()
 
         set_private_handler(_make_parsed("Team"), conn, {"sender_id": "U001"})
@@ -116,9 +105,7 @@ class TestSetPrivateSharedRejected:
     """Shared -> private rejected when tasks have non-owner assignees."""
 
     def test_set_private_shared_rejected_non_owner_assignee(self, conn):
-        conn.execute(
-            "INSERT INTO projects (name, visibility) VALUES ('Backend', 'shared');"
-        )
+        conn.execute("INSERT INTO projects (name, visibility) VALUES ('Backend', 'shared');")
         pid = conn.execute("SELECT id FROM projects WHERE name = 'Backend'").fetchone()[0]
 
         # Task assigned to someone other than the sender
@@ -141,16 +128,12 @@ class TestSetPrivateSharedRejected:
         assert "U002" in result
 
         # Verify project NOT changed
-        row = conn.execute(
-            "SELECT visibility FROM projects WHERE name = 'Backend';"
-        ).fetchone()
+        row = conn.execute("SELECT visibility FROM projects WHERE name = 'Backend';").fetchone()
         assert row[0] == "shared"
 
     def test_set_private_error_message_format(self, conn):
         """Error message includes task IDs and violating assignees."""
-        conn.execute(
-            "INSERT INTO projects (name, visibility) VALUES ('Backend', 'shared');"
-        )
+        conn.execute("INSERT INTO projects (name, visibility) VALUES ('Backend', 'shared');")
         pid = conn.execute("SELECT id FROM projects WHERE name = 'Backend'").fetchone()[0]
 
         # Two tasks, each with a different non-owner assignee
@@ -176,9 +159,7 @@ class TestSetPrivateSharedRejected:
 
     def test_owner_assignees_not_flagged(self, conn):
         """Tasks where the only assignee is the owner should NOT cause rejection."""
-        conn.execute(
-            "INSERT INTO projects (name, visibility) VALUES ('Backend', 'shared');"
-        )
+        conn.execute("INSERT INTO projects (name, visibility) VALUES ('Backend', 'shared');")
         pid = conn.execute("SELECT id FROM projects WHERE name = 'Backend'").fetchone()[0]
 
         # Task 1: assigned to sender (OK)
@@ -230,9 +211,7 @@ class TestSetPrivateCreatesNew:
         assert "NewProj" in result
 
         # Verify in DB
-        row = conn.execute(
-            "SELECT visibility, owner_user_id FROM projects WHERE name = 'NewProj';"
-        ).fetchone()
+        row = conn.execute("SELECT visibility, owner_user_id FROM projects WHERE name = 'NewProj';").fetchone()
         assert row is not None
         assert row[0] == "private"
         assert row[1] == "U001"
@@ -259,10 +238,7 @@ class TestSetPrivateEdgeCases:
 
     def test_other_users_private_not_affected(self, conn):
         """Setting private for a name that another user has private should create new."""
-        conn.execute(
-            "INSERT INTO projects (name, visibility, owner_user_id) "
-            "VALUES ('MyProj', 'private', 'U002');"
-        )
+        conn.execute("INSERT INTO projects (name, visibility, owner_user_id) " "VALUES ('MyProj', 'private', 'U002');")
         conn.commit()
 
         result = set_private_handler(_make_parsed("MyProj"), conn, {"sender_id": "U001"})
@@ -271,7 +247,5 @@ class TestSetPrivateEdgeCases:
         assert "created private" in result.lower()
 
         # Both should exist
-        count = conn.execute(
-            "SELECT COUNT(*) FROM projects WHERE name = 'MyProj';"
-        ).fetchone()[0]
+        count = conn.execute("SELECT COUNT(*) FROM projects WHERE name = 'MyProj';").fetchone()[0]
         assert count == 2

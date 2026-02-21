@@ -150,12 +150,14 @@ class TestDueYearBoundary:
     def test_due_dec_31(self):
         """due:12-31 should normalise to current year Dec 31."""
         from datetime import date
+
         result = parse("add Task due:12-31")
         assert result.due == f"{date.today().year}-12-31"
 
     def test_due_jan_01(self):
         """due:01-01 should normalise to current year Jan 1."""
         from datetime import date
+
         result = parse("add Task due:1-1")
         assert result.due == f"{date.today().year}-01-01"
 

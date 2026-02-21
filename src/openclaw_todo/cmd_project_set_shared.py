@@ -11,9 +11,7 @@ from openclaw_todo.parser import ParsedCommand
 logger = logging.getLogger(__name__)
 
 
-def set_shared_handler(
-    parsed: ParsedCommand, conn: sqlite3.Connection, context: dict
-) -> str:
+def set_shared_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) -> str:
     """Set a project to shared (or create a new shared project).
 
     Resolution flow:
@@ -31,8 +29,7 @@ def set_shared_handler(
 
     # Step 1: Check if a shared project with this name already exists
     row = conn.execute(
-        "SELECT id FROM projects "
-        "WHERE name = ? AND visibility = 'shared';",
+        "SELECT id FROM projects " "WHERE name = ? AND visibility = 'shared';",
         (project_name,),
     ).fetchone()
     if row is not None:
@@ -41,8 +38,7 @@ def set_shared_handler(
 
     # Step 2: Check if sender has a private project with this name
     private_row = conn.execute(
-        "SELECT id FROM projects "
-        "WHERE name = ? AND visibility = 'private' AND owner_user_id = ?;",
+        "SELECT id FROM projects " "WHERE name = ? AND visibility = 'private' AND owner_user_id = ?;",
         (project_name, sender_id),
     ).fetchone()
 
@@ -53,8 +49,7 @@ def set_shared_handler(
     # Step 3: Neither exists -> create new shared project
     try:
         cursor = conn.execute(
-            "INSERT INTO projects (name, visibility, owner_user_id) "
-            "VALUES (?, 'shared', NULL);",
+            "INSERT INTO projects (name, visibility, owner_user_id) " "VALUES (?, 'shared', NULL);",
             (project_name,),
         )
     except sqlite3.IntegrityError:

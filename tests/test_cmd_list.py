@@ -9,26 +9,15 @@ from openclaw_todo.parser import ParsedCommand
 def _seed_tasks(conn):
     """Seed test data: shared 'Inbox' + private 'Secret' project with tasks."""
     # Inbox already exists from V1 migration (id=1)
-    inbox_id = conn.execute(
-        "SELECT id FROM projects WHERE name = 'Inbox'"
-    ).fetchone()[0]
+    inbox_id = conn.execute("SELECT id FROM projects WHERE name = 'Inbox'").fetchone()[0]
 
     # Create a private project for U002
-    conn.execute(
-        "INSERT INTO projects (name, visibility, owner_user_id) "
-        "VALUES ('Secret', 'private', 'U002');"
-    )
-    secret_id = conn.execute(
-        "SELECT id FROM projects WHERE name = 'Secret'"
-    ).fetchone()[0]
+    conn.execute("INSERT INTO projects (name, visibility, owner_user_id) " "VALUES ('Secret', 'private', 'U002');")
+    secret_id = conn.execute("SELECT id FROM projects WHERE name = 'Secret'").fetchone()[0]
 
     # Create a shared project 'Backend'
-    conn.execute(
-        "INSERT INTO projects (name, visibility) VALUES ('Backend', 'shared');"
-    )
-    backend_id = conn.execute(
-        "SELECT id FROM projects WHERE name = 'Backend'"
-    ).fetchone()[0]
+    conn.execute("INSERT INTO projects (name, visibility) VALUES ('Backend', 'shared');")
+    backend_id = conn.execute("SELECT id FROM projects WHERE name = 'Backend'").fetchone()[0]
 
     # Tasks in Inbox, assigned to U001
     conn.execute(

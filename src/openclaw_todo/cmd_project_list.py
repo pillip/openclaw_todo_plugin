@@ -10,9 +10,7 @@ from openclaw_todo.parser import ParsedCommand
 logger = logging.getLogger(__name__)
 
 
-def project_list_handler(
-    parsed: ParsedCommand, conn: sqlite3.Connection, context: dict
-) -> str:
+def project_list_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) -> str:
     """List all shared projects and the sender's private projects with task counts."""
     sender_id: str = context["sender_id"]
 
@@ -54,7 +52,9 @@ def project_list_handler(
     private_count = len(private_lines)
     logger.info(
         "project list: %d shared, %d private for %s",
-        shared_count, private_count, sender_id,
+        shared_count,
+        private_count,
+        sender_id,
     )
 
     return "\n".join(parts)

@@ -54,8 +54,15 @@ All notable changes to this project will be documented in this file.
 - SQLite E2E integration tests (Issue #19): 20 tests exercising full `handle_message` flows with real SQLite via `tmp_path`. Covers: add→list, add→move→board, done/drop, edit, private project isolation, set-private rejection, due normalisation, set-shared flow, full lifecycle, cross-user write denial on private tasks
 - `.github/workflows/ci.yml`: GitHub Actions CI pipeline (push + PR on main, Python 3.11 + uv + pytest)
 - Branch protection: `test` job as required status check on main
+- Packaging and distribution setup (Issue #20): complete `pyproject.toml` metadata (license, authors, classifiers, `openclaw.plugins` entry-point), `Makefile` (lint/format/test/build/clean), comprehensive `README.md` with install/config/usage docs
+- Dev tooling: `ruff` + `black` dev dependencies with consistent config (line-length=120, py311 target)
 
 ### Fixed
+- Import ordering across all source and test files (ruff I001)
+- Ambiguous variable names in `test_cmd_board.py` (E741 `l` → `line`/`ln`)
+- Lambda assignment in `dispatcher.py` (E731 → explicit `if`/`return`)
+- `conftest` import path (`from conftest` → `from tests.conftest`) in 4 test files
+- `black` formatting applied across 30 files
 - Enable `PRAGMA foreign_keys=ON` in `get_connection()` for referential integrity
 - Leap-year `due:02-29` parsing in MM-DD format (strptime year-1900 bug)
 

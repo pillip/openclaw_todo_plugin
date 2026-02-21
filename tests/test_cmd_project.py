@@ -20,17 +20,9 @@ def _make_parsed() -> ParsedCommand:
 
 def _seed_projects(conn):
     """Seed test projects: Inbox (shared, from V1), Backend (shared), Secret (private U002)."""
-    conn.execute(
-        "INSERT INTO projects (name, visibility) VALUES ('Backend', 'shared');"
-    )
-    conn.execute(
-        "INSERT INTO projects (name, visibility, owner_user_id) "
-        "VALUES ('MyStuff', 'private', 'U001');"
-    )
-    conn.execute(
-        "INSERT INTO projects (name, visibility, owner_user_id) "
-        "VALUES ('Secret', 'private', 'U002');"
-    )
+    conn.execute("INSERT INTO projects (name, visibility) VALUES ('Backend', 'shared');")
+    conn.execute("INSERT INTO projects (name, visibility, owner_user_id) " "VALUES ('MyStuff', 'private', 'U001');")
+    conn.execute("INSERT INTO projects (name, visibility, owner_user_id) " "VALUES ('Secret', 'private', 'U002');")
 
     # Add tasks: 2 in Inbox, 1 in Backend, 1 in MyStuff, 1 in Secret
     inbox_id = conn.execute("SELECT id FROM projects WHERE name = 'Inbox'").fetchone()[0]

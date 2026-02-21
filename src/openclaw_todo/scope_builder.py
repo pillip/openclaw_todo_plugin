@@ -31,9 +31,7 @@ def build_scope_conditions(
     params: list[str | int] = []
 
     if scope == "mine":
-        conditions.append(
-            "t.id IN (SELECT task_id FROM task_assignees WHERE assignee_user_id = ?)"
-        )
+        conditions.append("t.id IN (SELECT task_id FROM task_assignees WHERE assignee_user_id = ?)")
         params.append(sender_id)
         conditions.append("(p.visibility = 'shared' OR p.owner_user_id = ?)")
         params.append(sender_id)
@@ -41,9 +39,7 @@ def build_scope_conditions(
         conditions.append("(p.visibility = 'shared' OR p.owner_user_id = ?)")
         params.append(sender_id)
     elif scope == "user" and scope_user:
-        conditions.append(
-            "t.id IN (SELECT task_id FROM task_assignees WHERE assignee_user_id = ?)"
-        )
+        conditions.append("t.id IN (SELECT task_id FROM task_assignees WHERE assignee_user_id = ?)")
         params.append(scope_user)
         conditions.append("(p.visibility = 'shared' OR p.owner_user_id = ?)")
         params.append(sender_id)

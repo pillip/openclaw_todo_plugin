@@ -6,7 +6,6 @@ import json
 
 from openclaw_todo.cmd_move import move_handler
 from openclaw_todo.parser import ParsedCommand
-
 from tests.conftest import seed_task as _seed_task
 
 
@@ -111,8 +110,12 @@ class TestMovePrivateOwnerOnly:
 
     def test_move_private_owner_can_move(self, conn):
         task_id = _seed_task(
-            conn, project_name="MyPrivate", visibility="private",
-            owner="UOWNER", created_by="UOWNER", assignees=["UOWNER"],
+            conn,
+            project_name="MyPrivate",
+            visibility="private",
+            owner="UOWNER",
+            created_by="UOWNER",
+            assignees=["UOWNER"],
         )
         parsed = _make_parsed(args=[str(task_id)], section="doing")
 
@@ -122,8 +125,12 @@ class TestMovePrivateOwnerOnly:
 
     def test_move_private_non_owner_rejected(self, conn):
         task_id = _seed_task(
-            conn, project_name="MyPrivate", visibility="private",
-            owner="UOWNER", created_by="UOWNER", assignees=["UOWNER"],
+            conn,
+            project_name="MyPrivate",
+            visibility="private",
+            owner="UOWNER",
+            created_by="UOWNER",
+            assignees=["UOWNER"],
         )
         parsed = _make_parsed(args=[str(task_id)], section="doing")
 
@@ -138,7 +145,9 @@ class TestMoveSharedPermission:
 
     def test_move_shared_assignee_can_move(self, conn):
         task_id = _seed_task(
-            conn, created_by="UCREATOR", assignees=["UASSIGNEE"],
+            conn,
+            created_by="UCREATOR",
+            assignees=["UASSIGNEE"],
         )
         parsed = _make_parsed(args=[str(task_id)], section="doing")
 
@@ -148,7 +157,9 @@ class TestMoveSharedPermission:
 
     def test_move_shared_creator_can_move(self, conn):
         task_id = _seed_task(
-            conn, created_by="UCREATOR", assignees=["UASSIGNEE"],
+            conn,
+            created_by="UCREATOR",
+            assignees=["UASSIGNEE"],
         )
         parsed = _make_parsed(args=[str(task_id)], section="doing")
 
@@ -158,7 +169,9 @@ class TestMoveSharedPermission:
 
     def test_move_shared_unrelated_user_rejected(self, conn):
         task_id = _seed_task(
-            conn, created_by="UCREATOR", assignees=["UASSIGNEE"],
+            conn,
+            created_by="UCREATOR",
+            assignees=["UASSIGNEE"],
         )
         parsed = _make_parsed(args=[str(task_id)], section="doing")
 

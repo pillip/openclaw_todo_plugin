@@ -105,7 +105,9 @@ def list_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
 
     logger.info(
         "list: scope=%s project=%s returned %d rows",
-        scope, parsed.project, len(rows),
+        scope,
+        parsed.project,
+        len(rows),
     )
 
     if not rows:
@@ -117,9 +119,6 @@ def list_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
         task_id, title, section, due, project_name = row
         due_str = due if due else "-"
         assignee_str = format_assignees(conn, task_id)
-        lines.append(
-            f"#{task_id} ({project_name}/{section}) due:{due_str} "
-            f"assignees:{assignee_str} -- {title}"
-        )
+        lines.append(f"#{task_id} ({project_name}/{section}) due:{due_str} " f"assignees:{assignee_str} -- {title}")
 
     return "\n".join(lines)

@@ -101,10 +101,7 @@ def parse(text: str) -> ParsedCommand:
                 raise ParseError("/s requires a section name")
             sec = remaining[i + 1].lower()
             if sec not in VALID_SECTIONS:
-                raise ParseError(
-                    f"Invalid section: {sec!r}. "
-                    f"Must be one of: {', '.join(sorted(VALID_SECTIONS))}"
-                )
+                raise ParseError(f"Invalid section: {sec!r}. " f"Must be one of: {', '.join(sorted(VALID_SECTIONS))}")
             section = sec
             i += 2
             continue

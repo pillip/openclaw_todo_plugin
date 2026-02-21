@@ -23,9 +23,7 @@ class Project:
     owner_user_id: str | None
 
 
-def resolve_project(
-    conn: sqlite3.Connection, name: str, sender_id: str
-) -> Project:
+def resolve_project(conn: sqlite3.Connection, name: str, sender_id: str) -> Project:
     """Resolve a project name following PRD 3.2 Option A.
 
     Resolution order:
@@ -44,29 +42,31 @@ def resolve_project(
         project = Project(id=row[0], name=row[1], visibility=row[2], owner_user_id=row[3])
         logger.debug(
             "Resolved project '%s' -> id=%d vis=%s (private match)",
-            name, project.id, project.visibility,
+            name,
+            project.id,
+            project.visibility,
         )
         return project
 
     # 2) Shared project
     row = conn.execute(
-        "SELECT id, name, visibility, owner_user_id FROM projects "
-        "WHERE name = ? AND visibility = 'shared';",
+        "SELECT id, name, visibility, owner_user_id FROM projects " "WHERE name = ? AND visibility = 'shared';",
         (name,),
     ).fetchone()
     if row:
         project = Project(id=row[0], name=row[1], visibility=row[2], owner_user_id=row[3])
         logger.debug(
             "Resolved project '%s' -> id=%d vis=%s (shared match)",
-            name, project.id, project.visibility,
+            name,
+            project.id,
+            project.visibility,
         )
         return project
 
     # 3) Auto-create Inbox as shared
     if name == "Inbox":
         conn.execute(
-            "INSERT OR IGNORE INTO projects (name, visibility, owner_user_id) "
-            "VALUES ('Inbox', 'shared', NULL);",
+            "INSERT OR IGNORE INTO projects (name, visibility, owner_user_id) " "VALUES ('Inbox', 'shared', NULL);",
         )
         conn.commit()
         row = conn.execute(
@@ -76,7 +76,9 @@ def resolve_project(
         project = Project(id=row[0], name=row[1], visibility=row[2], owner_user_id=row[3])
         logger.debug(
             "Resolved project '%s' -> id=%d vis=%s (auto-created)",
-            name, project.id, project.visibility,
+            name,
+            project.id,
+            project.visibility,
         )
         return project
 

@@ -86,7 +86,9 @@ def _close_task(
 def done_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) -> str:
     """Mark a task as done."""
     return _close_task(
-        parsed, conn, context,
+        parsed,
+        conn,
+        context,
         action="done",
         target_section="done",
         target_status="done",
@@ -96,7 +98,9 @@ def done_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
 def drop_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) -> str:
     """Mark a task as dropped."""
     return _close_task(
-        parsed, conn, context,
+        parsed,
+        conn,
+        context,
         action="drop",
         target_section="drop",
         target_status="dropped",

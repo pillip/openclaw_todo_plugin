@@ -88,8 +88,7 @@ class TestAddPrivateRejectsOtherAssignee:
 
     def test_add_private_rejects_other_assignee(self, conn):
         conn.execute(
-            "INSERT INTO projects (name, visibility, owner_user_id) "
-            "VALUES ('MyPrivate', 'private', 'U001');"
+            "INSERT INTO projects (name, visibility, owner_user_id) " "VALUES ('MyPrivate', 'private', 'U001');"
         )
         conn.commit()
 
@@ -112,8 +111,7 @@ class TestAddPrivateRejectsOtherAssignee:
 
     def test_add_private_allows_owner_assignee(self, conn):
         conn.execute(
-            "INSERT INTO projects (name, visibility, owner_user_id) "
-            "VALUES ('MyPrivate', 'private', 'U001');"
+            "INSERT INTO projects (name, visibility, owner_user_id) " "VALUES ('MyPrivate', 'private', 'U001');"
         )
         conn.commit()
 
@@ -141,9 +139,7 @@ class TestAddAssigneeDefaultsToSender:
 
         assert "<@USENDER>" in result
 
-        assignees = conn.execute(
-            "SELECT assignee_user_id FROM task_assignees WHERE task_id = 1"
-        ).fetchall()
+        assignees = conn.execute("SELECT assignee_user_id FROM task_assignees WHERE task_id = 1").fetchall()
         assert assignees == [("USENDER",)]
 
 

@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import pytest
 
+import openclaw_todo.schema_v1  # noqa: F401 — register V1 migration
 from openclaw_todo.db import get_connection
 from openclaw_todo.migrations import migrate
 from openclaw_todo.permissions import can_write_task, validate_private_assignees
-
-import openclaw_todo.schema_v1  # noqa: F401 — register V1 migration
 
 
 @pytest.fixture()
@@ -35,8 +34,7 @@ def _create_project(conn, name, visibility, owner_user_id=None):
 
 def _create_task(conn, project_id, title, created_by):
     conn.execute(
-        "INSERT INTO tasks (title, project_id, section, status, created_by) "
-        "VALUES (?, ?, 'backlog', 'open', ?);",
+        "INSERT INTO tasks (title, project_id, section, status, created_by) " "VALUES (?, ?, 'backlog', 'open', ?);",
         (title, project_id, created_by),
     )
     conn.commit()

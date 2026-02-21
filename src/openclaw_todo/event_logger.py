@@ -30,7 +30,6 @@ def log_event(
         Optional task reference.  ``None`` for project-level events.
     """
     conn.execute(
-        "INSERT INTO events (actor_user_id, action, task_id, payload) "
-        "VALUES (?, ?, ?, ?);",
+        "INSERT INTO events (actor_user_id, action, task_id, payload) " "VALUES (?, ?, ?, ?);",
         (actor_user_id, action, task_id, json.dumps(payload)),
     )

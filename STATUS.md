@@ -4,7 +4,7 @@
 
 ## Current Phase
 
-**Kickoff complete** — All planning documents generated. Ready to begin implementation.
+**All milestones complete** — Plugin fully implemented, tested, and packaged.
 
 ## Milestones
 
@@ -16,7 +16,7 @@
 | M3 | Commands (add/list/board/move/done/drop/edit) | **Done** | #6 ✅, #16 ✅, #7 ✅, #17 ✅, #10 ✅, #8 ✅, #11 ✅, #9 ✅, #12 ✅ |
 | M4 | Project commands (list/set-private/set-shared) | **Done** | #13 ✅, #14 ✅, #15 ✅ |
 | M5 | Tests (parser/unit + sqlite E2E) | **Done** | #18 ✅, #19 ✅ |
-| M6 | Packaging / deployment | Not started | #20 |
+| M6 | Packaging / deployment | **Done** | #20 ✅ |
 | DevOps | GitHub Actions CI | **Done** | #21 |
 
 ## Critical Path
@@ -28,7 +28,7 @@
 
 ## Next Issues to Work On
 
-1. **#20** — Packaging and distribution setup (M6)
+All issues complete. Project is fully implemented.
 
 ## Risks
 

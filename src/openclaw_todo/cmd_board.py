@@ -94,7 +94,8 @@ def board_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict
 
     logger.info(
         "board: scope=%s project=%s sections=%s",
-        scope, parsed.project,
+        scope,
+        parsed.project,
         {s: len(tasks) for s, tasks in section_tasks.items()},
     )
 
