@@ -387,12 +387,12 @@ Revert handler; read-only operation.
 |-------------|----------------------------------------|
 | Track       | Backend                                |
 | Milestone   | M3                                     |
-| Status      | TODO                                   |
+| Status      | done                                   |
 | Priority    | P1                                     |
 | Estimate    | 0.5d                                   |
 | Branch      | `feature/010-cmd-move`                 |
-| GH-Issue    | --                                     |
-| PR          | --                                     |
+| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/23 |
+| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/24 |
 
 **Description**
 Implement the `move` subcommand. Validates section enum, checks permissions (private: owner only; shared: assignee or created_by), updates task section and updated_at, logs event.
