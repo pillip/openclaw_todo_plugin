@@ -34,9 +34,9 @@ def handle_message():
 
 
 def _msg(handle_message, text: str, sender: str, db_path: str) -> str:
-    """Send a !todo command via the entry-point-loaded function."""
-    result = handle_message(f"!todo {text}", {"sender_id": sender}, db_path=db_path)
-    assert result is not None, f"Expected response for: !todo {text}"
+    """Send a todo: command via the entry-point-loaded function."""
+    result = handle_message(f"todo: {text}", {"sender_id": sender}, db_path=db_path)
+    assert result is not None, f"Expected response for: todo: {text}"
     return result
 
 
@@ -103,7 +103,7 @@ class TestPluginViaEntryPoint:
     """Exercise the full command flow through the entry-point-loaded function."""
 
     def test_non_todo_returns_none(self, handle_message, db_path):
-        """Messages not starting with !todo return None."""
+        """Messages not starting with todo: return None."""
         result = handle_message("hello world", {"sender_id": "U001"}, db_path=db_path)
         assert result is None
 

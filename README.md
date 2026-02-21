@@ -4,7 +4,7 @@ A Slack DM-based task management plugin for the [OpenClaw](https://github.com/pi
 
 ## Features
 
-- `!todo add`, `list`, `board`, `move`, `done`, `drop`, `edit` commands
+- `todo: add`, `list`, `board`, `move`, `done`, `drop`, `edit` commands
 - Project management: shared and private projects with visibility isolation
 - Kanban board view (backlog / doing / waiting / done / drop)
 - Due date tracking with MM-DD shorthand normalisation
@@ -43,7 +43,7 @@ To override, pass a custom `db_path` when calling the plugin entry point:
 ```python
 from openclaw_todo.plugin import handle_message
 
-response = handle_message("!todo add Buy milk", {"sender_id": "U001"}, db_path="/custom/path/todo.db")
+response = handle_message("todo: add Buy milk", {"sender_id": "U001"}, db_path="/custom/path/todo.db")
 ```
 
 ### OpenClaw gateway integration
@@ -60,20 +60,20 @@ todo_plugin = plugins["todo"].load()  # -> handle_message function
 
 ## Usage
 
-All commands are prefixed with `!todo`:
+All commands are prefixed with `todo:`:
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `add <title> [options]` | Create a task | `!todo add Buy milk /p Home due:03-15` |
-| `list [scope] [options]` | List tasks | `!todo list all /p Work` |
-| `board [options]` | Kanban board view | `!todo board /p Work` |
-| `move <id> /s <section>` | Move task to section | `!todo move 3 /s doing` |
-| `edit <id> [title] [options]` | Edit a task | `!todo edit 3 New title /s doing` |
-| `done <id>` | Mark task as done | `!todo done 3` |
-| `drop <id>` | Drop (cancel) a task | `!todo drop 3` |
-| `project list` | List projects | `!todo project list` |
-| `project set-shared <name>` | Create/convert to shared | `!todo project set-shared Work` |
-| `project set-private <name>` | Create/convert to private | `!todo project set-private MyStuff` |
+| `add <title> [options]` | Create a task | `todo: add Buy milk /p Home due:03-15` |
+| `list [scope] [options]` | List tasks | `todo: list all /p Work` |
+| `board [options]` | Kanban board view | `todo: board /p Work` |
+| `move <id> /s <section>` | Move task to section | `todo: move 3 /s doing` |
+| `edit <id> [title] [options]` | Edit a task | `todo: edit 3 New title /s doing` |
+| `done <id>` | Mark task as done | `todo: done 3` |
+| `drop <id>` | Drop (cancel) a task | `todo: drop 3` |
+| `project list` | List projects | `todo: project list` |
+| `project set-shared <name>` | Create/convert to shared | `todo: project set-shared Work` |
+| `project set-private <name>` | Create/convert to private | `todo: project set-private MyStuff` |
 
 ### Options
 

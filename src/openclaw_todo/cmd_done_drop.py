@@ -29,7 +29,7 @@ def _close_task(
 
     # --- Validate task ID ---
     if not parsed.args:
-        return f"Error: task ID required. Usage: !todo {action} <id>"
+        return f"Error: task ID required. Usage: todo: {action} <id>"
 
     try:
         task_id = int(parsed.args[0])

@@ -24,7 +24,7 @@ def set_shared_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context:
     # Extract project name from title_tokens (tokens after "set-shared")
     name_tokens = parsed.title_tokens[1:] if len(parsed.title_tokens) > 1 else []
     if not name_tokens:
-        return "Error: project name required. Usage: !todo project set-shared <name>"
+        return "Error: project name required. Usage: todo: project set-shared <name>"
     project_name = name_tokens[0]
 
     # Step 1: Check if a shared project with this name already exists
