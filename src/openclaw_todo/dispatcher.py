@@ -18,6 +18,7 @@ from openclaw_todo.cmd_list import list_handler as _list_handler  # noqa: E402
 from openclaw_todo.cmd_move import move_handler as _move_handler  # noqa: E402
 from openclaw_todo.cmd_done_drop import done_handler as _done_handler  # noqa: E402
 from openclaw_todo.cmd_done_drop import drop_handler as _drop_handler  # noqa: E402
+from openclaw_todo.cmd_board import board_handler as _board_handler  # noqa: E402
 from openclaw_todo.cmd_project_list import project_list_handler as _project_list_handler  # noqa: E402
 
 # Type alias for command handler functions.
@@ -63,6 +64,7 @@ _handlers: dict[str, HandlerFn] = {
     "move": _move_handler,
     "done": _done_handler,
     "drop": _drop_handler,
+    "board": _board_handler,
     "project_list": _project_list_handler,
 }
 

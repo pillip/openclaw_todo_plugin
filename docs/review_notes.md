@@ -1412,3 +1412,91 @@ No Critical, High, or Medium severity findings. Three Low findings (S3, S4, S5) 
 2. **Context typing**: Introduce a `TypedDict` for the `context` parameter across all handlers to prevent `KeyError` on missing `sender_id` (carried forward from prior reviews).
 3. **Order of checks**: Consider whether to reorder permission check before "already closed" check if the trust model ever changes from Slack-team to public-facing.
 4. **Transaction explicitness**: Consider wrapping the UPDATE + INSERT event in `with conn:` for explicit transaction semantics (same as cmd_add follow-up).
+
+---
+
+# PR #31 Review Notes -- Issue #9: /todo board kanban view
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-02-21
+> Branch: `feature/009-cmd-board`
+
+---
+
+## Code Review
+
+### Verdict: APPROVE
+
+The implementation is clean, well-structured, and consistent with the existing `cmd_list.py` pattern. All 17 board tests and 16 dispatcher tests pass (33 total).
+
+### Findings
+
+#### [Info] Duplicated filtering/scope logic with `cmd_list.py`
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_board.py`, lines 46-93
+- The scope resolution logic (mine/all/user), project filtering, visibility checks, and query building are nearly identical between `cmd_board.py` and `cmd_list.py`. This is approximately 45 lines of duplicated code.
+- **Action**: Acceptable for now (two consumers). If a third command reuses this pattern, extract a shared `build_task_query()` helper. Propose as follow-up issue.
+
+#### [Info] N+1 query for assignees in board rendering
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_board.py`, lines 128-131
+- For each displayed task, an individual query fetches assignees. With `limitPerSection=10` and 5 sections, this is up to 50 extra queries per board call. The same pattern exists in `cmd_list.py` so this is consistent.
+- **Action**: Not a problem at current scale (SQLite, local, small datasets). If performance becomes a concern, batch-fetch assignees in a single query using `WHERE task_id IN (...)`. Propose as follow-up.
+
+#### [Info] `OrderedDict` unnecessary on Python 3.11+
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_board.py`, line 7, 99
+- Since Python 3.7+, regular `dict` preserves insertion order. `OrderedDict` is not needed here since the code initializes sections in `SECTION_ORDER` order. However, using `OrderedDict` is explicit about the intent, so this is a stylistic choice, not a bug.
+- **Action**: None required.
+
+#### [Info] Board ignores `/s` section filter for non-done/drop sections
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_board.py`, lines 50-53
+- Unlike `cmd_list.py` which applies `parsed.section` as a section filter (e.g., `/s doing` shows only tasks in the "doing" section), `cmd_board.py` only checks `parsed.section` for status switching (done/drop). If a user passes `/s doing`, the board still shows all 5 sections but filtered to `status='open'`. This may be intentional (board always shows all sections) but differs from how `cmd_list.py` uses `parsed.section`.
+- **Action**: Clarify whether `/s <section>` on `/todo board` should filter to a single section or is intentionally ignored. Document the design decision if intentional.
+
+#### [Good] Negative/zero limitPerSection validation
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_board.py`, lines 37-40
+- Properly validates that `limitPerSection` is a positive integer and returns clear error messages for zero, negative, and non-numeric values. Tests cover both cases.
+
+#### [Good] Test coverage is thorough
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/tests/test_cmd_board.py`
+- 17 tests covering: section order, empty sections, task grouping, header format, section counts, limit capping, overflow messages, invalid/zero limits, scope filtering (mine/all/project), private project visibility, task line format (with and without due), and fully empty board. Well organized into 5 test classes.
+
+#### [Minor] Missing test for mention-based scope
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/tests/test_cmd_board.py`
+- The `scope="user"` path (triggered by `parsed.mentions`) is tested indirectly via private project filtering but has no dedicated test where `mentions=["UOTHER"]` is passed and the result shows only that user's tasks.
+- **Action**: Consider adding a test for mention-based user scope filtering.
+
+---
+
+## Security Findings
+
+### No Critical or High findings.
+
+#### [Low] No upper bound on `limitPerSection`
+
+- **Severity**: Low
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_board.py`, line 36
+- A user could pass `limitPerSection:999999` which would display all tasks without any cap. Since this is a read-only operation on SQLite and the main query already fetches all rows regardless of the limit (the limit is applied in Python slicing at line 125), the impact is negligible -- the database work is the same either way. The only effect is a longer output string.
+- **Action**: None required. If output length becomes a concern, add a `MAX_LIMIT_PER_SECTION` constant.
+
+#### [Info] SQL queries use parameterized statements -- no injection risk
+
+All SQL in `cmd_board.py` uses parameterized queries (`?` placeholders with params list). The `where_clause` is constructed from hardcoded condition strings with user values passed as parameters. This is consistent with `cmd_list.py` and is safe.
+
+#### [Info] Visibility/authorization correctly enforced
+
+Private project tasks are correctly hidden from non-owners via the `(p.visibility = 'shared' OR p.owner_user_id = ?)` condition across all scope modes (mine, all, user). Test `test_private_project_hidden_from_others` validates this.
+
+---
+
+## Follow-up Issues (proposed)
+
+1. **Refactor**: Extract shared scope/filtering/query-building logic from `cmd_board.py` and `cmd_list.py` into a common helper module to reduce duplication.
+2. **Performance**: Batch-fetch assignees for displayed tasks instead of N+1 individual queries (applies to both `cmd_board.py` and `cmd_list.py`).
+3. **Test coverage**: Add a dedicated test for mention-based user scope (`parsed.mentions=["UOTHER"]`) in `test_cmd_board.py`.
+4. **Design clarification**: Document whether `/s <section>` on `/todo board` should filter to a single section or is intentionally a no-op for non-done/drop sections.
