@@ -144,6 +144,14 @@ class TestMoveInvalidSection:
         assert "Error" in result
         assert "task ID required" in result
 
+    def test_move_invalid_task_id(self, conn):
+        parsed = _make_parsed(args=["abc"], section="doing")
+
+        result = move_handler(parsed, conn, {"sender_id": "U001"})
+
+        assert "Error" in result
+        assert "invalid task ID" in result
+
     def test_move_nonexistent_task(self, conn):
         parsed = _make_parsed(args=["9999"], section="doing")
 
