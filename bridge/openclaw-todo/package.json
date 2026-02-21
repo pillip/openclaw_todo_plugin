@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "OpenClaw bridge plugin for the Python TODO server",
   "main": "dist/index.js",
+  "openclaw": {
+    "extensions": ["./index.ts"]
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch"
