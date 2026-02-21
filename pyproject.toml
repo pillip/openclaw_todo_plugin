@@ -33,6 +33,9 @@ dev = [
 minversion = "7.0"
 addopts = "-ra"
 testpaths = ["tests"]
+markers = [
+    "install: plugin install e2e tests (entry-point discovery)",
+]
 
 [tool.ruff]
 target-version = "py311"

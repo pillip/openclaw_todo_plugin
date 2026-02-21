@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Plugin install E2E tests (Issue #22): 8 tests verifying entry-point discovery via `importlib.metadata.entry_points` and full command flow through the loaded function
+- `@pytest.mark.install` marker for selective E2E test execution
+
+### Fixed
+- Hardened `_query_task` SQL column interpolation with allowlist validation in both `test_e2e.py` and `test_plugin_install_e2e.py`
+
+### Previous (Unreleased)
+
+### Added
 - `db.py`: `get_connection(db_path)` helper with recursive directory creation, WAL mode, busy_timeout=3000
 - DB connection tests (4 tests)
 - `migrations.py`: sequential schema migration framework with `@register`, `migrate()`, `get_version()`
