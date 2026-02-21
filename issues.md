@@ -709,12 +709,12 @@ Revert module.
 |-------------|----------------------------------------|
 | Track       | QA                                     |
 | Milestone   | M5                                     |
-| Status      | doing                                  |
+| Status      | done                                   |
 | Priority    | P1                                     |
 | Estimate    | 1d                                     |
 | Branch      | `feature/018-parser-tests`             |
 | GH-Issue    | issues/39                              |
-| PR          | --                                     |
+| PR          | pull/40                                |
 
 **Description**
 Expand parser test coverage to include edge cases: multiple options in varied order, due at year boundary, empty title, mentions mixed with options, unicode in titles, extra whitespace handling.
