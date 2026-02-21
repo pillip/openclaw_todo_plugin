@@ -792,11 +792,11 @@ CI test results and coverage delta.
 |-------------|----------------------------------------|
 | Track       | DevOps                                 |
 | Milestone   | M6                                     |
-| Status      | TODO                                   |
+| Status      | done                                   |
 | Priority    | P2                                     |
 | Estimate    | 1d                                     |
 | Branch      | `feature/020-packaging`               |
-| GH-Issue    | --                                     |
+| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/42 |
 | PR          | --                                     |
 
 **Description**
