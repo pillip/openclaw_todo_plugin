@@ -1243,3 +1243,172 @@ No Critical, High, or Medium findings.
 ### Verdict
 
 **APPROVE -- ready to merge.** All 98 tests pass. One Low finding fixed (F3). No blocking issues.
+
+---
+
+# PR #27 Review Notes -- Issue #11: /todo done & /todo drop commands
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-02-21
+> Branch: (PR #27)
+
+---
+
+## Code Review
+
+### Changed Files
+
+| File | Change | Lines |
+|------|--------|-------|
+| `src/openclaw_todo/cmd_done_drop.py` | NEW | 102 |
+| `tests/test_cmd_done_drop.py` | NEW | 226 |
+| `src/openclaw_todo/dispatcher.py` | MODIFIED | +3 lines (2 imports + 2 registry entries) |
+| `tests/test_dispatcher.py` | MODIFIED | +8 lines (parametrize trim, 2 routing tests) |
+
+### Acceptance Criteria Checklist
+
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| `done` sets section='done', status='done', closed_at | PASS | `test_done_sets_fields` verifies all three columns in DB. |
+| `drop` sets section='drop', status='dropped', closed_at | PASS | `test_drop_sets_fields` verifies all three columns. |
+| Already-closed task returns informational message (no error) | PASS | `test_already_done`, `test_already_dropped`, `test_done_on_dropped_task` cover all combinations. |
+| Private project: only owner can close | PASS | `test_done_private_owner_allowed`, `test_done_private_non_owner_rejected`. |
+| Shared project: only assignee or creator can close | PASS | `test_drop_shared_assignee_allowed`, `test_drop_shared_unrelated_rejected`. |
+| Event logged with old/new section and status | PASS | `test_done_logs_event`, `test_drop_logs_event` verify JSON payload. |
+| Missing/invalid task ID returns error | PASS | `test_missing_task_id`, `test_invalid_task_id`, `test_nonexistent_task`. |
+| Dispatcher routes `done` and `drop` to real handlers | PASS | `test_done_routes_to_handler`, `test_drop_routes_to_handler` in `test_dispatcher.py`. |
+
+### Findings
+
+#### [Info] F1: Excellent use of shared `_close_task` helper to avoid duplication
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_done_drop.py`, lines 15-82
+- **Description**: The `_close_task` private function encapsulates all shared logic (validation, permission check, UPDATE, event logging) with `action`, `target_section`, and `target_status` as keyword-only parameters. `done_handler` and `drop_handler` are thin wrappers that pass the correct values. This is clean DRY design and avoids the duplication risk that would come from two separate handler functions.
+- **Action**: None. Good pattern.
+
+#### [Low] F2: `context["sender_id"]` raises `KeyError` if key is absent
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_done_drop.py`, line 28
+- **Description**: Same as `cmd_add.py` (line 22) and `cmd_move.py` (line 22). If `context` does not contain `sender_id`, an unhandled `KeyError` propagates. This is consistent across all handlers and is documented as a contract requirement.
+- **Action**: OPEN -- non-blocking. Consistent with existing handlers. Consider a shared `TypedDict` for `context` in a future refactor (noted in prior reviews).
+
+#### [Low] F3: TOCTOU between SELECT and UPDATE (same as cmd_move)
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_done_drop.py`, lines 40-63
+- **Description**: The handler SELECTs the task, checks conditions, then UPDATEs. Between the SELECT and UPDATE, another request could modify the task. In SQLite with single-writer WAL mode, this is theoretical -- writes are serialized by the database lock. Identical pattern to `cmd_move.py`.
+- **Action**: OPEN -- non-blocking. Consistent with existing pattern. Acceptable for SQLite single-writer.
+
+#### [Low] F4: Task existence disclosed before permission check (ID enumeration)
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_done_drop.py`, lines 40-55
+- **Description**: The handler returns "not found" (line 45) before checking permissions (line 54). This allows any user to probe whether a task ID exists. Same pattern as `cmd_move.py`. Acceptable in a Slack team context where all users are trusted team members.
+- **Action**: OPEN -- consistent with `cmd_move.py`. Acceptable for Slack team trust model.
+
+#### [Info] F5: "Already closed" check is correctly ordered before permission check
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_done_drop.py`, lines 49-55
+- **Description**: The "already done/dropped" check (line 50-51) runs before `can_write_task` (line 54). This means a user without write permission can discover that a task is already closed by receiving "already done" instead of "permission denied." This is a minor information disclosure but acceptable: the "already closed" message is informational, not an error, and the Slack team context makes this a non-issue.
+- **Action**: OPEN -- acceptable design choice. The alternative (checking permissions first) would return "permission denied" even for informational queries, which is less user-friendly.
+
+#### [Info] F6: Pattern consistency with `cmd_move.py` is excellent
+
+- **Description**: The handler follows the exact same structure as `cmd_move.py`: validate ID, check existence, check condition, check permission, UPDATE, INSERT event, commit, log, return message. Imports, error message format, parameterized queries, and test structure are all consistent. The `_close_task` abstraction is a clean addition that `cmd_move` does not need (since move has different parameters).
+
+#### [Info] F7: Test coverage is thorough -- 14 tests across 5 test classes
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/tests/test_cmd_done_drop.py`
+- **Description**: Tests are organized into logical classes:
+  - `TestDoneSetsFields` (2 tests): DB state and event logging for done
+  - `TestDropSetsFields` (2 tests): DB state and event logging for drop
+  - `TestPermissionCheck` (4 tests): Private owner, private non-owner, shared assignee, shared unrelated
+  - `TestAlreadyClosed` (3 tests): Already done, already dropped, done-on-dropped cross-case
+  - `TestEdgeCases` (3 tests): Missing ID, invalid ID, nonexistent task
+- Coverage of the cross-case (`test_done_on_dropped_task`) is a nice addition that verifies the "already closed" check works across both statuses.
+
+#### [Info] F8: `_seed_task` helper uses `cursor.lastrowid` -- improvement over `cmd_move` tests
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/tests/test_cmd_done_drop.py`, line 57
+- **Description**: The test helper uses `cursor.lastrowid` to get the inserted task ID, which is the recommended approach. The `cmd_move` tests use a `SELECT last_insert_rowid()` query (noted as F5 in PR #24 review). This is a minor improvement in consistency.
+
+#### [Low] F9: Dispatcher stub parametrize reduced but comment is slightly stale
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/tests/test_dispatcher.py`, lines 34-37
+- **Description**: The parametrized stub test now only lists `["board", "edit"]`. The comment on line 41 says "For move/done/drop/edit, provide an id-like arg" but the parametrize list no longer includes move, done, or drop. The conditional `if command in ("move", "done", "drop", "edit")` on line 41 is technically unreachable for move/done/drop since they are no longer in the parametrize list. The code still works correctly (the `if` just never matches for those commands), but the comment and conditional could be simplified.
+- **Action**: OPEN -- non-blocking. Minor cleanup opportunity: simplify the conditional to `if command == "edit"` and update the comment.
+
+### Code Quality Summary
+
+The implementation is clean, well-structured, and follows established patterns precisely:
+
+- The `_close_task` shared helper is a good DRY abstraction with keyword-only parameters for the varying behavior.
+- All SQL uses parameterized queries (`?` placeholders). No string interpolation in SQL.
+- Error messages are descriptive and consistent with the existing handler style.
+- The event payload captures both old and new section/status, providing full audit trail.
+- `updated_at` and `closed_at` are both set via `datetime('now')` in a single UPDATE statement.
+- 14 tests organized into 5 well-named classes covering happy path, permissions, idempotency, and edge cases.
+- Dispatcher integration is minimal and correct (2 imports, 2 registry entries, 2 routing tests).
+- All 114 tests pass.
+
+**Verdict: APPROVE** -- no blocking issues. No fixes required.
+
+---
+
+## Security Findings
+
+### [Info] S1: SQL injection -- No risk
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_done_drop.py`, lines 40-76
+- **Description**: All four SQL statements (SELECT task, UPDATE task, INSERT event) use `?` parameter placeholders. The `task_id` is converted to `int` on line 35 before any DB use, eliminating string-based injection via the ID parameter. `sender_id` comes from `context["sender_id"]` which is set by the gateway framework, not user input. `target_section` and `target_status` are hardcoded string literals passed from `done_handler`/`drop_handler`.
+- **Severity**: Info (no risk found)
+
+### [Info] S2: Authorization correctly enforced via `can_write_task()`
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_done_drop.py`, line 54
+- **Description**: Permission check delegates to the shared `can_write_task()` function (reviewed and approved in PR #16). Private projects restrict to owner only; shared projects restrict to assignee or creator. Four permission tests verify both allow and deny paths for both `done` and `drop`.
+- **Severity**: Info (correctly implemented)
+
+### [Low] S3: Task existence disclosed before permission check (ID enumeration)
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_done_drop.py`, lines 44-45
+- **Description**: "Task not found" is returned before the permission check, allowing any authenticated user to probe task ID existence. Same pattern as `cmd_move.py` (PR #24, S3).
+- **Severity**: Low (acceptable in Slack team context where all users are authenticated team members)
+- **Recommendation**: If the plugin is ever exposed to untrusted users, reorder to check permissions before disclosing existence.
+
+### [Low] S4: "Already closed" status disclosed before permission check
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_done_drop.py`, lines 50-51
+- **Description**: A user without write permission on a task can discover whether it is already "done" or "dropped" by observing the response message ("already done" vs "permission denied"). This is minor information disclosure.
+- **Severity**: Low (informational status only; no sensitive data exposed; Slack team trust model)
+- **Recommendation**: No fix needed for current context. Document if the trust model changes.
+
+### [Low] S5: User input reflected in error messages via `!r` formatting
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_done_drop.py`, line 37
+- **Description**: `f"Error: invalid task ID: {parsed.args[0]!r}"` reflects user input with `repr()` formatting. In Slack DM context, Slack auto-escapes message content. Same pattern as `cmd_move.py`.
+- **Severity**: Low (safe in Slack; review if output context changes to web)
+
+### [Info] S6: No hardcoded secrets or credentials
+
+- No API keys, tokens, or secrets found in `cmd_done_drop.py` or `test_cmd_done_drop.py`.
+
+### [Info] S7: No new dependencies introduced
+
+- `cmd_done_drop.py` uses only standard library (`json`, `logging`, `sqlite3`) plus internal modules (`parser`, `permissions`). No new entries in `pyproject.toml`.
+
+### [Info] S8: `int()` conversion provides input sanitization
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_done_drop.py`, line 35
+- **Description**: `task_id = int(parsed.args[0])` converts the user-supplied string to an integer before any DB use. This eliminates any possibility of SQL injection through the task ID, even if parameterized queries were somehow bypassed. The `ValueError` catch on line 36 handles non-numeric input gracefully.
+
+### Security Summary
+
+No Critical, High, or Medium severity findings. Three Low findings (S3, S4, S5) are consistent with patterns already accepted in prior handler reviews (`cmd_move.py`, `cmd_add.py`). The implementation follows established security patterns: parameterized queries, permission checks via `can_write_task()`, integer conversion for IDs, and no hardcoded secrets.
+
+---
+
+## Follow-up Issues (proposed)
+
+1. **Dispatcher cleanup**: Simplify the stub parametrize conditional in `test_dispatcher.py` from `if command in ("move", "done", "drop", "edit")` to `if command == "edit"` and update the comment, since move/done/drop are no longer stubs.
+2. **Context typing**: Introduce a `TypedDict` for the `context` parameter across all handlers to prevent `KeyError` on missing `sender_id` (carried forward from prior reviews).
+3. **Order of checks**: Consider whether to reorder permission check before "already closed" check if the trust model ever changes from Slack-team to public-facing.
+4. **Transaction explicitness**: Consider wrapping the UPDATE + INSERT event in `with conn:` for explicit transaction semantics (same as cmd_add follow-up).
