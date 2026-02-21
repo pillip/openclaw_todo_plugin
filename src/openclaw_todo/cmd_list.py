@@ -7,6 +7,7 @@ import sqlite3
 
 from openclaw_todo.parser import ParsedCommand
 from openclaw_todo.project_resolver import ProjectNotFoundError, resolve_project
+from openclaw_todo.scope_builder import build_scope_conditions, format_assignees
 
 logger = logging.getLogger(__name__)
 
@@ -84,31 +85,9 @@ def list_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
         params.append(project.id)
 
     # Scope filter
-    if scope == "mine":
-        conditions.append(
-            "t.id IN (SELECT task_id FROM task_assignees WHERE assignee_user_id = ?)"
-        )
-        params.append(sender_id)
-        # Also exclude others' private projects
-        conditions.append(
-            "(p.visibility = 'shared' OR p.owner_user_id = ?)"
-        )
-        params.append(sender_id)
-    elif scope == "all":
-        conditions.append(
-            "(p.visibility = 'shared' OR p.owner_user_id = ?)"
-        )
-        params.append(sender_id)
-    elif scope == "user" and scope_user:
-        conditions.append(
-            "t.id IN (SELECT task_id FROM task_assignees WHERE assignee_user_id = ?)"
-        )
-        params.append(scope_user)
-        # Still enforce visibility
-        conditions.append(
-            "(p.visibility = 'shared' OR p.owner_user_id = ?)"
-        )
-        params.append(sender_id)
+    scope_conds, scope_params = build_scope_conditions(scope, sender_id, scope_user)
+    conditions.extend(scope_conds)
+    params.extend(scope_params)
 
     where_clause = " AND ".join(conditions)
 
@@ -137,12 +116,7 @@ def list_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
     for row in rows:
         task_id, title, section, due, project_name = row
         due_str = due if due else "-"
-        # Get assignees for this task
-        assignee_rows = conn.execute(
-            "SELECT assignee_user_id FROM task_assignees WHERE task_id = ?",
-            (task_id,),
-        ).fetchall()
-        assignee_str = ", ".join(f"<@{a[0]}>" for a in assignee_rows)
+        assignee_str = format_assignees(conn, task_id)
         lines.append(
             f"#{task_id} ({project_name}/{section}) due:{due_str} "
             f"assignees:{assignee_str} -- {title}"

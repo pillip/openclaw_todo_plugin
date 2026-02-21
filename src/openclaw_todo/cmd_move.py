@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import sqlite3
 
+from openclaw_todo.event_logger import log_event
 from openclaw_todo.parser import ParsedCommand
 from openclaw_todo.permissions import can_write_task
 
@@ -59,14 +59,15 @@ def move_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
     )
 
     # --- Log event ---
-    payload = json.dumps({
-        "old_section": current_section,
-        "new_section": target_section,
-    })
-    conn.execute(
-        "INSERT INTO events (actor_user_id, action, task_id, payload) "
-        "VALUES (?, 'task.move', ?, ?);",
-        (sender_id, task_id, payload),
+    log_event(
+        conn,
+        actor_user_id=sender_id,
+        action="task.move",
+        task_id=task_id,
+        payload={
+            "old_section": current_section,
+            "new_section": target_section,
+        },
     )
 
     conn.commit()

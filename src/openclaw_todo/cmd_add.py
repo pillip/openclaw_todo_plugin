@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import sqlite3
 
+from openclaw_todo.event_logger import log_event
 from openclaw_todo.parser import DUE_CLEAR, ParsedCommand
 from openclaw_todo.project_resolver import ProjectNotFoundError, resolve_project
 
@@ -64,17 +64,18 @@ def add_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) 
         )
 
     # --- Log event ---
-    payload = json.dumps({
-        "title": title,
-        "project": project.name,
-        "section": section,
-        "due": due,
-        "assignees": assignees,
-    })
-    conn.execute(
-        "INSERT INTO events (actor_user_id, action, task_id, payload) "
-        "VALUES (?, 'task.add', ?, ?);",
-        (sender_id, task_id, payload),
+    log_event(
+        conn,
+        actor_user_id=sender_id,
+        action="task.add",
+        task_id=task_id,
+        payload={
+            "title": title,
+            "project": project.name,
+            "section": section,
+            "due": due,
+            "assignees": assignees,
+        },
     )
 
     conn.commit()

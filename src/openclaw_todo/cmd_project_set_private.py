@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import sqlite3
 
+from openclaw_todo.event_logger import log_event
 from openclaw_todo.parser import ParsedCommand
 
 logger = logging.getLogger(__name__)
@@ -61,10 +61,11 @@ def set_private_handler(
     )
     new_id = cursor.lastrowid
 
-    conn.execute(
-        "INSERT INTO events (actor_user_id, action, payload) "
-        "VALUES (?, 'project.create_private', ?);",
-        (sender_id, json.dumps({"project_id": new_id, "name": project_name})),
+    log_event(
+        conn,
+        actor_user_id=sender_id,
+        action="project.create_private",
+        payload={"project_id": new_id, "name": project_name},
     )
     conn.commit()
 
@@ -130,17 +131,15 @@ def _convert_shared_to_private(
         (sender_id, project_id),
     )
 
-    conn.execute(
-        "INSERT INTO events (actor_user_id, action, payload) "
-        "VALUES (?, 'project.set_private', ?);",
-        (
-            sender_id,
-            json.dumps({
-                "project_id": project_id,
-                "name": project_name,
-                "old_visibility": "shared",
-            }),
-        ),
+    log_event(
+        conn,
+        actor_user_id=sender_id,
+        action="project.set_private",
+        payload={
+            "project_id": project_id,
+            "name": project_name,
+            "old_visibility": "shared",
+        },
     )
     conn.commit()
 

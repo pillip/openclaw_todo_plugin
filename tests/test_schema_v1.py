@@ -4,34 +4,7 @@ import sqlite3
 
 import pytest
 
-from openclaw_todo.db import get_connection
-from openclaw_todo.migrations import _migrations, get_version, migrate
-
-
-@pytest.fixture(autouse=True)
-def _load_v1_migration():
-    """Ensure exactly one V1 migration is registered, then restore."""
-    saved = _migrations.copy()
-    _migrations.clear()
-
-    from openclaw_todo.schema_v1 import migrate_v1
-
-    # Ensure exactly one copy
-    if migrate_v1 not in _migrations:
-        _migrations.append(migrate_v1)
-
-    yield
-    _migrations.clear()
-    _migrations.extend(saved)
-
-
-@pytest.fixture()
-def conn(tmp_path):
-    """Return a migrated V1 connection."""
-    c = get_connection(tmp_path / "test.sqlite3")
-    migrate(c)
-    yield c
-    c.close()
+from openclaw_todo.migrations import get_version
 
 
 def test_v1_tables_exist(conn):

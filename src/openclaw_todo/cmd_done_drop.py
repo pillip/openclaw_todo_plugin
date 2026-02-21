@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import sqlite3
 
+from openclaw_todo.event_logger import log_event
 from openclaw_todo.parser import ParsedCommand
 from openclaw_todo.permissions import can_write_task
 
@@ -63,16 +63,17 @@ def _close_task(
     )
 
     # --- Log event ---
-    payload = json.dumps({
-        "old_section": current_section,
-        "new_section": target_section,
-        "old_status": current_status,
-        "new_status": target_status,
-    })
-    conn.execute(
-        "INSERT INTO events (actor_user_id, action, task_id, payload) "
-        "VALUES (?, ?, ?, ?);",
-        (sender_id, f"task.{action}", task_id, payload),
+    log_event(
+        conn,
+        actor_user_id=sender_id,
+        action=f"task.{action}",
+        task_id=task_id,
+        payload={
+            "old_section": current_section,
+            "new_section": target_section,
+            "old_status": current_status,
+            "new_status": target_status,
+        },
     )
 
     conn.commit()

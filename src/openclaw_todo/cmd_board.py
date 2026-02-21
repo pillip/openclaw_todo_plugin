@@ -8,6 +8,7 @@ from collections import OrderedDict
 
 from openclaw_todo.parser import ParsedCommand
 from openclaw_todo.project_resolver import ProjectNotFoundError, resolve_project
+from openclaw_todo.scope_builder import build_scope_conditions, format_assignees
 
 logger = logging.getLogger(__name__)
 
@@ -65,23 +66,9 @@ def board_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict
         params.append(project.id)
 
     # Scope filter
-    if scope == "mine":
-        conditions.append(
-            "t.id IN (SELECT task_id FROM task_assignees WHERE assignee_user_id = ?)"
-        )
-        params.append(sender_id)
-        conditions.append("(p.visibility = 'shared' OR p.owner_user_id = ?)")
-        params.append(sender_id)
-    elif scope == "all":
-        conditions.append("(p.visibility = 'shared' OR p.owner_user_id = ?)")
-        params.append(sender_id)
-    elif scope == "user" and scope_user:
-        conditions.append(
-            "t.id IN (SELECT task_id FROM task_assignees WHERE assignee_user_id = ?)"
-        )
-        params.append(scope_user)
-        conditions.append("(p.visibility = 'shared' OR p.owner_user_id = ?)")
-        params.append(sender_id)
+    scope_conds, scope_params = build_scope_conditions(scope, sender_id, scope_user)
+    conditions.extend(scope_conds)
+    params.extend(scope_params)
 
     where_clause = " AND ".join(conditions)
 
@@ -125,11 +112,7 @@ def board_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict
             displayed = tasks[:limit_per_section]
             for task_id, title, due in displayed:
                 due_str = due if due else "-"
-                assignee_rows = conn.execute(
-                    "SELECT assignee_user_id FROM task_assignees WHERE task_id = ?",
-                    (task_id,),
-                ).fetchall()
-                assignee_str = ", ".join(f"<@{a[0]}>" for a in assignee_rows)
+                assignee_str = format_assignees(conn, task_id)
                 lines.append(f"  #{task_id}  due:{due_str}  {assignee_str}  {title}")
             overflow = len(tasks) - limit_per_section
             if overflow > 0:

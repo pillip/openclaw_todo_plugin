@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import sqlite3
 
+from openclaw_todo.event_logger import log_event
 from openclaw_todo.parser import ParsedCommand
 
 logger = logging.getLogger(__name__)
@@ -62,10 +62,11 @@ def set_shared_handler(
         return f"Project '{project_name}' is already shared."
     new_id = cursor.lastrowid
 
-    conn.execute(
-        "INSERT INTO events (actor_user_id, action, payload) "
-        "VALUES (?, 'project.create_shared', ?);",
-        (sender_id, json.dumps({"project_id": new_id, "name": project_name})),
+    log_event(
+        conn,
+        actor_user_id=sender_id,
+        action="project.create_shared",
+        payload={"project_id": new_id, "name": project_name},
     )
     conn.commit()
 
@@ -90,17 +91,15 @@ def _convert_private_to_shared(
         # A shared project with this name was created concurrently (TOCTOU).
         return f"Project '{project_name}' is already shared."
 
-    conn.execute(
-        "INSERT INTO events (actor_user_id, action, payload) "
-        "VALUES (?, 'project.set_shared', ?);",
-        (
-            sender_id,
-            json.dumps({
-                "project_id": project_id,
-                "name": project_name,
-                "old_visibility": "private",
-            }),
-        ),
+    log_event(
+        conn,
+        actor_user_id=sender_id,
+        action="project.set_shared",
+        payload={
+            "project_id": project_id,
+            "name": project_name,
+            "old_visibility": "private",
+        },
     )
     conn.commit()
 

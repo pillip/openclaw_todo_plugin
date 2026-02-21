@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import sqlite3
 
+from openclaw_todo.event_logger import log_event
 from openclaw_todo.parser import DUE_CLEAR, ParsedCommand
 from openclaw_todo.permissions import can_write_task, validate_private_assignees
 from openclaw_todo.project_resolver import ProjectNotFoundError, resolve_project
@@ -131,13 +131,12 @@ def edit_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
             )
 
     # --- Log event ---
-    payload = json.dumps({
-        k: {"old": v[0], "new": v[1]} for k, v in changes.items()
-    })
-    conn.execute(
-        "INSERT INTO events (actor_user_id, action, task_id, payload) "
-        "VALUES (?, 'task.edit', ?, ?);",
-        (sender_id, task_id, payload),
+    log_event(
+        conn,
+        actor_user_id=sender_id,
+        action="task.edit",
+        task_id=task_id,
+        payload={k: {"old": v[0], "new": v[1]} for k, v in changes.items()},
     )
 
     conn.commit()
