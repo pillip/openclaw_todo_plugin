@@ -115,11 +115,11 @@ def edit_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
         return f"No changes for task #{task_id}."
 
     # --- Apply updates ---
-    if update_fields:
-        update_fields.append("updated_at = datetime('now')")
-        sql = f"UPDATE tasks SET {', '.join(update_fields)} WHERE id = ?;"
-        update_params.append(task_id)
-        conn.execute(sql, update_params)
+    # Always set updated_at if any changes detected
+    update_fields.append("updated_at = datetime('now')")
+    sql = f"UPDATE tasks SET {', '.join(update_fields)} WHERE id = ?;"
+    update_params.append(task_id)
+    conn.execute(sql, update_params)
 
     # Apply assignee replacement
     if "assignees" in changes:
