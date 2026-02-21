@@ -32,6 +32,9 @@ All notable changes to this project will be documented in this file.
 - `cmd_list.py`: `/todo list` command handler with scope filtering (mine/all/<@USER>), project/section/status filters, sorting (due ASC NULLs last, id DESC), configurable limit
 - `list` handler registered in dispatcher
 - cmd_list tests (12 tests): mine default, all scope, private visibility, project/section filters, sorting, limit, edge cases
+- `cmd_done_drop.py`: `/todo done` and `/todo drop` command handlers with shared `_close_task` helper, sets section/status/closed_at, permission checks, event logging
+- `done` and `drop` handlers registered in dispatcher
+- cmd_done_drop tests (14 tests): field updates, event logging, permissions (private/shared), already-closed idempotency, validation edge cases
 - `.github/workflows/ci.yml`: GitHub Actions CI pipeline (push + PR on main, Python 3.11 + uv + pytest)
 - Branch protection: `test` job as required status check on main
 
