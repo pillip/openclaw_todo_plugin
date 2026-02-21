@@ -593,12 +593,12 @@ Revert handler; no schema change.
 |-------------|----------------------------------------|
 | Track       | Backend                                |
 | Milestone   | M4                                     |
-| Status      | TODO                                   |
+| Status      | done                                   |
 | Priority    | P1                                     |
 | Estimate    | 0.5d                                   |
 | Branch      | `feature/015-cmd-project-set-shared`   |
 | GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/36 |
-| PR          | --                                     |
+| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/37 |
 
 **Description**
 Implement `/todo project set-shared <name>`. Creates a shared project if none exists. If a shared project with that name already exists, noop. Global uniqueness enforced by DB index.
