@@ -14,6 +14,7 @@ from openclaw_todo.parser import ParsedCommand, ParseError, parse
 import openclaw_todo.schema_v1 as _schema_v1  # noqa: F401 — registers migrations
 
 from openclaw_todo.cmd_add import add_handler as _add_handler  # noqa: E402
+from openclaw_todo.cmd_list import list_handler as _list_handler  # noqa: E402
 from openclaw_todo.cmd_move import move_handler as _move_handler  # noqa: E402
 
 # Type alias for command handler functions.
@@ -55,6 +56,7 @@ def _stub_handler(command: str, parsed: ParsedCommand, conn: sqlite3.Connection,
 # Handler registry: command name -> callable(parsed, conn, context) -> str
 _handlers: dict[str, HandlerFn] = {
     "add": _add_handler,
+    "list": _list_handler,
     "move": _move_handler,
 }
 
