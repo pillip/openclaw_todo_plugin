@@ -669,12 +669,12 @@ Revert module.
 |-------------|----------------------------------------|
 | Track       | Backend                                |
 | Milestone   | M3                                     |
-| Status      | TODO                                   |
+| Status      | done                                   |
 | Priority    | P0                                     |
 | Estimate    | 0.5d                                   |
 | Branch      | `feature/017-permissions`              |
-| GH-Issue    | --                                     |
-| PR          | --                                     |
+| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/21 |
+| PR          | (merged directly on main)              |
 
 **Description**
 Extract shared permission-checking logic into `src/openclaw_todo/permissions.py`. Provides `can_write_task(conn, task_id, sender_id) -> bool` and `validate_private_assignees(project, assignees, owner_id) -> Optional[str]` (returns warning message or None).
