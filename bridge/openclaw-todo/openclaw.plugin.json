@@ -1,4 +1,5 @@
 {
+  "id": "openclaw-todo",
   "name": "openclaw-todo",
   "version": "0.1.0",
   "description": "Bridge plugin that forwards todo: commands to the Python HTTP server",
