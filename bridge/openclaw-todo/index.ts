@@ -1,5 +1,5 @@
 /**
- * OpenClaw bridge plugin — forwards /todo messages to the Python HTTP server.
+ * OpenClaw bridge plugin — forwards todo: messages to the Python HTTP server.
  *
  * Uses Node built-in `fetch` (Node 18+). Zero npm runtime dependencies.
  *
@@ -9,33 +9,35 @@
 
 const TODO_URL = process.env.OPENCLAW_TODO_URL ?? "http://127.0.0.1:8200";
 
-interface MessageContext {
-  sender_id: string;
-}
-
 interface PluginResponse {
   response: string | null;
 }
 
-export async function handleMessage(
-  text: string,
-  context: MessageContext,
-): Promise<string | null> {
-  const url = `${TODO_URL}/message`;
+export default function activate(api: any) {
+  api.registerMessageHandler({
+    pattern: /^todo:\s*/,
+    handler: async (message: any, context: any) => {
+      const text = message.text;
+      const senderId = context.sender_id ?? context.userId ?? message.user;
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, sender_id: context.sender_id }),
+      const res = await fetch(`${TODO_URL}/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, sender_id: senderId }),
+      });
+
+      if (!res.ok) {
+        const errorBody = await res.text();
+        throw new Error(
+          `openclaw-todo server error: ${res.status} ${errorBody}`,
+        );
+      }
+
+      const data: PluginResponse = await res.json();
+      if (data.response) {
+        return { text: data.response };
+      }
+      return null;
+    },
   });
-
-  if (!res.ok) {
-    const errorBody = await res.text();
-    throw new Error(
-      `openclaw-todo server error: ${res.status} ${errorBody}`,
-    );
-  }
-
-  const data: PluginResponse = await res.json();
-  return data.response;
 }
