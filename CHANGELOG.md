@@ -47,6 +47,9 @@ All notable changes to this project will be documented in this file.
 - `cmd_project_set_private.py`: `/todo project set-private <name>` command with three resolution paths (already-private noop, shared→private conversion with assignee validation, create new private project), event logging
 - `project_set_private` handler registered in dispatcher via project sub-routing
 - cmd_project_set_private tests (11 tests): already-private, shared conversion success/rejection, new project creation, assignee validation, event logging, edge cases
+- `cmd_project_set_shared.py`: `/todo project set-shared <name>` command with three resolution paths (already-shared noop, private→shared conversion, create new shared project), event logging, TOCTOU race handling via IntegrityError catch
+- `project_set_shared` handler registered in dispatcher via project sub-routing
+- cmd_project_set_shared tests (9 tests): already-shared noop, Inbox detection, private→shared conversion, updated_at, event logging, other user isolation, new creation, edge cases
 - `.github/workflows/ci.yml`: GitHub Actions CI pipeline (push + PR on main, Python 3.11 + uv + pytest)
 - Branch protection: `test` job as required status check on main
 
