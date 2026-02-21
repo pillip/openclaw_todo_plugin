@@ -23,7 +23,7 @@ def add_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) 
     title = " ".join(parsed.title_tokens)
 
     if not title:
-        return "Error: task title is required. Usage: /todo add <title> [options]"
+        return "Error: task title is required. Usage: !todo add <title> [options]"
 
     # --- Resolve project ---
     project_name = parsed.project or "Inbox"

@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- Command prefix changed from `/todo` to `!todo` to avoid Slack slash-command interception
+
 ### Added
 - HTTP server bridge for JS/TS OpenClaw gateway (Issue #23): stdlib `http.server` wrapping `handle_message` with `POST /message` and `GET /health` endpoints
 - `openclaw-todo-server` CLI entry point and `python -m openclaw_todo` support

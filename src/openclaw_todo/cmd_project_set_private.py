@@ -27,7 +27,7 @@ def set_private_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context
     # Extract project name from title_tokens (tokens after "set-private")
     name_tokens = parsed.title_tokens[1:] if len(parsed.title_tokens) > 1 else []
     if not name_tokens:
-        return "Error: project name required. Usage: /todo project set-private <name>"
+        return "Error: project name required. Usage: !todo project set-private <name>"
     project_name = name_tokens[0]
 
     # Step 1: Check if sender already has a private project with this name

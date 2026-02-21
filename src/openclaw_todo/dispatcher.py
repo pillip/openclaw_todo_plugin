@@ -26,9 +26,9 @@ HandlerFn = Callable[[ParsedCommand, sqlite3.Connection, dict], str]
 
 logger = logging.getLogger(__name__)
 
-USAGE = "Usage: /todo <command> [options]\n" "Commands: add, list, board, move, done, drop, edit, project"
+USAGE = "Usage: !todo <command> [options]\n" "Commands: add, list, board, move, done, drop, edit, project"
 
-PROJECT_USAGE = "Usage: /todo project <subcommand>\n" "Subcommands: list, set-private, set-shared"
+PROJECT_USAGE = "Usage: !todo project <subcommand>\n" "Subcommands: list, set-private, set-shared"
 
 # Valid top-level command names
 _VALID_COMMANDS = frozenset({"add", "list", "board", "move", "done", "drop", "edit", "project"})
