@@ -1611,3 +1611,102 @@ Private project tasks are correctly hidden from non-owners via the `(p.visibilit
 2. **Performance**: Batch-fetch assignees for displayed tasks instead of N+1 individual queries (applies to both `cmd_board.py` and `cmd_list.py`).
 3. **Test coverage**: Add a dedicated test for mention-based user scope (`parsed.mentions=["UOTHER"]`) in `test_cmd_board.py`.
 4. **Design clarification**: Document whether `/s <section>` on `/todo board` should filter to a single section or is intentionally a no-op for non-done/drop sections.
+
+---
+
+# PR #33 Review Notes -- Issue #14: `/todo project set-private` command
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-02-21
+> Branch: `feature/014-cmd-project-set-private`
+
+---
+
+## Code Review
+
+### Verdict: APPROVE
+
+The implementation is clean, well-structured, and follows established handler patterns. All 11 set-private tests pass alongside the full suite (131 total).
+
+### Acceptance Criteria Checklist
+
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| Already-private for sender: returns "already private" message | PASS | `test_set_private_already_private` validates response contains "already private" and project name. |
+| Shared -> private: all assignees are owner -> success (visibility='private', owner_user_id=sender) | PASS | `test_set_private_shared_success` verifies response and DB state. `test_set_private_shared_no_tasks` covers zero-task shared project. |
+| Shared -> private: non-owner assignee -> error with task IDs and violating assignees (max 10) | PASS | `test_set_private_shared_rejected_non_owner_assignee`, `test_set_private_error_message_format`, and `test_owner_assignees_not_flagged` all pass. |
+| Neither exists: creates new private project with owner=sender | PASS | `test_set_private_creates_new` verifies response and DB state. |
+| Error message format matches PRD example | PARTIAL | See finding F1 below. The message conveys the correct information but the exact format differs from UX spec Section 5.3. |
+| Event logged | PASS | `test_event_logged_on_conversion` and `test_event_logged_on_create` verify events for both conversion and creation paths. |
+
+### Test Coverage Summary
+
+- 11 tests, all passing.
+- Covers: already-private noop, shared conversion success (with tasks, without tasks), shared conversion rejection (single violator, multiple violators, mixed owner/non-owner assignees), new project creation, missing project name validation, other user's private project isolation, event logging for both code paths.
+- No missing critical paths identified.
+
+### Findings
+
+#### [Medium] F1: Error message format deviates from UX spec Section 5.3
+
+- **File**: `src/openclaw_todo/cmd_project_set_private.py`, lines 121-124
+- **Description**: The actual error message format differs from the UX spec. Key differences: (a) missing `:x:` emoji prefix, (b) different wording ("Cannot make" vs "Cannot set project ... to"), (c) task-assignee pairs are not grouped per-task, (d) missing "Please reassign or remove" guidance line, (e) truncation message differs.
+- **Impact**: Functional behavior is correct; only the user-facing message text differs. UX polish issue, not a logic bug.
+- **Recommendation**: Align the message format with the UX spec in a follow-up.
+
+#### [Low] F2: No explicit transaction wrapping for multi-statement DB writes
+
+- **File**: `src/openclaw_todo/cmd_project_set_private.py`, lines 127-145 and 57-69
+- **Description**: Both the conversion path (UPDATE + INSERT event) and the creation path (INSERT project + INSERT event) perform two DB writes followed by `conn.commit()`. Using `with conn:` would make the transactional intent explicit.
+- **Impact**: Low. Current behavior is correct under SQLite's default autocommit=False mode.
+- **Recommendation**: Wrap multi-statement writes in `with conn:` for clarity.
+
+#### [Low] F3: `task_ids` deduplication uses linear scan
+
+- **File**: `src/openclaw_todo/cmd_project_set_private.py`, lines 97-101
+- **Description**: `if task_id not in task_ids` performs O(n) membership checks on a list. Negligible for practical workloads (capped at `_MAX_VIOLATIONS = 10`).
+- **Recommendation**: No change needed now.
+
+#### [Info] F4: Dispatcher registration is clean
+
+- Import and handler registration follow the established pattern. The `project_set_private` key in `_handlers` matches the dynamic lookup in `_dispatch_project`.
+
+#### [Info] F5: Test helper `_make_parsed` correctly simulates parser output
+
+- `title_tokens=["set-private", project_name]` matches the expected parser output for `/todo project set-private <name>`.
+
+---
+
+## Security Findings
+
+### [Low] S1: User-supplied project name reflected in response messages
+
+- **Severity**: Low (safe in Slack; review if output context changes)
+- Project name from user input is included directly in response strings. Slack auto-escapes message content, preventing XSS.
+
+### [Low] S2: No authorization check for shared-to-private conversion
+
+- **Severity**: Low (matches current PRD; flag if requirements evolve)
+- Any user can convert any shared project to private. The assignee validation is the only gate. This is by-design per the current requirements.
+
+### [Info] S3: All SQL queries use parameterized statements
+
+- No string interpolation or f-string SQL construction found. SQL injection risk is mitigated.
+
+### [Info] S4: No hardcoded secrets or credentials
+
+### [Info] S5: No new dependencies introduced
+
+- Uses only standard library (`json`, `logging`, `sqlite3`) plus internal module (`parser`).
+
+### Security Summary
+
+No Critical or High severity findings. Two Low findings (S1, S2) are consistent with patterns already accepted in prior handler reviews.
+
+---
+
+## Follow-up Issues (proposed)
+
+1. **Error message format alignment**: Update the error message in `_convert_shared_to_private` to match UX spec Section 5.3 format.
+2. **Transaction explicitness**: Wrap multi-statement DB writes in `with conn:` blocks.
+3. **Context typing**: Introduce a `TypedDict` for `context` parameter to prevent `KeyError` on missing `sender_id` (carried forward from prior reviews).
