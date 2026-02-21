@@ -51,11 +51,15 @@ def set_shared_handler(
         return _convert_private_to_shared(conn, project_id, project_name, sender_id)
 
     # Step 3: Neither exists -> create new shared project
-    cursor = conn.execute(
-        "INSERT INTO projects (name, visibility, owner_user_id) "
-        "VALUES (?, 'shared', NULL);",
-        (project_name,),
-    )
+    try:
+        cursor = conn.execute(
+            "INSERT INTO projects (name, visibility, owner_user_id) "
+            "VALUES (?, 'shared', NULL);",
+            (project_name,),
+        )
+    except sqlite3.IntegrityError:
+        # Concurrent request already created the shared project (TOCTOU).
+        return f"Project '{project_name}' is already shared."
     new_id = cursor.lastrowid
 
     conn.execute(
@@ -76,11 +80,15 @@ def _convert_private_to_shared(
     sender_id: str,
 ) -> str:
     """Convert a private project to shared."""
-    conn.execute(
-        "UPDATE projects SET visibility = 'shared', owner_user_id = NULL, "
-        "updated_at = datetime('now') WHERE id = ?;",
-        (project_id,),
-    )
+    try:
+        conn.execute(
+            "UPDATE projects SET visibility = 'shared', owner_user_id = NULL, "
+            "updated_at = datetime('now') WHERE id = ?;",
+            (project_id,),
+        )
+    except sqlite3.IntegrityError:
+        # A shared project with this name was created concurrently (TOCTOU).
+        return f"Project '{project_name}' is already shared."
 
     conn.execute(
         "INSERT INTO events (actor_user_id, action, payload) "
