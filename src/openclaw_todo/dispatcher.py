@@ -18,6 +18,7 @@ from openclaw_todo.cmd_list import list_handler as _list_handler  # noqa: E402
 from openclaw_todo.cmd_move import move_handler as _move_handler  # noqa: E402
 from openclaw_todo.cmd_done_drop import done_handler as _done_handler  # noqa: E402
 from openclaw_todo.cmd_done_drop import drop_handler as _drop_handler  # noqa: E402
+from openclaw_todo.cmd_board import board_handler as _board_handler  # noqa: E402
 from openclaw_todo.cmd_edit import edit_handler as _edit_handler  # noqa: E402
 from openclaw_todo.cmd_project_list import project_list_handler as _project_list_handler  # noqa: E402
 from openclaw_todo.cmd_project_set_private import set_private_handler as _set_private_handler  # noqa: E402
@@ -65,6 +66,7 @@ _handlers: dict[str, HandlerFn] = {
     "move": _move_handler,
     "done": _done_handler,
     "drop": _drop_handler,
+    "board": _board_handler,
     "edit": _edit_handler,
     "project_list": _project_list_handler,
     "project_set_private": _set_private_handler,

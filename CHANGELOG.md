@@ -41,6 +41,12 @@ All notable changes to this project will be documented in this file.
 - `cmd_project_list.py`: `/todo project list` subcommand showing shared + sender's private projects with task counts
 - `project_list` handler registered in dispatcher via project sub-routing
 - cmd_project_list tests (6 tests): shared visibility, task counts, own private shown, others hidden, bidirectional privacy, default Inbox
+- `cmd_edit.py`: `/todo edit` command with v1 replace semantics — title, assignees (full replace), project move, section, due (including due:- clear), private assignee validation, event diff payload
+- `edit` handler registered in dispatcher
+- cmd_edit tests (20 tests): title/assignees/due/section/project editing, permissions, private validation, event logging, edge cases
+- `cmd_project_set_private.py`: `/todo project set-private <name>` command with three resolution paths (already-private noop, shared→private conversion with assignee validation, create new private project), event logging
+- `project_set_private` handler registered in dispatcher via project sub-routing
+- cmd_project_set_private tests (11 tests): already-private, shared conversion success/rejection, new project creation, assignee validation, event logging, edge cases
 - `.github/workflows/ci.yml`: GitHub Actions CI pipeline (push + PR on main, Python 3.11 + uv + pytest)
 - Branch protection: `test` job as required status check on main
 

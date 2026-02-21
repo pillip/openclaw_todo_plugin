@@ -56,6 +56,11 @@ class TestRoutesKnownCommands:
         result = dispatch("drop 1", {"sender_id": "U1"}, db_path=db_path)
         assert "not yet implemented" not in result.lower()
 
+    def test_board_routes_to_handler(self, db_path):
+        """The board command routes to the real board handler."""
+        result = dispatch("board", {"sender_id": "U1"}, db_path=db_path)
+        assert "not yet implemented" not in result.lower()
+
     def test_edit_routes_to_handler(self, db_path):
         """The edit command routes to the real edit handler."""
         result = dispatch("edit 1", {"sender_id": "U1"}, db_path=db_path)
@@ -82,7 +87,7 @@ class TestProjectSubRouting:
     """Verify /todo project subcommand routing."""
 
     def test_project_list_routes(self, db_path):
-        """``/todo project list`` routes to the project_list handler."""
+        """`/todo project list` routes to the project_list handler."""
         called = {"hit": False}
 
         def fake_project_list(parsed, conn, ctx):
@@ -96,7 +101,7 @@ class TestProjectSubRouting:
         assert result == "project list!"
 
     def test_project_set_private_routes(self, db_path):
-        """``/todo project set-private`` routes correctly."""
+        """`/todo project set-private` routes correctly."""
         called = {"hit": False}
 
         def fake_handler(parsed, conn, ctx):
@@ -110,7 +115,7 @@ class TestProjectSubRouting:
         assert result == "set private!"
 
     def test_project_set_shared_routes(self, db_path):
-        """``/todo project set-shared`` routes correctly."""
+        """`/todo project set-shared` routes correctly."""
         called = {"hit": False}
 
         def fake_handler(parsed, conn, ctx):
@@ -124,7 +129,7 @@ class TestProjectSubRouting:
         assert result == "set shared!"
 
     def test_project_no_subcommand(self, db_path):
-        """``/todo project`` without subcommand returns usage."""
+        """`/todo project` without subcommand returns usage."""
         result = dispatch("project", {"sender_id": "U1"}, db_path=db_path)
         assert "Subcommands" in result
 
@@ -146,7 +151,6 @@ class TestUnknownCommandHelp:
 
     def test_parse_error_returned(self, db_path):
         """Parser errors are returned as user-facing messages."""
-        # /s with invalid section should trigger ParseError
         result = dispatch("add /s invalid_section title", {"sender_id": "U1"}, db_path=db_path)
         assert "Parse error" in result
 
@@ -158,7 +162,6 @@ class TestDbInitialization:
         """Dispatching a command initializes the DB with migrations."""
         dispatch("add something", {"sender_id": "U1"}, db_path=db_path)
 
-        # Verify DB has schema_version table
         conn = sqlite3.connect(db_path)
         row = conn.execute("SELECT version FROM schema_version").fetchone()
         conn.close()

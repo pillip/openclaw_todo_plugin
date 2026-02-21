@@ -13,7 +13,7 @@
 | M0 | Plugin skeleton + `/todo` command registration | **Done** | #1 |
 | M1 | DB init + migrations + schema_version | **Done** | #2, #3, #4 |
 | M2 | Parser (Slack mention, /p, /s, due correction) | **Done** | #5 |
-| M3 | Commands (add/list/board/move/done/drop/edit) | **In progress** | #6 ✅, #16 ✅, #7 ✅, #17 ✅, #10 ✅, #8 ✅, #11 ✅, #9, #12 |
+| M3 | Commands (add/list/board/move/done/drop/edit) | **Done** | #6 ✅, #16 ✅, #7 ✅, #17 ✅, #10 ✅, #8 ✅, #11 ✅, #9 ✅, #12 ✅ |
 | M4 | Project commands (list/set-private/set-shared) | **In progress** | #13 ✅, #14 ✅, #15 |
 | M5 | Tests (parser/unit + sqlite E2E) | Not started | #18, #19 |
 | M6 | Packaging / deployment | Not started | #20 |
@@ -28,9 +28,9 @@
 
 ## Next Issues to Work On
 
-1. **#9** — /todo board command (M3)
-2. **#12** — /todo edit command (M3)
-3. **#15** — /todo project set-shared command (M4)
+1. **#15** — /todo project set-shared command (M4)
+2. **#18** — Parser comprehensive unit tests (M5)
+3. **#19** — SQLite E2E integration tests (M5)
 
 ## Risks
 
