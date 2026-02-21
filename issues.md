@@ -597,7 +597,7 @@ Revert handler; no schema change.
 | Priority    | P1                                     |
 | Estimate    | 0.5d                                   |
 | Branch      | `feature/015-cmd-project-set-shared`   |
-| GH-Issue    | --                                     |
+| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/36 |
 | PR          | --                                     |
 
 **Description**
