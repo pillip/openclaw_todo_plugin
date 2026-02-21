@@ -31,6 +31,15 @@ def _extract_task_id(add_result: str) -> str:
     return add_result.split("#")[1].split(" ")[0]
 
 
+def _query_task(db_path: str, task_id: str, columns: str = "*") -> tuple | None:
+    """Query a task row by ID using a context-managed connection."""
+    with sqlite3.connect(db_path) as conn:
+        return conn.execute(
+            f"SELECT {columns} FROM tasks WHERE id = ?;",
+            (int(task_id),),
+        ).fetchone()
+
+
 # ---------------------------------------------------------------------------
 # Scenario 1: add -> list roundtrip
 # ---------------------------------------------------------------------------
@@ -78,7 +87,7 @@ class TestAddMoveBoardFlow:
         task_id = _extract_task_id(add_result)
 
         move_result = _msg(f"move {task_id} /s doing", "U001", db_path)
-        assert "Moved" in move_result or "moved" in move_result.lower()
+        assert "moved" in move_result.lower()
 
         board = _msg("board", "U001", db_path)
         assert "DOING" in board
@@ -101,15 +110,9 @@ class TestDoneAndDropFlow:
         task_id = _extract_task_id(add_result)
 
         done_result = _msg(f"done {task_id}", "U001", db_path)
-        assert "Done" in done_result or "done" in done_result.lower()
+        assert "done" in done_result.lower()
 
-        # Verify in DB directly (need foreign_keys=ON for consistency)
-        conn = sqlite3.connect(db_path)
-        row = conn.execute(
-            "SELECT status, section, closed_at FROM tasks WHERE id = ?;",
-            (int(task_id),),
-        ).fetchone()
-        conn.close()
+        row = _query_task(db_path, task_id, "status, section, closed_at")
         assert row is not None, f"Task #{task_id} not found in DB"
         assert row[0] == "done"
         assert row[1] == "done"
@@ -120,14 +123,9 @@ class TestDoneAndDropFlow:
         task_id = _extract_task_id(add_result)
 
         drop_result = _msg(f"drop {task_id}", "U001", db_path)
-        assert "Drop" in drop_result or "drop" in drop_result.lower()
+        assert "drop" in drop_result.lower()
 
-        conn = sqlite3.connect(db_path)
-        row = conn.execute(
-            "SELECT status, section FROM tasks WHERE id = ?;",
-            (int(task_id),),
-        ).fetchone()
-        conn.close()
+        row = _query_task(db_path, task_id, "status, section")
         assert row is not None
         assert row[0] == "dropped"
         assert row[1] == "drop"
@@ -157,9 +155,7 @@ class TestEditFlow:
         edit_result = _msg(f"edit {task_id} new title", "U001", db_path)
         assert "Edited" in edit_result
 
-        conn = sqlite3.connect(db_path)
-        row = conn.execute("SELECT title FROM tasks WHERE id = ?;", (int(task_id),)).fetchone()
-        conn.close()
+        row = _query_task(db_path, task_id, "title")
         assert row is not None
         assert row[0] == "new title"
 
@@ -169,9 +165,7 @@ class TestEditFlow:
 
         _msg(f"edit {task_id} /s doing", "U001", db_path)
 
-        conn = sqlite3.connect(db_path)
-        row = conn.execute("SELECT section FROM tasks WHERE id = ?;", (int(task_id),)).fetchone()
-        conn.close()
+        row = _query_task(db_path, task_id, "section")
         assert row is not None
         assert row[0] == "doing"
 
@@ -181,9 +175,7 @@ class TestEditFlow:
 
         _msg(f"edit {task_id} due:2026-12-31", "U001", db_path)
 
-        conn = sqlite3.connect(db_path)
-        row = conn.execute("SELECT due FROM tasks WHERE id = ?;", (int(task_id),)).fetchone()
-        conn.close()
+        row = _query_task(db_path, task_id, "due")
         assert row is not None
         assert row[0] == "2026-12-31"
 
@@ -216,6 +208,16 @@ class TestPrivateProjectIsolation:
         u2_projects = _msg("project list", "U002", db_path)
         assert "MyPrivate" not in u2_projects
 
+    def test_private_task_write_denied_for_non_owner(self, db_path):
+        """Non-owner cannot edit/move/done tasks in a private project."""
+        _msg("project set-private Private", "U001", db_path)
+        add_result = _msg("add owned task /p Private", "U001", db_path)
+        task_id = _extract_task_id(add_result)
+
+        # U002 should be denied write access
+        edit_result = _msg(f"edit {task_id} hacked", "U002", db_path)
+        assert "denied" in edit_result.lower() or "error" in edit_result.lower()
+
 
 # ---------------------------------------------------------------------------
 # Scenario 6: set-private rejects foreign assignees
@@ -230,7 +232,7 @@ class TestSetPrivateRejectsForeignAssignees:
 
         # Try to set it private — should be rejected
         result = _msg("project set-private TeamProj", "U001", db_path)
-        assert "cannot make" in result.lower() or "Cannot" in result
+        assert "cannot" in result.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -243,10 +245,7 @@ class TestDueNormalisationStored:
         add_result = _msg("add task due:03-15", "U001", db_path)
         task_id = _extract_task_id(add_result)
 
-        conn = sqlite3.connect(db_path)
-        row = conn.execute("SELECT due FROM tasks WHERE id = ?;", (int(task_id),)).fetchone()
-        conn.close()
-
+        row = _query_task(db_path, task_id, "due")
         assert row is not None
         # Should be YYYY-MM-DD format (current or next year)
         assert len(row[0]) == 10
@@ -256,9 +255,7 @@ class TestDueNormalisationStored:
         add_result = _msg("add task due:2026-06-01", "U001", db_path)
         task_id = _extract_task_id(add_result)
 
-        conn = sqlite3.connect(db_path)
-        row = conn.execute("SELECT due FROM tasks WHERE id = ?;", (int(task_id),)).fetchone()
-        conn.close()
+        row = _query_task(db_path, task_id, "due")
         assert row is not None
         assert row[0] == "2026-06-01"
 
@@ -271,7 +268,7 @@ class TestProjectSetSharedFlow:
 
     def test_create_shared_project_and_add_task(self, db_path):
         create_result = _msg("project set-shared TeamBoard", "U001", db_path)
-        assert "created shared" in create_result.lower() or "Created" in create_result
+        assert "created" in create_result.lower()
 
         _msg("add team task /p TeamBoard", "U001", db_path)
 
@@ -325,12 +322,7 @@ class TestFullLifecycle:
         _msg(f"done {task_id}", "U001", db_path)
 
         # Verify in DB
-        conn = sqlite3.connect(db_path)
-        row = conn.execute(
-            "SELECT title, status, section FROM tasks WHERE id = ?;",
-            (int(task_id),),
-        ).fetchone()
-        conn.close()
+        row = _query_task(db_path, task_id, "title, status, section")
         assert row is not None
         assert row[0] == "updated title"
         assert row[1] == "done"

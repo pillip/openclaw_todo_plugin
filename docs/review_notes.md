@@ -2111,3 +2111,12 @@ All direct DB queries in tests use parameterized queries (`?` placeholders). No 
 4. **Use context managers for SQLite connections**: Replace manual `conn.close()` calls with `with` blocks to prevent connection leaks on assertion failures (Finding 1).
 
 5. **Board command coverage for private projects**: No test verifies that `board` output respects private project visibility. A user calling `/todo board` should not see tasks from other users' private projects.
+
+---
+
+### Fixes Applied (Review Round)
+
+1. **Added `_query_task()` helper** with `sqlite3.connect` context manager — replaces all manual `conn.execute`/`conn.close()` patterns (addresses F1, F4, follow-up #3, #4).
+2. **Simplified assertion patterns** — replaced `"X" in r or "x" in r.lower()` with just `"x" in r.lower()` (addresses F4).
+3. **Added `test_private_task_write_denied_for_non_owner`** — verifies that U002 cannot edit a task in U001's private project through the full `handle_message` path (addresses SF-3 Medium security finding).
+4. Total tests: 20 (19 original + 1 new security test). All passing.
