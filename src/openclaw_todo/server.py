@@ -27,12 +27,17 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_PORT = 8200
 DEFAULT_HOST = "127.0.0.1"
+MAX_BODY_BYTES = 1_048_576  # 1 MiB — reject oversized payloads
 
 
 def _get_config() -> tuple[str, int, str | None]:
     """Return (host, port, db_path) from environment."""
     host = DEFAULT_HOST
-    port = int(os.environ.get("OPENCLAW_TODO_PORT", str(DEFAULT_PORT)))
+    try:
+        port = int(os.environ.get("OPENCLAW_TODO_PORT", str(DEFAULT_PORT)))
+    except ValueError:
+        logger.warning("Invalid OPENCLAW_TODO_PORT, falling back to %d", DEFAULT_PORT)
+        port = DEFAULT_PORT
     db_path = os.environ.get("OPENCLAW_TODO_DB_PATH") or None
     return host, port, db_path
 
@@ -65,9 +70,20 @@ def _make_handler_class(db_path: str | None) -> type[BaseHTTPRequestHandler]:
                 return
 
             # Read body
-            content_length = int(self.headers.get("Content-Length", 0))
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+            except (ValueError, TypeError):
+                _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "invalid Content-Length"})
+                return
             if content_length == 0:
                 _json_response(self, HTTPStatus.BAD_REQUEST, {"error": "empty body"})
+                return
+            if content_length > MAX_BODY_BYTES:
+                _json_response(
+                    self,
+                    HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                    {"error": f"body exceeds {MAX_BODY_BYTES} byte limit"},
+                )
                 return
 
             raw = self.rfile.read(content_length)

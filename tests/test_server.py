@@ -112,3 +112,21 @@ class TestErrorHandling:
         payload = json.dumps({"text": "hi", "sender_id": "U001"}).encode()
         status, _body = _post(f"{server_url}/other", payload)
         assert status == 404
+
+    def test_oversized_body_413(self, server_url):
+        """Content-Length exceeding MAX_BODY_BYTES is rejected with 413."""
+        from openclaw_todo.server import MAX_BODY_BYTES
+
+        # Send a small body but claim a huge Content-Length so the server
+        # rejects it before reading the full stream.
+        url = f"{server_url}/message"
+        req = urllib.request.Request(url, data=b'{"x":1}', method="POST")
+        req.add_header("Content-Type", "application/json")
+        req.add_header("Content-Length", str(MAX_BODY_BYTES + 1))
+        try:
+            resp = urllib.request.urlopen(req)
+            status, body = resp.status, json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            status, body = e.code, json.loads(e.read())
+        assert status == 413
+        assert "limit" in body["error"]
