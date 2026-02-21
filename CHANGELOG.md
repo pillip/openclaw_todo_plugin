@@ -26,6 +26,9 @@ All notable changes to this project will be documented in this file.
 - `cmd_add.py`: `/todo add` command handler with project resolution, assignee defaults, private-project validation, event logging
 - `add` handler registered in dispatcher (replaces stub)
 - cmd_add tests (10 tests): default Inbox, explicit options, private rejection, assignee defaults, multiple assignees, event logging, edge cases
+- `cmd_move.py`: `/todo move` command handler with section validation, permission checks (private: owner only, shared: assignee/creator), updated_at, event logging
+- `move` handler registered in dispatcher
+- cmd_move tests (13 tests): valid moves, updated_at, event logging, same-section noop, missing section/ID, invalid ID, nonexistent task, permission checks
 - `.github/workflows/ci.yml`: GitHub Actions CI pipeline (push + PR on main, Python 3.11 + uv + pytest)
 - Branch protection: `test` job as required status check on main
 

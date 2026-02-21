@@ -1179,3 +1179,67 @@ Second review pass to verify the F3 fix (commit 594cad4) and confirm no remainin
 ### Verdict
 
 **APPROVE -- ready to merge.** All 49 tests pass. No Critical or High issues.
+
+---
+
+# PR #24 Review Notes -- Issue #10: /todo move command
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-02-21
+> Branch: `feature/010-cmd-move`
+
+---
+
+## Code Review
+
+### Changed Files
+
+| File | Change | Lines |
+|------|--------|-------|
+| `src/openclaw_todo/cmd_move.py` | NEW | 76 |
+| `tests/test_cmd_move.py` | NEW | 222 |
+| `src/openclaw_todo/dispatcher.py` | MODIFIED | +2 lines (import + registry) |
+| `tests/test_dispatcher.py` | MODIFIED | +6 lines (routing test for move) |
+
+### Acceptance Criteria Checklist
+
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| Section validated against enum; invalid returns error | PASS | Validated upstream by parser (line 103). DB CHECK constraint as backup. |
+| Private project: only owner can move | PASS | Delegates to `can_write_task()`. `test_move_private_non_owner_rejected` verifies. |
+| Shared project: only assignee or created_by can move | PASS | `test_move_shared_*` (3 tests) verify all paths. |
+| `updated_at` set on change | PASS | `test_move_updates_updated_at` verifies. |
+| Event logged | PASS | `test_move_logs_event` checks actor, action, task_id, and JSON payload. |
+| Response confirms new section | PASS | Format: `Moved #<id> from <old> → <new>`. |
+
+### Findings
+
+| ID | Severity | Description | Status |
+|----|----------|-------------|--------|
+| F1 | Low | No handler-level section enum validation -- relies on parser + DB CHECK | OPEN -- acceptable defense-in-depth |
+| F2 | Low | `context["sender_id"]` raises `KeyError` if missing | OPEN -- consistent with cmd_add.py |
+| F3 | Low | No test for non-integer task ID (`ValueError` path) | FIXED -- `test_move_invalid_task_id` added |
+| F4 | Low | TOCTOU between SELECT and UPDATE | OPEN -- theoretical in SQLite single-writer |
+| F5 | Low | `_seed_task` uses `SELECT last_insert_rowid()` vs `cursor.lastrowid` | OPEN -- non-blocking |
+
+### Code Quality Summary
+
+Clean, correct implementation following established patterns. All SQL uses parameterized queries. 13 tests covering happy path, validation, permissions, and edge cases.
+
+---
+
+## Security Findings
+
+| ID | Severity | Description | Status |
+|----|----------|-------------|--------|
+| S1 | Info | SQL injection: No risk -- all queries parameterized | N/A |
+| S2 | Info | Authorization correctly enforced via `can_write_task()` | N/A |
+| S3 | Low | Task existence disclosed before permission check (ID enumeration) | OPEN -- acceptable in Slack team context |
+| S4 | Low | User input reflected in error via `!r` formatting | OPEN -- safe in Slack (auto-escapes) |
+| S5 | Info | No hardcoded secrets or new dependencies | N/A |
+
+No Critical, High, or Medium findings.
+
+### Verdict
+
+**APPROVE -- ready to merge.** All 98 tests pass. One Low finding fixed (F3). No blocking issues.
