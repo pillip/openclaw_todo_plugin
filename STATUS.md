@@ -15,7 +15,7 @@
 | M2 | Parser (Slack mention, /p, /s, due correction) | **Done** | #5 |
 | M3 | Commands (add/list/board/move/done/drop/edit) | **Done** | #6 ✅, #16 ✅, #7 ✅, #17 ✅, #10 ✅, #8 ✅, #11 ✅, #9 ✅, #12 ✅ |
 | M4 | Project commands (list/set-private/set-shared) | **Done** | #13 ✅, #14 ✅, #15 ✅ |
-| M5 | Tests (parser/unit + sqlite E2E) | Not started | #18, #19 |
+| M5 | Tests (parser/unit + sqlite E2E) | **Done** | #18 ✅, #19 ✅ |
 | M6 | Packaging / deployment | Not started | #20 |
 | DevOps | GitHub Actions CI | **Done** | #21 |
 
@@ -28,9 +28,7 @@
 
 ## Next Issues to Work On
 
-1. **#18** — Parser comprehensive unit tests (M5)
-2. **#19** — SQLite E2E integration tests (M5)
-3. **#20** — Packaging and distribution setup (M6)
+1. **#20** — Packaging and distribution setup (M6)
 
 ## Risks
 

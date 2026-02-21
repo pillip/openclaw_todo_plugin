@@ -1,8 +1,10 @@
 """Tests for the command parser."""
 
+from datetime import date
+
 import pytest
 
-from openclaw_todo.parser import DUE_CLEAR, ParseError, ParsedCommand, parse
+from openclaw_todo.parser import DUE_CLEAR, ParseError, parse
 
 
 def test_extract_project():
@@ -29,8 +31,6 @@ def test_extract_section_invalid():
 
 def test_due_mm_dd_normalisation():
     """due:03-15 should be normalised to current-year YYYY-MM-DD."""
-    from datetime import date
-
     result = parse("add Task due:03-15")
     expected = f"{date.today().year}-03-15"
     assert result.due == expected

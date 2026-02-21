@@ -754,7 +754,7 @@ CI coverage report.
 | Estimate    | 1.5d                                   |
 | Branch      | `feature/019-e2e-tests`               |
 | GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/38 |
-| PR          | --                                     |
+| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/41 |
 
 **Description**
 Write integration tests that exercise the full flow through `handle_message` with a real (tmp_path) SQLite database. Cover the main user stories: add a task, list it, move it, mark done, edit it, manage projects, and validate private project constraints.
