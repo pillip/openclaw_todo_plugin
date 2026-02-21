@@ -2120,3 +2120,28 @@ All direct DB queries in tests use parameterized queries (`?` placeholders). No 
 2. **Simplified assertion patterns** — replaced `"X" in r or "x" in r.lower()` with just `"x" in r.lower()` (addresses F4).
 3. **Added `test_private_task_write_denied_for_non_owner`** — verifies that U002 cannot edit a task in U001's private project through the full `handle_message` path (addresses SF-3 Medium security finding).
 4. Total tests: 20 (19 original + 1 new security test). All passing.
+
+---
+
+## PR #43 — [Issue#20] Packaging and distribution setup
+
+**Date:** 2026-02-21 | **Verdict:** APPROVE (no blockers)
+
+### Code Review
+- Packaging metadata correct: hatchling build, `openclaw.plugins` entry-point verified
+- `Makefile` targets work (lint/format/test/build/clean)
+- README comprehensive with install, config, usage docs
+- **Fix applied:** Added `format` to `.PHONY` declaration in Makefile
+
+### Security Findings
+- **Medium (S1/S2):** SQL via f-string in cmd_list/board/edit — safe (parameterized) but fragile pattern
+- **Low (S3-S6):** No input length limit, default DB permissions, debug logging of user input, no secrets found
+
+### Follow-ups
+1. Add LICENSE file (MIT text)
+2. Single-source version (dynamic versioning)
+3. Expand ruff rules (B, UP)
+4. DB file permission hardening
+5. SQL construction safety comments
+
+Full details: `docs/review_notes_pr43.md`

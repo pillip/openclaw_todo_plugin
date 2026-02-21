@@ -1,4 +1,4 @@
-.PHONY: lint test build clean
+.PHONY: lint format test build clean
 
 lint:
 	uv run ruff check src/ tests/
