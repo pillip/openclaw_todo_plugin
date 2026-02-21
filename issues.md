@@ -929,3 +929,47 @@ Revert test file; no production code change.
 
 **Dependencies**
 #20
+
+---
+
+## Issue #23: HTTP Server Bridge for OpenClaw JS Gateway
+
+| Field       | Value                                  |
+|-------------|----------------------------------------|
+| Track       | Backend / Integration                  |
+| Milestone   | M7                                     |
+| Status      | done                                   |
+| Priority    | P1                                     |
+| Estimate    | 1.5d                                   |
+| Branch      | `feature/023-http-bridge`              |
+| GH-Issue    | --                                     |
+| PR          | --                                     |
+
+**Description**
+Add an HTTP server bridge so the Python plugin can be used from JS/TS-only OpenClaw gateways. The Python side wraps `handle_message` in a stdlib `http.server` (`POST /message`, `GET /health`). A thin JS/TS bridge plugin calls it via `fetch`. Zero runtime dependencies on both sides.
+
+**Acceptance Criteria**
+- [ ] `src/openclaw_todo/server.py` — HTTP server with `/message` and `/health` endpoints
+- [ ] `src/openclaw_todo/__main__.py` — `python -m openclaw_todo` runs the server
+- [ ] `pyproject.toml` — `openclaw-todo-server` CLI entry point
+- [ ] `bridge/openclaw-todo/` — JS bridge plugin (openclaw.plugin.json, index.ts, package.json, tsconfig.json)
+- [ ] `tests/test_server.py` — health, message, error handling tests
+- [ ] Environment variables: `OPENCLAW_TODO_PORT`, `OPENCLAW_TODO_DB_PATH`, `OPENCLAW_TODO_URL`
+- [ ] 127.0.0.1 binding, graceful SIGINT/SIGTERM shutdown
+
+**Tests**
+- `tests/test_server.py::TestHealthEndpoint::test_health_ok`
+- `tests/test_server.py::TestHealthEndpoint::test_unknown_get_path_404`
+- `tests/test_server.py::TestMessageEndpoint::test_todo_add_returns_response`
+- `tests/test_server.py::TestMessageEndpoint::test_non_todo_returns_null`
+- `tests/test_server.py::TestMessageEndpoint::test_todo_usage`
+- `tests/test_server.py::TestErrorHandling::test_empty_body_400`
+- `tests/test_server.py::TestErrorHandling::test_invalid_json_400`
+- `tests/test_server.py::TestErrorHandling::test_missing_fields_422`
+- `tests/test_server.py::TestErrorHandling::test_unknown_post_path_404`
+
+**Rollback**
+Remove server.py, __main__.py, bridge/ directory; revert pyproject.toml scripts.
+
+**Dependencies**
+#1, #20

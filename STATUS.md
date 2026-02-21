@@ -18,6 +18,7 @@
 | M5 | Tests (parser/unit + sqlite E2E) | **Done** | #18 ✅, #19 ✅, #22 ✅ |
 | M6 | Packaging / deployment | **Done** | #20 ✅ |
 | DevOps | GitHub Actions CI | **Done** | #21 |
+| M7 | HTTP bridge for JS/TS gateway | **Done** | #23 ✅ |
 
 ## Critical Path
 
@@ -28,7 +29,7 @@
 
 ## Next Issues to Work On
 
-All issues complete. Project is fully implemented.
+All core issues complete. HTTP bridge (Issue #23) shipped.
 
 ## Risks
 
@@ -45,4 +46,4 @@ All issues complete. Project is fully implemented.
 - [x] `docs/ux_spec.md` — UX specification with all command flows
 - [x] `docs/architecture.md` — Software architecture design
 - [x] `docs/test_plan.md` — Test strategy with 80+ test cases
-- [x] `issues.md` — 20 issues across 7 milestones
+- [x] `issues.md` — 23 issues across 8 milestones
