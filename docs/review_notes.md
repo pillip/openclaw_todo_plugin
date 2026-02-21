@@ -1848,3 +1848,82 @@ The handler correctly scopes the private project lookup to `owner_user_id = send
 3. **Shared fixture extraction**: Move `_load_v1` and `conn` fixtures to `tests/conftest.py` to eliminate duplication across test modules (carried forward).
 4. **Input validation layer**: Add project name length and character validation, shared across all project subcommands.
 5. **Multi-word project name policy**: Document or test the single-token assumption for project names.
+
+---
+
+# PR #40 Review Notes -- Issue #18: Parser unit tests (comprehensive)
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-02-21
+> Branch: `feature/018-parser-tests`
+
+---
+
+## Code Review
+
+### Verdict: APPROVE
+
+Well-structured test expansion bringing `parser.py` from 95% to 100% line coverage (83/83 statements). 50 tests organized into logical test classes with clear docstrings. No production code changes.
+
+### Acceptance Criteria Checklist
+
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| >=95% line coverage on `parser.py` | PASS | 100% (83/83 stmts, 0 missing) |
+| Edge cases documented in test docstrings | PASS | Every test method has a docstring |
+| All tests pass with `uv run pytest tests/test_parser.py -v` | PASS | 50/50 passed |
+| `test_options_in_any_order` | PASS | `TestOptionsInAnyOrder` class (5 tests) |
+| `test_due_year_boundary` | PASS | `TestDueYearBoundary` class (6 tests) |
+| `test_empty_title_no_crash` | PASS | `TestEmptyTitleNoCrash` class (4 tests) |
+| `test_unicode_title` | PASS | `TestUnicodeTitle` class (3 tests) |
+| `test_extra_whitespace` | PASS | `TestExtraWhitespace` class (3 tests) |
+| `test_mixed_mentions_and_options` | PASS | `TestMixedMentionsAndOptions` class (3 tests) |
+
+### Coverage Gap Verification
+
+Previously uncovered lines now exercised:
+- **Lines 61-62:** MM-DD invalid date (ValueError in `date()` constructor) — covered by `test_due_mm_dd_invalid_day` and `test_due_mm_dd_invalid_month`
+- **Line 93:** `/p` missing argument — covered by `test_p_at_end_without_value`
+- **Line 101:** `/s` missing argument — covered by `test_s_at_end_without_value`
+
+### Findings
+
+#### [Trivial] F1: Unused `ParsedCommand` import
+
+- **File**: `tests/test_parser.py`, line 5
+- `ParsedCommand` is imported but never referenced. Could be removed for cleanliness.
+
+#### [Trivial] F2: `from datetime import date` imported inside function bodies
+
+- **File**: `tests/test_parser.py`, lines 34, 152, 158
+- Three tests import `date` locally instead of at module level. Harmless but inconsistent with Python conventions.
+
+#### [Low] F3: No test for `due:` with empty value
+
+- `parse("add Task due:")` would match `_DUE_RE` with empty capture, then raise `ParseError` via `_normalise_due("")`. An explicit test would document this behavior.
+
+#### [Low] F4: No test for non-matching mention-like patterns
+
+- `<@lowercase>` or `<@>` would not match `_MENTION_RE` and become title tokens. An explicit test documenting this regex boundary would be useful.
+
+---
+
+## Security Findings
+
+No security issues. This PR contains only test code.
+
+| # | Severity | Finding |
+|---|----------|---------|
+| 1 | Info | No hardcoded secrets or credentials. All test data uses placeholder IDs. |
+| 2 | Info | No dangerous imports. Only `pytest` and project-internal modules. |
+| 3 | Info | No exploitable code. Tests only call the pure `parse()` function. |
+
+---
+
+## Follow-up Issues (proposed)
+
+1. **Remove unused `ParsedCommand` import** from `tests/test_parser.py` line 5.
+2. **Move `from datetime import date`** to module-level import in `tests/test_parser.py`.
+3. **Add test for `due:` with empty value** — verify `ParseError` is raised for `parse("add Task due:")`.
+4. **Add test for non-matching mention patterns** — verify `<@lowercase>` becomes a title token.
+5. **Add `__pycache__/` and `*.pyc` to `.gitignore`** — bytecode files should not be tracked.
