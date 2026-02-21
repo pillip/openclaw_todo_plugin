@@ -896,12 +896,12 @@ None.
 |-------------|----------------------------------------|
 | Track       | QA                                     |
 | Milestone   | M5                                     |
-| Status      | doing                                  |
+| Status      | done                                   |
 | Priority    | P1                                     |
 | Estimate    | 0.5d                                   |
 | Branch      | `feature/022-plugin-install-e2e`       |
 | GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/44 |
-| PR          | --                                     |
+| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/45 |
 
 **Description**
 Add E2E tests that discover the plugin via `importlib.metadata.entry_points(group="openclaw.plugins")`, load the `todo` entry-point, and exercise the full command flow through the discovered function. Unlike `test_e2e.py` which imports `handle_message` directly, these tests verify that the package installation and entry-point registration work correctly.
