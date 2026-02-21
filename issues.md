@@ -709,11 +709,11 @@ Revert module.
 |-------------|----------------------------------------|
 | Track       | QA                                     |
 | Milestone   | M5                                     |
-| Status      | TODO                                   |
+| Status      | doing                                  |
 | Priority    | P1                                     |
 | Estimate    | 1d                                     |
 | Branch      | `feature/018-parser-tests`             |
-| GH-Issue    | --                                     |
+| GH-Issue    | issues/39                              |
 | PR          | --                                     |
 
 **Description**
@@ -749,11 +749,11 @@ CI coverage report.
 |-------------|----------------------------------------|
 | Track       | QA                                     |
 | Milestone   | M5                                     |
-| Status      | TODO                                   |
+| Status      | doing                                  |
 | Priority    | P1                                     |
 | Estimate    | 1.5d                                   |
 | Branch      | `feature/019-e2e-tests`               |
-| GH-Issue    | --                                     |
+| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/38 |
 | PR          | --                                     |
 
 **Description**
