@@ -551,12 +551,12 @@ Revert handler; read-only.
 |-------------|----------------------------------------|
 | Track       | Backend                                |
 | Milestone   | M4                                     |
-| Status      | TODO                                   |
+| Status      | done                                   |
 | Priority    | P0                                     |
 | Estimate    | 1.5d                                   |
 | Branch      | `feature/014-cmd-project-set-private`  |
-| GH-Issue    | --                                     |
-| PR          | --                                     |
+| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/32 |
+| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/33 |
 
 **Description**
 Implement `/todo project set-private <name>` with the assignee validation described in PRD 3.4. Resolution flow: if sender already has private with that name -> noop; if shared exists -> attempt conversion; if neither -> create new private. Conversion scans all tasks in the project and rejects if any task has a non-owner assignee.

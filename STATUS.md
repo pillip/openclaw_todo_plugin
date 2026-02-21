@@ -28,8 +28,8 @@
 
 ## Next Issues to Work On
 
-1. **#12** — /todo edit command (M3)
-2. **#14** — /todo project set-private command (M4)
+1. **#9** — /todo board command (M3)
+2. **#12** — /todo edit command (M3)
 3. **#15** — /todo project set-shared command (M4)
 
 ## Risks
