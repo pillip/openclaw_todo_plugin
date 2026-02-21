@@ -1415,6 +1415,117 @@ No Critical, High, or Medium severity findings. Three Low findings (S3, S4, S5) 
 
 ---
 
+# PR #33 Review Notes -- Issue #14: `/todo project set-private` command
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-02-21
+> Branch: `feature/014-cmd-project-set-private`
+
+---
+
+## Code Review
+
+### Acceptance Criteria Checklist
+
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| Already-private for sender: returns "already private" message | PASS | `test_set_private_already_private` validates response contains "already private" and project name. |
+| Shared -> private: all assignees are owner -> success (visibility='private', owner_user_id=sender) | PASS | `test_set_private_shared_success` verifies response and DB state. `test_set_private_shared_no_tasks` covers zero-task shared project. |
+| Shared -> private: non-owner assignee -> error with task IDs and violating assignees (max 10) | PASS | `test_set_private_shared_rejected_non_owner_assignee`, `test_set_private_error_message_format`, and `test_owner_assignees_not_flagged` all pass. |
+| Neither exists: creates new private project with owner=sender | PASS | `test_set_private_creates_new` verifies response and DB state. |
+| Error message format matches PRD example | PARTIAL | See finding F1 below. The message conveys the correct information but the exact format differs from UX spec Section 5.3. |
+| Event logged | PASS | `test_event_logged_on_conversion` and `test_event_logged_on_create` verify events for both conversion and creation paths. |
+
+### Test Coverage Summary
+
+- 11 tests, all passing.
+- Covers: already-private noop, shared conversion success (with tasks, without tasks), shared conversion rejection (single violator, multiple violators, mixed owner/non-owner assignees), new project creation, missing project name validation, other user's private project isolation, event logging for both code paths.
+- No missing critical paths identified.
+
+### Findings
+
+#### [Medium] F1: Error message format deviates from UX spec Section 5.3
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_project_set_private.py`, lines 121-124
+- **Description**: The actual error message format is:
+  ```
+  Cannot make 'Backend' private: tasks [#1, #2] have non-owner assignees [U002, U003].
+  ```
+  The UX spec (Section 5.3) prescribes:
+  ```
+  :x: Cannot set project "Backend" to private: found tasks assigned to non-owner users.
+  e.g. #12 assignees:@alice, #18 assignees:@carol
+  Please reassign or remove these assignees first.
+  ```
+  Key differences: (a) missing `:x:` emoji prefix, (b) different wording ("Cannot make" vs "Cannot set project ... to"), (c) task-assignee pairs are not grouped per-task (e.g., `#12 assignees:@alice`), (d) missing "Please reassign or remove" guidance line, (e) truncation message differs ("(+N more tasks)" vs "... and N more tasks with external assignees.").
+- **Impact**: Functional behavior is correct; only the user-facing message text differs. This is a UX polish issue, not a logic bug.
+- **Recommendation**: Align the message format with the UX spec in a follow-up. Not blocking since the AC tests check for the essential information (task IDs, assignee IDs) and pass.
+
+#### [Low] F2: No explicit transaction wrapping for multi-statement DB writes
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_project_set_private.py`, lines 127-145 and 57-69
+- **Description**: Both the conversion path (UPDATE + INSERT event) and the creation path (INSERT project + INSERT event) perform two DB writes followed by `conn.commit()`. If the second statement fails, the first write remains uncommitted in the implicit transaction. While SQLite's default behavior handles this correctly (both are in the same implicit transaction and neither is committed until `conn.commit()`), using `with conn:` would make the transactional intent explicit and guard against future refactoring that might introduce intermediate commits.
+- **Impact**: Low. Current behavior is correct under SQLite's default autocommit=False mode.
+- **Recommendation**: Wrap multi-statement writes in `with conn:` for clarity. Consistent with follow-up item from prior reviews.
+
+#### [Low] F3: `task_ids` deduplication uses linear scan
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_project_set_private.py`, lines 97-101
+- **Description**: `if task_id not in task_ids` performs O(n) membership checks on a list. For the typical case (small number of violations), this is fine. If performance ever matters, a seen-set could be added.
+- **Impact**: Negligible for practical workloads (capped at task count per project).
+- **Recommendation**: No change needed now. The `_MAX_VIOLATIONS = 10` cap limits output anyway.
+
+#### [Info] F4: Dispatcher registration is clean
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/dispatcher.py`, line 22 and 68
+- **Description**: Import and handler registration follow the established pattern. The `project_set_private` key in `_handlers` matches the dynamic lookup in `_dispatch_project` (line 129: `f"project_{sub.replace('-', '_')}"`). This is correct and consistent.
+
+#### [Info] F5: Test helper `_make_parsed` correctly simulates parser output
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/tests/test_cmd_project_set_private.py`, lines 38-47
+- **Description**: `title_tokens=["set-private", project_name]` matches the expected parser output for `/todo project set-private <name>`. The handler's `parsed.title_tokens[1:]` extraction on line 30 of the handler correctly skips the subcommand token.
+
+---
+
+## Security Findings
+
+### [Low] S1: User-supplied project name reflected in response messages
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_project_set_private.py`, lines 43, 72, 122, 148
+- **Description**: The project name from user input is included directly in response strings (e.g., `f"Project '{project_name}' is already private for you."`). In the Slack context, message content is auto-escaped by the Slack API, preventing XSS. If the output context ever changes to raw HTML, this would need sanitization.
+- **Severity**: Low (safe in Slack; review if output context changes)
+
+### [Low] S2: No authorization check for shared-to-private conversion
+
+- **File**: `/Users/pillip/project/practice/openclaw_todo_plugin/src/openclaw_todo/cmd_project_set_private.py`, lines 52-54
+- **Description**: Any user can convert any shared project to private (becoming the owner). The PRD does not specify any restriction on who can perform this conversion -- the assignee validation is the only gate. This is by-design per the current requirements but worth noting: in a multi-team environment, this could allow a user to "claim" a shared project.
+- **Severity**: Low (matches current PRD; flag if requirements evolve)
+
+### [Info] S3: All SQL queries use parameterized statements
+
+- All database queries in `cmd_project_set_private.py` use `?` placeholders with parameter tuples. No string interpolation or f-string SQL construction found. SQL injection risk is mitigated.
+
+### [Info] S4: No hardcoded secrets or credentials
+
+- No API keys, tokens, or secrets found in `cmd_project_set_private.py` or `test_cmd_project_set_private.py`.
+
+### [Info] S5: No new dependencies introduced
+
+- `cmd_project_set_private.py` uses only standard library (`json`, `logging`, `sqlite3`) plus internal module (`parser`). No new entries in `pyproject.toml`.
+
+### Security Summary
+
+No Critical or High severity findings. Two Low findings (S1, S2) are consistent with patterns already accepted in prior handler reviews. The implementation follows established security patterns: parameterized queries, no hardcoded secrets, and standard library only.
+
+---
+
+## Follow-up Issues (proposed)
+
+1. **Error message format alignment**: Update the error message in `_convert_shared_to_private` to match UX spec Section 5.3 format (`:x:` prefix, per-task assignee grouping, "Please reassign or remove" guidance line, spec-matching truncation text). Reference: finding F1.
+2. **Transaction explicitness**: Wrap multi-statement DB writes in `with conn:` blocks in `set_private_handler` and `_convert_shared_to_private`. Consistent with the same follow-up item from prior reviews (cmd_add, cmd_done_drop).
+3. **Context typing**: Introduce a `TypedDict` for `context` parameter to prevent `KeyError` on missing `sender_id` (carried forward from prior reviews).
+
+
 # PR #31 Review Notes -- Issue #9: /todo board kanban view
 
 > Reviewer: Claude Opus 4.6 (automated review)
