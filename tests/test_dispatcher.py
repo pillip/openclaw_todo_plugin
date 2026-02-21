@@ -33,7 +33,7 @@ class TestRoutesKnownCommands:
 
     @pytest.mark.parametrize(
         "command",
-        ["list", "board", "move", "done", "drop", "edit"],
+        ["board", "move", "done", "drop", "edit"],
     )
     def test_routes_known_commands(self, command, db_path):
         """Each known command reaches its handler (stub by default)."""
@@ -51,6 +51,11 @@ class TestRoutesKnownCommands:
         """The add command routes to the real add handler."""
         result = dispatch("add something", {"sender_id": "U1"}, db_path=db_path)
         assert "Added #" in result
+
+    def test_list_routes_to_handler(self, db_path):
+        """The list command routes to the real list handler."""
+        result = dispatch("list", {"sender_id": "U1"}, db_path=db_path)
+        assert "not yet implemented" not in result.lower()
 
     def test_registered_handler_called(self, db_path):
         """A registered handler is called instead of the stub."""
