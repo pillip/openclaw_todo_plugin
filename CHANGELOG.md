@@ -35,6 +35,9 @@ All notable changes to this project will be documented in this file.
 - `cmd_done_drop.py`: `/todo done` and `/todo drop` command handlers with shared `_close_task` helper, sets section/status/closed_at, permission checks, event logging
 - `done` and `drop` handlers registered in dispatcher
 - cmd_done_drop tests (14 tests): field updates, event logging, permissions (private/shared), already-closed idempotency, validation edge cases
+- `cmd_project_list.py`: `/todo project list` subcommand showing shared + sender's private projects with task counts
+- `project_list` handler registered in dispatcher via project sub-routing
+- cmd_project_list tests (6 tests): shared visibility, task counts, own private shown, others hidden, bidirectional privacy, default Inbox
 - `.github/workflows/ci.yml`: GitHub Actions CI pipeline (push + PR on main, Python 3.11 + uv + pytest)
 - Branch protection: `test` job as required status check on main
 

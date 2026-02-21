@@ -513,12 +513,12 @@ Revert handler.
 |-------------|----------------------------------------|
 | Track       | Backend                                |
 | Milestone   | M4                                     |
-| Status      | doing                                  |
+| Status      | done                                   |
 | Priority    | P1                                     |
 | Estimate    | 0.5d                                   |
 | Branch      | `feature/013-cmd-project-list`         |
 | GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/28 |
-| PR          | --                                     |
+| PR          | Merged via PR #27 (bundled with Issue #11) |
 
 **Description**
 Implement `/todo project list`. Returns all shared projects and the sender's private projects. Format: grouped by visibility with name and task count.
