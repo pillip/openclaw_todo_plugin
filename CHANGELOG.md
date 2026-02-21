@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- HTTP server bridge for JS/TS OpenClaw gateway (Issue #23): stdlib `http.server` wrapping `handle_message` with `POST /message` and `GET /health` endpoints
+- `openclaw-todo-server` CLI entry point and `python -m openclaw_todo` support
+- JS/TS bridge plugin (`bridge/openclaw-todo/`) using Node built-in `fetch` — zero npm dependencies
+- Environment variables: `OPENCLAW_TODO_PORT`, `OPENCLAW_TODO_DB_PATH`, `OPENCLAW_TODO_URL`
+- Server tests (10 tests): health, message dispatch, error handling, body size limit
+- Request body size limit (1 MiB) with 413 response
 - Plugin install E2E tests (Issue #22): 8 tests verifying entry-point discovery via `importlib.metadata.entry_points` and full command flow through the loaded function
 - `@pytest.mark.install` marker for selective E2E test execution
 
