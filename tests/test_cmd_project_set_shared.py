@@ -36,9 +36,7 @@ class TestSetSharedAlreadyShared:
     """If a shared project with the name exists, return noop."""
 
     def test_already_shared_noop(self, conn):
-        conn.execute(
-            "INSERT INTO projects (name, visibility) VALUES ('Backend', 'shared');"
-        )
+        conn.execute("INSERT INTO projects (name, visibility) VALUES ('Backend', 'shared');")
         conn.commit()
 
         result = set_shared_handler(_make_parsed("Backend"), conn, {"sender_id": "U001"})
@@ -57,10 +55,7 @@ class TestSetSharedConvertPrivate:
     """Private -> shared conversion when sender owns a private project."""
 
     def test_convert_private_to_shared(self, conn):
-        conn.execute(
-            "INSERT INTO projects (name, visibility, owner_user_id) "
-            "VALUES ('MyProj', 'private', 'U001');"
-        )
+        conn.execute("INSERT INTO projects (name, visibility, owner_user_id) " "VALUES ('MyProj', 'private', 'U001');")
         conn.commit()
 
         result = set_shared_handler(_make_parsed("MyProj"), conn, {"sender_id": "U001"})
@@ -68,9 +63,7 @@ class TestSetSharedConvertPrivate:
         assert "now shared" in result.lower()
 
         # Verify DB state
-        row = conn.execute(
-            "SELECT visibility, owner_user_id FROM projects WHERE name = 'MyProj';"
-        ).fetchone()
+        row = conn.execute("SELECT visibility, owner_user_id FROM projects WHERE name = 'MyProj';").fetchone()
         assert row[0] == "shared"
         assert row[1] is None  # owner cleared for shared projects
 
@@ -84,16 +77,11 @@ class TestSetSharedConvertPrivate:
 
         set_shared_handler(_make_parsed("MyProj"), conn, {"sender_id": "U001"})
 
-        row = conn.execute(
-            "SELECT updated_at FROM projects WHERE name = 'MyProj';"
-        ).fetchone()
+        row = conn.execute("SELECT updated_at FROM projects WHERE name = 'MyProj';").fetchone()
         assert row[0] != "2020-01-01 00:00:00"
 
     def test_event_logged_on_conversion(self, conn):
-        conn.execute(
-            "INSERT INTO projects (name, visibility, owner_user_id) "
-            "VALUES ('MyProj', 'private', 'U001');"
-        )
+        conn.execute("INSERT INTO projects (name, visibility, owner_user_id) " "VALUES ('MyProj', 'private', 'U001');")
         conn.commit()
 
         set_shared_handler(_make_parsed("MyProj"), conn, {"sender_id": "U001"})
@@ -111,10 +99,7 @@ class TestSetSharedConvertPrivate:
 
     def test_other_users_private_not_converted(self, conn):
         """Another user's private project is not found; a new shared project is created."""
-        conn.execute(
-            "INSERT INTO projects (name, visibility, owner_user_id) "
-            "VALUES ('MyProj', 'private', 'U002');"
-        )
+        conn.execute("INSERT INTO projects (name, visibility, owner_user_id) " "VALUES ('MyProj', 'private', 'U002');")
         conn.commit()
 
         result = set_shared_handler(_make_parsed("MyProj"), conn, {"sender_id": "U001"})
@@ -124,8 +109,7 @@ class TestSetSharedConvertPrivate:
 
         # U002's private should remain untouched
         row = conn.execute(
-            "SELECT visibility, owner_user_id FROM projects "
-            "WHERE name = 'MyProj' AND visibility = 'private';"
+            "SELECT visibility, owner_user_id FROM projects " "WHERE name = 'MyProj' AND visibility = 'private';"
         ).fetchone()
         assert row is not None
         assert row[1] == "U002"
@@ -141,9 +125,7 @@ class TestSetSharedCreatesNew:
         assert "NewProj" in result
 
         # Verify in DB
-        row = conn.execute(
-            "SELECT visibility, owner_user_id FROM projects WHERE name = 'NewProj';"
-        ).fetchone()
+        row = conn.execute("SELECT visibility, owner_user_id FROM projects WHERE name = 'NewProj';").fetchone()
         assert row is not None
         assert row[0] == "shared"
         assert row[1] is None

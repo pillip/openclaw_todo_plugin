@@ -11,13 +11,8 @@ from openclaw_todo.project_resolver import (
 def test_private_takes_priority(conn):
     """Sender's private project should be matched before shared."""
     # Create shared and private with same name
-    conn.execute(
-        "INSERT INTO projects (name, visibility) VALUES ('Work', 'shared');"
-    )
-    conn.execute(
-        "INSERT INTO projects (name, visibility, owner_user_id) "
-        "VALUES ('Work', 'private', 'U1');"
-    )
+    conn.execute("INSERT INTO projects (name, visibility) VALUES ('Work', 'shared');")
+    conn.execute("INSERT INTO projects (name, visibility, owner_user_id) " "VALUES ('Work', 'private', 'U1');")
     conn.commit()
 
     result = resolve_project(conn, "Work", "U1")
@@ -28,9 +23,7 @@ def test_private_takes_priority(conn):
 
 def test_falls_back_to_shared(conn):
     """If no private match, shared project should be returned."""
-    conn.execute(
-        "INSERT INTO projects (name, visibility) VALUES ('Team', 'shared');"
-    )
+    conn.execute("INSERT INTO projects (name, visibility) VALUES ('Team', 'shared');")
     conn.commit()
 
     result = resolve_project(conn, "Team", "U1")
@@ -65,10 +58,7 @@ def test_inbox_already_exists(conn):
 
 def test_private_different_owner_not_matched(conn):
     """Private project of another owner should not be matched."""
-    conn.execute(
-        "INSERT INTO projects (name, visibility, owner_user_id) "
-        "VALUES ('Secret', 'private', 'U2');"
-    )
+    conn.execute("INSERT INTO projects (name, visibility, owner_user_id) " "VALUES ('Secret', 'private', 'U2');")
     conn.commit()
 
     with pytest.raises(ProjectNotFoundError):

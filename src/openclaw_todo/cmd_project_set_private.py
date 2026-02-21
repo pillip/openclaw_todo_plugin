@@ -13,9 +13,7 @@ logger = logging.getLogger(__name__)
 _MAX_VIOLATIONS = 10
 
 
-def set_private_handler(
-    parsed: ParsedCommand, conn: sqlite3.Connection, context: dict
-) -> str:
+def set_private_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) -> str:
     """Set a project to private for the sender.
 
     Resolution flow:
@@ -34,8 +32,7 @@ def set_private_handler(
 
     # Step 1: Check if sender already has a private project with this name
     row = conn.execute(
-        "SELECT id FROM projects "
-        "WHERE name = ? AND visibility = 'private' AND owner_user_id = ?;",
+        "SELECT id FROM projects " "WHERE name = ? AND visibility = 'private' AND owner_user_id = ?;",
         (project_name, sender_id),
     ).fetchone()
     if row is not None:
@@ -44,8 +41,7 @@ def set_private_handler(
 
     # Step 2: Check if a shared project with this name exists
     shared_row = conn.execute(
-        "SELECT id FROM projects "
-        "WHERE name = ? AND visibility = 'shared';",
+        "SELECT id FROM projects " "WHERE name = ? AND visibility = 'shared';",
         (project_name,),
     ).fetchone()
 
@@ -55,8 +51,7 @@ def set_private_handler(
 
     # Step 3: Neither exists → create new private project
     cursor = conn.execute(
-        "INSERT INTO projects (name, visibility, owner_user_id) "
-        "VALUES (?, 'private', ?);",
+        "INSERT INTO projects (name, visibility, owner_user_id) " "VALUES (?, 'private', ?);",
         (project_name, sender_id),
     )
     new_id = cursor.lastrowid
@@ -117,7 +112,9 @@ def _convert_shared_to_private(
 
         logger.info(
             "project set-private: %s result=rejected by %s (%d violations)",
-            project_name, sender_id, len(violations),
+            project_name,
+            sender_id,
+            len(violations),
         )
         return (
             f"Cannot make '{project_name}' private: "
@@ -126,8 +123,7 @@ def _convert_shared_to_private(
 
     # All clear — convert
     conn.execute(
-        "UPDATE projects SET visibility = 'private', owner_user_id = ?, "
-        "updated_at = datetime('now') WHERE id = ?;",
+        "UPDATE projects SET visibility = 'private', owner_user_id = ?, " "updated_at = datetime('now') WHERE id = ?;",
         (sender_id, project_id),
     )
 

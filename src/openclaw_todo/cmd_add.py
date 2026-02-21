@@ -50,8 +50,7 @@ def add_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) 
 
     # --- Insert task ---
     cursor = conn.execute(
-        "INSERT INTO tasks (title, project_id, section, due, status, created_by) "
-        "VALUES (?, ?, ?, ?, 'open', ?);",
+        "INSERT INTO tasks (title, project_id, section, due, status, created_by) " "VALUES (?, ?, ?, ?, 'open', ?);",
         (title, project.id, section, due, sender_id),
     )
     task_id = cursor.lastrowid
@@ -80,14 +79,9 @@ def add_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) 
 
     conn.commit()
 
-    logger.info(
-        "Task #%d created in %s/%s by %s", task_id, project.name, section, sender_id
-    )
+    logger.info("Task #%d created in %s/%s by %s", task_id, project.name, section, sender_id)
 
     # --- Format response ---
     due_str = due if due else "-"
     assignee_str = ", ".join(f"<@{a}>" for a in assignees)
-    return (
-        f"Added #{task_id} ({project.name}/{section}) "
-        f"due:{due_str} assignees:{assignee_str} -- {title}"
-    )
+    return f"Added #{task_id} ({project.name}/{section}) " f"due:{due_str} assignees:{assignee_str} -- {title}"

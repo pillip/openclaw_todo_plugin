@@ -36,9 +36,7 @@ def test_fresh_db_gets_version_table(conn):
     version = get_version(conn)
     assert version == 0
     # Table should exist
-    row = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version';"
-    ).fetchone()
+    row = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version';").fetchone()
     assert row is not None
 
 
@@ -57,12 +55,7 @@ def test_applies_migrations_sequentially(conn):
     assert final == 2
 
     # Both tables should exist
-    tables = {
-        r[0]
-        for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table';"
-        ).fetchall()
-    }
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()}
     assert "t1" in tables
     assert "t2" in tables
 
@@ -101,10 +94,5 @@ def test_rollback_on_failure(conn):
     assert get_version(conn) == 1
 
     # t_ok should exist (committed), but nothing from bad migration
-    tables = {
-        r[0]
-        for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table';"
-        ).fetchall()
-    }
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()}
     assert "t_ok" in tables

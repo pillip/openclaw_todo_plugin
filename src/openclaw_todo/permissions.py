@@ -35,7 +35,10 @@ def can_write_task(conn: sqlite3.Connection, task_id: int, sender_id: str) -> bo
         result = sender_id == owner_user_id
         logger.debug(
             "Permission check: task=%d sender=%s result=%s (private, owner=%s)",
-            task_id, sender_id, result, owner_user_id,
+            task_id,
+            sender_id,
+            result,
+            owner_user_id,
         )
         return result
 
@@ -43,7 +46,8 @@ def can_write_task(conn: sqlite3.Connection, task_id: int, sender_id: str) -> bo
     if sender_id == created_by:
         logger.debug(
             "Permission check: task=%d sender=%s result=True (creator)",
-            task_id, sender_id,
+            task_id,
+            sender_id,
         )
         return True
 
@@ -55,7 +59,9 @@ def can_write_task(conn: sqlite3.Connection, task_id: int, sender_id: str) -> bo
     result = assignee_row is not None
     logger.debug(
         "Permission check: task=%d sender=%s result=%s (shared, assignee check)",
-        task_id, sender_id, result,
+        task_id,
+        sender_id,
+        result,
     )
     return result
 
@@ -76,6 +82,4 @@ def validate_private_assignees(
     if not non_owner:
         return None
 
-    return (
-        f"Private project cannot have non-owner assignees: {', '.join(non_owner)}"
-    )
+    return f"Private project cannot have non-owner assignees: {', '.join(non_owner)}"

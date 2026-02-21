@@ -79,9 +79,7 @@ def edit_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
             return f"Error: project {parsed.project!r} not found."
         if project.id != old_project_id:
             # Get old project name for the change log
-            old_proj_name = conn.execute(
-                "SELECT name FROM projects WHERE id = ?", (old_project_id,)
-            ).fetchone()[0]
+            old_proj_name = conn.execute("SELECT name FROM projects WHERE id = ?", (old_project_id,)).fetchone()[0]
             changes["project"] = (old_proj_name, project.name)
             update_fields.append("project_id = ?")
             update_params.append(project.id)
@@ -90,7 +88,8 @@ def edit_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
     # Assignees (full replace if mentions present)
     if parsed.mentions:
         old_assignees = [
-            r[0] for r in conn.execute(
+            r[0]
+            for r in conn.execute(
                 "SELECT assignee_user_id FROM task_assignees WHERE task_id = ? ORDER BY assignee_user_id",
                 (task_id,),
             ).fetchall()
@@ -102,9 +101,7 @@ def edit_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
                 "SELECT visibility, owner_user_id FROM projects WHERE id = ?",
                 (new_project_id,),
             ).fetchone()
-            warning = validate_private_assignees(
-                proj_row[0], new_assignees, proj_row[1]
-            )
+            warning = validate_private_assignees(proj_row[0], new_assignees, proj_row[1])
             if warning:
                 return f"Error: {warning}"
 

@@ -4,45 +4,34 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-
 from typing import Callable
 
-from openclaw_todo.db import get_connection
-from openclaw_todo.migrations import migrate
-from openclaw_todo.parser import ParsedCommand, ParseError, parse
-
 import openclaw_todo.schema_v1 as _schema_v1  # noqa: F401 — registers migrations
-
 from openclaw_todo.cmd_add import add_handler as _add_handler  # noqa: E402
-from openclaw_todo.cmd_list import list_handler as _list_handler  # noqa: E402
-from openclaw_todo.cmd_move import move_handler as _move_handler  # noqa: E402
+from openclaw_todo.cmd_board import board_handler as _board_handler  # noqa: E402
 from openclaw_todo.cmd_done_drop import done_handler as _done_handler  # noqa: E402
 from openclaw_todo.cmd_done_drop import drop_handler as _drop_handler  # noqa: E402
-from openclaw_todo.cmd_board import board_handler as _board_handler  # noqa: E402
 from openclaw_todo.cmd_edit import edit_handler as _edit_handler  # noqa: E402
+from openclaw_todo.cmd_list import list_handler as _list_handler  # noqa: E402
+from openclaw_todo.cmd_move import move_handler as _move_handler  # noqa: E402
 from openclaw_todo.cmd_project_list import project_list_handler as _project_list_handler  # noqa: E402
 from openclaw_todo.cmd_project_set_private import set_private_handler as _set_private_handler  # noqa: E402
 from openclaw_todo.cmd_project_set_shared import set_shared_handler as _set_shared_handler  # noqa: E402
+from openclaw_todo.db import get_connection
+from openclaw_todo.migrations import migrate
+from openclaw_todo.parser import ParsedCommand, ParseError, parse
 
 # Type alias for command handler functions.
 HandlerFn = Callable[[ParsedCommand, sqlite3.Connection, dict], str]
 
 logger = logging.getLogger(__name__)
 
-USAGE = (
-    "Usage: /todo <command> [options]\n"
-    "Commands: add, list, board, move, done, drop, edit, project"
-)
+USAGE = "Usage: /todo <command> [options]\n" "Commands: add, list, board, move, done, drop, edit, project"
 
-PROJECT_USAGE = (
-    "Usage: /todo project <subcommand>\n"
-    "Subcommands: list, set-private, set-shared"
-)
+PROJECT_USAGE = "Usage: /todo project <subcommand>\n" "Subcommands: list, set-private, set-shared"
 
 # Valid top-level command names
-_VALID_COMMANDS = frozenset(
-    {"add", "list", "board", "move", "done", "drop", "edit", "project"}
-)
+_VALID_COMMANDS = frozenset({"add", "list", "board", "move", "done", "drop", "edit", "project"})
 
 # Valid project subcommands
 _VALID_PROJECT_SUBS = frozenset({"list", "set-private", "set-shared"})
@@ -133,5 +122,7 @@ def _dispatch_project(parsed: ParsedCommand, conn: sqlite3.Connection, context: 
     logger.info("Dispatching command=project sub=%s", sub)
 
     handler_name = f"project_{sub.replace('-', '_')}"
-    handler: HandlerFn = _handlers.get(handler_name, lambda parsed, conn, ctx: _stub_handler(f"project {sub}", parsed, conn, ctx))
+    handler: HandlerFn | None = _handlers.get(handler_name)
+    if handler is None:
+        return _stub_handler(f"project {sub}", parsed, conn, context)
     return handler(parsed, conn, context)

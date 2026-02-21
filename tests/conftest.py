@@ -31,9 +31,18 @@ def conn(tmp_path):
     c.close()
 
 
-def seed_task(conn, *, project_name="Inbox", visibility="shared", owner=None,
-              title="Test task", section="backlog", created_by="U001",
-              assignees=None, due=None):
+def seed_task(
+    conn,
+    *,
+    project_name="Inbox",
+    visibility="shared",
+    owner=None,
+    title="Test task",
+    section="backlog",
+    created_by="U001",
+    assignees=None,
+    due=None,
+):
     """Insert a task with associated project and assignees. Returns task_id."""
     row = conn.execute("SELECT id FROM projects WHERE name = ?", (project_name,)).fetchone()
     if row:
@@ -46,13 +55,12 @@ def seed_task(conn, *, project_name="Inbox", visibility="shared", owner=None,
         project_id = conn.execute("SELECT id FROM projects WHERE name = ?", (project_name,)).fetchone()[0]
 
     cursor = conn.execute(
-        "INSERT INTO tasks (title, project_id, section, status, created_by, due) "
-        "VALUES (?, ?, ?, 'open', ?, ?);",
+        "INSERT INTO tasks (title, project_id, section, status, created_by, due) " "VALUES (?, ?, ?, 'open', ?, ?);",
         (title, project_id, section, created_by, due),
     )
     task_id = cursor.lastrowid
 
-    for assignee in (assignees or [created_by]):
+    for assignee in assignees or [created_by]:
         conn.execute(
             "INSERT INTO task_assignees (task_id, assignee_user_id) VALUES (?, ?);",
             (task_id, assignee),

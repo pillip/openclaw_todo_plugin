@@ -6,7 +6,6 @@ import json
 
 from openclaw_todo.cmd_edit import edit_handler
 from openclaw_todo.parser import ParsedCommand
-
 from tests.conftest import seed_task as _seed_task
 
 
@@ -128,8 +127,12 @@ class TestEditPrivateAssignee:
 
     def test_edit_private_assignee_rejected(self, conn):
         task_id = _seed_task(
-            conn, project_name="MyPrivate", visibility="private",
-            owner="UOWNER", created_by="UOWNER", assignees=["UOWNER"],
+            conn,
+            project_name="MyPrivate",
+            visibility="private",
+            owner="UOWNER",
+            created_by="UOWNER",
+            assignees=["UOWNER"],
         )
         parsed = _make_parsed(args=[str(task_id)], mentions=["UOTHER"])
         result = edit_handler(parsed, conn, {"sender_id": "UOWNER"})
@@ -138,11 +141,16 @@ class TestEditPrivateAssignee:
 
     def test_edit_private_owner_assignee_allowed(self, conn):
         task_id = _seed_task(
-            conn, project_name="MyPrivate", visibility="private",
-            owner="UOWNER", created_by="UOWNER", assignees=["UOWNER"],
+            conn,
+            project_name="MyPrivate",
+            visibility="private",
+            owner="UOWNER",
+            created_by="UOWNER",
+            assignees=["UOWNER"],
         )
         parsed = _make_parsed(
-            args=[str(task_id)], title_tokens=["Updated", "title"],
+            args=[str(task_id)],
+            title_tokens=["Updated", "title"],
             mentions=["UOWNER"],
         )
         result = edit_handler(parsed, conn, {"sender_id": "UOWNER"})
@@ -172,9 +180,7 @@ class TestEditEvent:
         parsed = _make_parsed(args=[str(task_id)], title_tokens=["New"])
         edit_handler(parsed, conn, {"sender_id": "U001"})
 
-        event = conn.execute(
-            "SELECT actor_user_id, action, payload FROM events WHERE action = 'task.edit'"
-        ).fetchone()
+        event = conn.execute("SELECT actor_user_id, action, payload FROM events WHERE action = 'task.edit'").fetchone()
         assert event is not None
         assert event[0] == "U001"
         assert event[1] == "task.edit"
@@ -189,8 +195,12 @@ class TestEditPermissions:
 
     def test_edit_private_non_owner_rejected(self, conn):
         task_id = _seed_task(
-            conn, project_name="MyPrivate", visibility="private",
-            owner="UOWNER", created_by="UOWNER", assignees=["UOWNER"],
+            conn,
+            project_name="MyPrivate",
+            visibility="private",
+            owner="UOWNER",
+            created_by="UOWNER",
+            assignees=["UOWNER"],
         )
         parsed = _make_parsed(args=[str(task_id)], title_tokens=["Hacked"])
         result = edit_handler(parsed, conn, {"sender_id": "UOTHER"})
@@ -249,9 +259,7 @@ class TestEditEdgeCases:
         assert "section" in result
         assert "due" in result
 
-        row = conn.execute(
-            "SELECT title, section, due FROM tasks WHERE id = ?", (task_id,)
-        ).fetchone()
+        row = conn.execute("SELECT title, section, due FROM tasks WHERE id = ?", (task_id,)).fetchone()
         assert row[0] == "New"
         assert row[1] == "doing"
         assert row[2] == "2026-06-01"
