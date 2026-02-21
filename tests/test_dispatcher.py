@@ -31,22 +31,6 @@ def _clean_handlers():
 class TestRoutesKnownCommands:
     """Verify that all valid command names are routed to their handler."""
 
-    @pytest.mark.parametrize(
-        "command",
-        ["board", "edit"],
-    )
-    def test_routes_known_commands(self, command, db_path):
-        """Each known command reaches its handler (stub by default)."""
-        # For move/done/drop/edit, provide an id-like arg
-        if command in ("move", "done", "drop", "edit"):
-            text = f"{command} 1"
-        else:
-            text = f"{command} something"
-
-        result = dispatch(text, {"sender_id": "U1"}, db_path=db_path)
-        # Stub handlers return "not yet implemented"
-        assert "not yet implemented" in result.lower()
-
     def test_add_routes_to_handler(self, db_path):
         """The add command routes to the real add handler."""
         result = dispatch("add something", {"sender_id": "U1"}, db_path=db_path)
@@ -70,6 +54,11 @@ class TestRoutesKnownCommands:
     def test_drop_routes_to_handler(self, db_path):
         """The drop command routes to the real drop handler."""
         result = dispatch("drop 1", {"sender_id": "U1"}, db_path=db_path)
+        assert "not yet implemented" not in result.lower()
+
+    def test_edit_routes_to_handler(self, db_path):
+        """The edit command routes to the real edit handler."""
+        result = dispatch("edit 1", {"sender_id": "U1"}, db_path=db_path)
         assert "not yet implemented" not in result.lower()
 
     def test_registered_handler_called(self, db_path):
