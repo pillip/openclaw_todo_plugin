@@ -3,7 +3,7 @@ name = "openclaw-todo-plugin"
 version = "0.1.0"
 description = "OpenClaw TODO plugin for Slack — team/personal task management via DM"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 license = "MIT"
 authors = [
     { name = "pillip" },

@@ -4,6 +4,17 @@
   "version": "0.1.0",
   "description": "Bridge plugin that forwards todo: commands to the Python HTTP server",
   "main": "dist/index.js",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "serverUrl": {
+        "type": "string",
+        "default": "http://127.0.0.1:8200",
+        "description": "Python TODO server URL"
+      }
+    }
+  },
   "triggers": {
     "dm": {
       "pattern": "^todo:(\\s|$)"
