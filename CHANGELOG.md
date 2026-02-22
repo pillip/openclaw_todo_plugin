@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Command prefix changed from `/todo` to `todo:` — avoids both Slack slash-command interception and OpenClaw `!` bash reservation
+- Relax Python version requirement to `>=3.10`
+
+### Fixed
+- Add `SO_REUSEADDR` to HTTP server for clean systemd restarts
+- Add `id` and `configSchema` to OpenClaw plugin manifest
+- Add `openclaw.extensions` to bridge `package.json`
 
 ### Added
 - HTTP server bridge for JS/TS OpenClaw gateway (Issue #23): stdlib `http.server` wrapping `handle_message` with `POST /message` and `GET /health` endpoints

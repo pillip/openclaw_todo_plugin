@@ -129,7 +129,11 @@ def run(host: str | None = None, port: int | None = None, db_path: str | None = 
     db_path = db_path or env_db_path
 
     handler_class = _make_handler_class(db_path)
-    server = HTTPServer((host, port), handler_class)
+
+    class ReusableHTTPServer(HTTPServer):
+        allow_reuse_address = True
+
+    server = ReusableHTTPServer((host, port), handler_class)
 
     # Graceful shutdown on SIGINT / SIGTERM
     def _shutdown(signum: int, _frame: Any) -> None:
