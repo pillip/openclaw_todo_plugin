@@ -357,7 +357,7 @@ PRD 5.4 문법 `todo: move <id> <section>`을 지원한다. 현재는 `todo: mov
 - Owner: pillip
 - Branch: `issue/ISSUE-035-error-message-alignment`
 - GH-Issue: #62
-- PR: --
+- PR: #63
 
 #### Goal
 UX 명세 3.1~3.5에 정의된 에러 메시지 패턴과 현재 코드의 에러 메시지를 일치시킨다.
