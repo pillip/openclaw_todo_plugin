@@ -91,6 +91,16 @@ def list_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
 
     where_clause = " AND ".join(conditions)
 
+    # --- Count total matching rows ---
+    count_query = (
+        "SELECT COUNT(*) "
+        "FROM tasks t "
+        "JOIN projects p ON t.project_id = p.id "
+        f"WHERE {where_clause}"
+    )
+    total_count = conn.execute(count_query, params).fetchone()[0]
+
+    # --- Fetch limited rows ---
     query = (
         "SELECT t.id, t.title, t.section, t.due, p.name AS project_name "
         "FROM tasks t "
@@ -99,9 +109,9 @@ def list_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
         "ORDER BY (CASE WHEN t.due IS NOT NULL THEN 0 ELSE 1 END), t.due ASC, t.id DESC "
         "LIMIT ?"
     )
-    params.append(limit)
+    fetch_params = list(params) + [limit]
 
-    rows = conn.execute(query, params).fetchall()
+    rows = conn.execute(query, fetch_params).fetchall()
 
     logger.info(
         "list: scope=%s project=%s returned %d rows",
@@ -110,15 +120,25 @@ def list_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
         len(rows),
     )
 
-    if not rows:
-        return "No tasks found."
+    # --- Build header ---
+    project_label = f" /p {parsed.project}" if parsed.project else ""
+    section_label = f" /s {parsed.section}" if section_filter else ""
+    header = f"📋 TODO List ({scope} / {status_filter}){project_label}{section_label} — {total_count} tasks"
+
+    if total_count == 0:
+        return f"{header}\n\nNo tasks found."
 
     # --- Format output ---
-    lines: list[str] = []
+    lines: list[str] = [header, ""]
     for row in rows:
         task_id, title, section, due, project_name = row
         due_str = due if due else "-"
         assignee_str = format_assignees(conn, task_id)
-        lines.append(f"#{task_id} ({project_name}/{section}) due:{due_str} " f"assignees:{assignee_str} -- {title}")
+        lines.append(f"#{task_id}  due:{due_str}  ({project_name}/{section})  {assignee_str}  {title}")
+
+    # --- Footer ---
+    displayed = len(rows)
+    lines.append("")
+    lines.append(f"Showing {displayed} of {total_count}. Use limit:N to see more.")
 
     return "\n".join(lines)

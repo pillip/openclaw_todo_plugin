@@ -43,7 +43,7 @@ def move_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
     if row is None:
         return f"Error: task #{task_id} not found."
 
-    _, current_section, _ = row
+    title, current_section, project_id = row
 
     if current_section == target_section:
         return f"Task #{task_id} is already in section '{target_section}'."
@@ -72,6 +72,9 @@ def move_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
 
     conn.commit()
 
+    # --- Fetch project name for response ---
+    project_name = conn.execute("SELECT name FROM projects WHERE id = ?", (project_id,)).fetchone()[0]
+
     logger.info("Task #%d moved to %s by %s", task_id, target_section, sender_id)
 
-    return f"Moved #{task_id} from {current_section} → {target_section}"
+    return f"➡️ Moved #{task_id} to {target_section} ({project_name}) — {title}"

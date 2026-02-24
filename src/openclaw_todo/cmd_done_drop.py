@@ -20,6 +20,8 @@ def _close_task(
     action: str,
     target_section: str,
     target_status: str,
+    emoji: str,
+    verb: str,
 ) -> str:
     """Shared logic for ``done`` and ``drop`` commands.
 
@@ -38,13 +40,15 @@ def _close_task(
 
     # --- Check task exists ---
     row = conn.execute(
-        "SELECT section, status FROM tasks WHERE id = ?;",
+        "SELECT t.title, t.section, t.status, p.name "
+        "FROM tasks t JOIN projects p ON t.project_id = p.id "
+        "WHERE t.id = ?;",
         (task_id,),
     ).fetchone()
     if row is None:
         return f"Error: task #{task_id} not found."
 
-    current_section, current_status = row
+    title, current_section, current_status, project_name = row
 
     # --- Already closed? ---
     if current_status in ("done", "dropped"):
@@ -80,7 +84,7 @@ def _close_task(
 
     logger.info("Task #%d %s by %s", task_id, action, sender_id)
 
-    return f"Task #{task_id} marked as {target_status}."
+    return f"{emoji} {verb} #{task_id} ({project_name}) — {title}"
 
 
 def done_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) -> str:
@@ -92,6 +96,8 @@ def done_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
         action="done",
         target_section="done",
         target_status="done",
+        emoji="✅",
+        verb="Done",
     )
 
 
@@ -104,4 +110,6 @@ def drop_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
         action="drop",
         target_section="drop",
         target_status="dropped",
+        emoji="🗑️",
+        verb="Dropped",
     )

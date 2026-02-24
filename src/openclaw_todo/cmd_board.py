@@ -101,12 +101,12 @@ def board_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict
 
     # --- Format output ---
     project_label = f" /p {parsed.project}" if parsed.project else ""
-    header = f":bar_chart: Board ({scope} / {status_filter}){project_label}"
+    header = f"📊 Board ({scope} / {status_filter}){project_label}"
 
     lines: list[str] = [header, ""]
 
     for section, tasks in section_tasks.items():
-        lines.append(f"-- {section.upper()} ({len(tasks)}) --")
+        lines.append(f"— {section.upper()} ({len(tasks)}) —")
         if not tasks:
             lines.append("(empty)")
         else:
