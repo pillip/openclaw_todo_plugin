@@ -1,10 +1,14 @@
-# OpenClaw TODO Plugin for Slack — PRD v1.1 (DM 기반)
+# OpenClaw TODO Plugin for Slack — PRD v1.2 (DM 기반)
 
-> 변경사항 반영:
-> 1) Slack **슬래시 커맨드 미사용** → **DM(또는 앱 멘션/일반 메시지)에서 `/todo …`**로 사용  
-> 2) private 프로젝트: **same owner 내 name 유니크**  
-> 3) `/todo project set-private` 실행 시: 해당 프로젝트 내 task 중 **owner가 아닌 assignee가 하나라도 있으면 에러**  
-> 4) 프로젝트 이름 충돌 해소: **옵션 A(private 우선)** 유지  
+> 변경사항 반영 (v1.2):
+> 6) 커맨드 접두사 **`todo:` 통일** — bridge↔plugin 이중 변환 제거
+> 7) **LLM 바이패스**: manifest에 command prefix 등록 → Gateway가 LLM 없이 직접 플러그인 호출
+>
+> 이전 변경사항 (v1.1):
+> 1) Slack **슬래시 커맨드 미사용** → **DM에서 `todo: …`**로 사용
+> 2) private 프로젝트: **same owner 내 name 유니크**
+> 3) `todo: project set-private` 실행 시: 해당 프로젝트 내 task 중 **owner가 아닌 assignee가 하나라도 있으면 에러**
+> 4) 프로젝트 이름 충돌 해소: **옵션 A(private 우선)** 유지
 > 5) DB **초기 생성/마이그레이션** 절차 추가
 
 ---
@@ -14,12 +18,19 @@
 ### 1.1 목표
 OpenClaw 플러그인으로 Slack에서 다음을 **LLM 호출 없이(=비용 0)** 처리하는 팀/개인용 TODO 시스템을 제공한다.
 
-- `/todo add|list|board|move|done|drop|edit`
-- `/todo project list|set-private|set-shared`
+- `todo: add|list|board|move|done|drop|edit`
+- `todo: project list|set-private|set-shared`
 - 저장소: **공유 SQLite3** (동일 Gateway/동일 DB 파일)
 - 담당자(assignee): **Slack 멘션만 허용** (`<@U…>` 기반)
 - due: `YYYY-MM-DD` 또는 `MM-DD` 허용, 연도 생략 시 **현재 연도**로 보정
 - Private 프로젝트: **오직 owner만** 조회/수정 가능
+
+### 1.2 LLM 바이패스 (Direct Execution)
+OpenClaw에 설치된 플러그인은 **LLM을 거치지 않고 직접 실행**되어야 한다.
+
+- **방식**: manifest에 `command_prefix`(예: `"todo:"`)를 등록하면, Gateway가 메시지 접두사를 매칭하여 LLM 파이프라인을 건너뛰고 **즉시** 플러그인 핸들러를 호출한다.
+- **이점**: 응답 지연 최소화, LLM 토큰 비용 0, 결정적(deterministic) 동작 보장
+- **폴백**: Gateway가 `command_prefix` 매칭을 지원하지 않는 경우, 기존 방식(LLM 라우팅)으로 동작하되, 이는 임시 방편이며 Gateway 측 지원이 목표
 
 ---
 
@@ -28,15 +39,45 @@ OpenClaw 플러그인으로 Slack에서 다음을 **LLM 호출 없이(=비용 0)
 ### 2.1 사용 채널
 슬래시 커맨드를 쓰지 않는다면, 일반적으로 다음 중 하나로 사용한다.
 
-- **DM 채널**: OpenClaw Slack 앱(봇)과 1:1 대화에서 `/todo …` 입력  
-- **채널/스레드**(옵션): 앱 멘션(`@openclaw /todo …`) 또는 특정 메시지 패턴을 OpenClaw가 수신하도록 설정된 경우
+- **DM 채널**: OpenClaw Slack 앱(봇)과 1:1 대화에서 `todo: …` 입력
+- **채널/스레드**(옵션): 앱 멘션(`@openclaw todo: …`) 또는 특정 메시지 패턴을 OpenClaw가 수신하도록 설정된 경우
 
-> v1은 **DM 사용을 기본 경로**로 가정한다.  
+> v1은 **DM 사용을 기본 경로**로 가정한다.
 > 이유: 권한/노이즈/오작동 리스크가 낮고 운영이 단순함.
 
-### 2.2 커맨드 인식 규칙
-- 메시지의 첫 토큰이 `/todo`이면 플러그인이 처리한다.
+### 2.2 커맨드 접두사 정책 (v1.2 변경)
+
+**접두사**: `todo:` (단일)
+- 사용자는 `todo: add 장보기` 형태로 입력한다.
+- Gateway manifest에 `command_prefix: "todo:"` 를 등록하여 **LLM 없이 직접 플러그인으로 라우팅**된다.
+
+> **`/todo` 미지원 사유**: Slack에서 `/`로 시작하는 메시지는 슬래시 커맨드로 오인식되어 앞에 공백을 넣어야 하는 불편함이 있음.
+> `todo:` 접두사는 이 문제가 없고, bridge 이중 변환도 불필요하므로 단일 접두사로 확정.
+
+### 2.3 커맨드 인식 규칙
+- 메시지가 `todo:`로 시작하면 플러그인이 처리한다.
 - 그 외 메시지는 v1에서 무시(자연어 자동 등록은 Phase 2).
+
+### 2.4 Gateway 직접 실행 흐름 (LLM 바이패스)
+
+```
+사용자 Slack DM: "todo: add 장보기"
+    ↓
+OpenClaw Gateway — manifest의 command_prefix 매칭
+    ↓ (LLM 스킵)
+플러그인 handle_message() 직접 호출
+    ↓
+응답 → Slack DM
+```
+
+- Gateway는 메시지 접두사가 등록된 `command_prefix`와 일치하면 LLM 파이프라인을 **완전히 건너뛴다**.
+- manifest 설정 예시:
+  ```json
+  {
+    "command_prefix": "todo:",
+    "bypass_llm": true
+  }
+  ```
 
 ---
 
@@ -92,7 +133,10 @@ OpenClaw 플러그인으로 Slack에서 다음을 **LLM 호출 없이(=비용 0)
 
 ## 5) 커맨드 스펙
 
-### 5.0 공통 토큰
+### 5.0 공통 규칙
+
+**접두사**: `todo:` (우선) 또는 `/todo` (폴백). 이하 스펙에서는 `todo:`를 기준으로 표기한다.
+
 - 프로젝트: `/p <projectName>`
 - 섹션: `/s <section>`
 - 섹션 enum: `backlog | doing | waiting | done | drop`
@@ -100,10 +144,10 @@ OpenClaw 플러그인으로 Slack에서 다음을 **LLM 호출 없이(=비용 0)
 
 ---
 
-### 5.1 `/todo add`
+### 5.1 `todo: add`
 문법:
 ```
-/todo add <title...> [<@USER> ...] [/p <project>] [/s <section>] [due:YYYY-MM-DD|MM-DD]
+todo: add <title...> [<@USER> ...] [/p <project>] [/s <section>] [due:YYYY-MM-DD|MM-DD]
 ```
 
 기본값:
@@ -124,10 +168,10 @@ OpenClaw 플러그인으로 Slack에서 다음을 **LLM 호출 없이(=비용 0)
 
 ---
 
-### 5.2 `/todo list`
+### 5.2 `todo: list`
 문법:
 ```
-/todo list [mine|all|<@USER>] [/p <project>] [/s <section>] [open|done|drop] [limit:N]
+todo: list [mine|all|<@USER>] [/p <project>] [/s <section>] [open|done|drop] [limit:N]
 ```
 
 기본값:
@@ -147,10 +191,10 @@ scope 의미:
 
 ---
 
-### 5.3 `/todo board`
+### 5.3 `todo: board`
 문법:
 ```
-/todo board [mine|all|<@USER>] [/p <project>] [open|done|drop] [limitPerSection:N]
+todo: board [mine|all|<@USER>] [/p <project>] [open|done|drop] [limitPerSection:N]
 ```
 
 기본값:
@@ -164,10 +208,10 @@ scope 의미:
 
 ---
 
-### 5.4 `/todo move`
+### 5.4 `todo: move`
 문법:
 ```
-/todo move <id> <section>
+todo: move <id> <section>
 ```
 
 검증:
@@ -178,24 +222,24 @@ scope 의미:
 
 ---
 
-### 5.5 `/todo done`
+### 5.5 `todo: done`
 ```
-/todo done <id>
+todo: done <id>
 ```
 - section=`done`, status=`done`, closed_at 기록
 
-### 5.6 `/todo drop`
+### 5.6 `todo: drop`
 ```
-/todo drop <id>
+todo: drop <id>
 ```
 - section=`drop`, status=`dropped`, closed_at 기록
 
 ---
 
-### 5.7 `/todo edit`
+### 5.7 `todo: edit`
 문법(v1 replace 방식):
 ```
-/todo edit <id> [<new title...>] [<@USER> ...] [/p <project>] [/s <section>] [due:YYYY-MM-DD|MM-DD|due:-]
+todo: edit <id> [<new title...>] [<@USER> ...] [/p <project>] [/s <section>] [due:YYYY-MM-DD|MM-DD|due:-]
 ```
 
 규칙:
@@ -209,14 +253,14 @@ scope 의미:
 
 ---
 
-### 5.8 `/todo project list`
+### 5.8 `todo: project list`
 - 반환:
   - shared 프로젝트 목록
   - sender(owner)의 private 프로젝트 목록
 
 ---
 
-### 5.9 `/todo project set-private <name>`
+### 5.9 `todo: project set-private <name>`
 동작:
 1) 대상 프로젝트를 resolve:
    - sender의 private `<name>` 존재 → already private (ok)
@@ -234,7 +278,7 @@ scope 의미:
 
 ---
 
-### 5.10 `/todo project set-shared <name>`
+### 5.10 `todo: project set-shared <name>`
 동작:
 - shared `<name>`이 없으면 생성
 - 이미 있으면 noop
@@ -296,7 +340,7 @@ Indexes:
 ## 7) DB 초기 생성 / 마이그레이션(필수)
 
 ### 7.1 생성 타이밍
-플러그인 로딩 후 첫 `/todo …` 실행 시 또는 gateway startup 시점에 아래를 수행:
+플러그인 로딩 후 첫 `todo: …` 실행 시 또는 gateway startup 시점에 아래를 수행:
 
 1) workspace path 결정
 2) `~/.openclaw/workspace/.todo/` 디렉토리 생성
@@ -333,19 +377,23 @@ Indexes:
 
 - [ ] shared 프로젝트 이름 충돌 시 생성/변경 거부
 - [ ] private 프로젝트는 owner 단위로 유니크 (owner A/B는 같은 name 허용)
-- [ ] `/todo project set-private <name>` 실행 시:
+- [ ] `todo: project set-private <name>` 실행 시:
   - 프로젝트 내 task 중 owner 외 assignee 존재하면 에러로 실패
 - [ ] private 프로젝트에 타 assignee 지정 시: 경고 + 작업 미생성/미수정
 - [ ] due `MM-DD` 입력 시 올해로 보정되어 저장
 - [ ] DB 최초 실행 시 파일 생성 + schema 적용 + Inbox 생성
+- [ ] `todo:` 접두사로 커맨드 입력 시 정상 인식 및 처리
+- [ ] `/todo` 접두사는 인식하지 않음 (의도적 미지원)
+- [ ] manifest에 `command_prefix`, `bypass_llm` 설정 시 Gateway가 LLM 없이 직접 플러그인 호출
+- [ ] bridge 서버의 `/todo` → `todo:` 이중 변환 로직 제거
 
 ---
 
 ## 10) 구현 작업 분해(WBS)
 
-- M0: plugin skeleton + `/todo` command 등록
+- M0: plugin skeleton + `todo:` command prefix 등록 + manifest `bypass_llm` 설정
 - M1: DB init + migrations + schema_version
-- M2: parser (Slack mention, /p, /s, due 보정)
+- M2: parser (`todo:` 단일 접두사 인식, Slack mention, /p, /s, due 보정)
 - M3: commands (add/list/board/move/done/drop/edit)
 - M4: project commands (list/set-private/set-shared + set-private 검증 로직)
 - M5: tests (parser/unit + sqlite E2E)

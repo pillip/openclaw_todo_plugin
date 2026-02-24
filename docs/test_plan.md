@@ -1,405 +1,725 @@
-# OpenClaw TODO Plugin -- Test Plan
+# OpenClaw TODO Plugin -- Test Plan v2.1
 
-> Based on PRD v1.1 at `/Users/pillip/project/practice/openclaw_todo_plugin/openclaw_todo_plugin_prd.md`
-> Framework: **pytest** | DB: **SQLite3 (in-memory for tests)** | Date: 2026-02-20
-
----
-
-## 1. Test Strategy
-
-### 1.1 Objectives
-
-- Validate all PRD acceptance criteria (Section 9).
-- Ensure parser correctness for mentions, `/p`, `/s`, `due:` tokens.
-- Verify DB schema creation, migration, and CRUD integrity.
-- Confirm access-control rules for private/shared projects.
-- Catch regressions early through an automatable smoke suite.
-
-### 1.2 Test Levels
-
-| Level | Scope | DB | Mocking |
-|---|---|---|---|
-| **Unit** | Parser functions, date normalization, individual command handlers | None or in-memory SQLite | Slack context mocked |
-| **Integration** | Full command flow: parse -> handler -> DB -> response | In-memory SQLite | Slack API mocked |
-| **E2E (lite)** | Multi-step scenarios (add then list, set-private with tasks) | Temp file SQLite | Slack API mocked |
-
-### 1.3 Principles
-
-- Every test must be **deterministic**. No real network calls; use `unittest.mock` or `pytest-mock`.
-- Date-sensitive tests must **freeze time** (e.g., `freezegun` or manual patching of `datetime.now`).
-- Tests touching SQLite use **in-memory** databases (`:memory:`) unless file-path behavior is explicitly under test.
-- Mark slow or file-I/O tests with `@pytest.mark.integration`.
+> PRD v1.2 기준 | 작성일: 2026-02-24
+> 프레임워크: **pytest** | DB: **SQLite3 (tmp_path 기반)** | 실행: `uv run pytest`
 
 ---
 
-## 2. Fixtures Guidance
+## 목차
 
-### 2.1 Core Fixtures (`conftest.py`)
+1. [테스트 전략](#1-테스트-전략)
+2. [Critical Flows (핵심 흐름)](#2-critical-flows)
+3. [테스트 픽스처 가이드](#3-테스트-픽스처-가이드)
+4. [테스트 케이스 -- 접두사 인식](#4-테스트-케이스--접두사-인식)
+5. [테스트 케이스 -- 커맨드 파서](#5-테스트-케이스--커맨드-파서)
+6. [테스트 케이스 -- add](#6-테스트-케이스--add)
+7. [테스트 케이스 -- list](#7-테스트-케이스--list)
+8. [테스트 케이스 -- board](#8-테스트-케이스--board)
+9. [테스트 케이스 -- move](#9-테스트-케이스--move)
+10. [테스트 케이스 -- done / drop](#10-테스트-케이스--done--drop)
+11. [테스트 케이스 -- edit](#11-테스트-케이스--edit)
+12. [테스트 케이스 -- project](#12-테스트-케이스--project)
+13. [테스트 케이스 -- LLM 바이패스 검증](#13-테스트-케이스--llm-바이패스-검증)
+14. [테스트 케이스 -- DB 초기화 및 마이그레이션](#14-테스트-케이스--db-초기화-및-마이그레이션)
+15. [Edge Case / Error Scenario 종합](#15-edge-case--error-scenario-종합)
+16. [수용 기준 추적표](#16-수용-기준-추적표)
+17. [자동화 후보](#17-자동화-후보)
+18. [스모크 테스트 체크리스트](#18-스모크-테스트-체크리스트)
 
-| Fixture | Scope | Purpose |
-|---|---|---|
-| `db_conn` | function | Returns a fresh in-memory SQLite connection with schema applied and `PRAGMA journal_mode=WAL; PRAGMA busy_timeout=3000;` set. Tears down after each test. |
-| `db_with_inbox` | function | Extends `db_conn`; also inserts the default shared `Inbox` project. |
-| `sender_ctx` | function | Returns a mock Slack sender context: `{"user_id": "U_OWNER", "team_id": "T001"}`. |
-| `other_user_ctx` | function | Returns a second mock user: `{"user_id": "U_OTHER", ...}`. |
-| `frozen_now` | function | Patches `datetime.now()` to `2026-02-20T09:00:00` (Asia/Seoul). |
-| `private_project` | function | Inserts a private project owned by `U_OWNER`. |
-| `shared_project` | function | Inserts a shared project (e.g., "TeamWork"). |
-| `sample_tasks` | function | Inserts a set of tasks across projects/sections for list/board tests. |
+---
 
-### 2.2 Fixture Composition
+## 1. 테스트 전략
 
-Tests that need both a private project and sample tasks should compose fixtures:
+### 1.1 목표
+
+- PRD v1.2의 수용 기준(Section 9) 전체를 검증한다.
+- 파서 정확성 (멘션, `/p`, `/s`, `due:` 토큰 처리)을 보장한다.
+- DB 스키마 생성, 마이그레이션, CRUD 무결성을 확인한다.
+- private/shared 프로젝트 접근 제어 규칙을 검증한다.
+- `todo:` 단일 접두사 정책 및 `/todo` 미지원 정책을 확인한다.
+- LLM 바이패스 구조가 유지되는지 확인한다.
+
+### 1.2 테스트 계층
+
+| 계층 | 도구 | 범위 | 비율(목표) |
+|------|------|------|------------|
+| **단위 테스트** | `pytest` | 파서, 개별 커맨드 핸들러, 권한 검증, 프로젝트 리졸버 | 60% |
+| **통합 테스트** | `pytest` + SQLite (tmp_path) | 커맨드 핸들러 + DB 연동, 디스패처 라우팅, 마이그레이션 | 25% |
+| **E2E 테스트** | `pytest` + `handle_message()` 전체 경로 | `todo: ...` 입력부터 응답 문자열까지 전 경로 | 15% |
+
+### 1.3 원칙
+
+- **격리**: 각 테스트는 `tmp_path` 기반 임시 SQLite DB를 사용하여 테스트 간 상태 오염을 방지한다.
+- **결정적 실행**: 외부 네트워크 호출이 없다 (SQLite 로컬, LLM 바이패스 설계). 플레이키 테스트를 금지한다.
+- **mock 최소화**: 실제 SQLite를 사용하므로 DB 레이어 mock은 불필요하다. Gateway/Slack API 연동 부분만 필요 시 mock 한다.
+- **커버리지 목표**: 라인 커버리지 80% 이상 (`pytest-cov`)
+- **한글/유니코드 지원**: title, project name에 한글/이모지가 포함된 케이스를 반드시 검증한다.
+- **edge case 우선**: 정상 경로보다 경계값/에러 경로에 더 많은 케이스를 배치한다.
+
+### 1.4 실행 방법
+
+```bash
+# 전체 테스트
+uv run pytest -q
+
+# 커버리지 포함
+uv run pytest --cov=src/openclaw_todo --cov-report=term-missing
+
+# 특정 모듈
+uv run pytest tests/test_parser.py -v
+
+# 특정 마크만 실행
+uv run pytest -m "not integration" -q
+```
+
+### 1.5 테스트 파일 구조
 
 ```
-def test_example(db_with_inbox, private_project, sample_tasks, sender_ctx):
-    ...
+tests/
+  conftest.py                     # 공용 픽스처 (conn, seed_task, _load_v1)
+  test_parser.py                  # 파서 단위 테스트
+  test_dispatcher.py              # 디스패처 라우팅 테스트
+  test_cmd_add.py                 # add 핸들러 테스트
+  test_cmd_list.py                # list 핸들러 테스트
+  test_cmd_board.py               # board 핸들러 테스트
+  test_cmd_move.py                # move 핸들러 테스트
+  test_cmd_done_drop.py           # done/drop 핸들러 테스트
+  test_cmd_edit.py                # edit 핸들러 테스트
+  test_cmd_project.py             # project list 테스트
+  test_cmd_project_set_private.py # set-private 테스트
+  test_cmd_project_set_shared.py  # set-shared 테스트
+  test_permissions.py             # 권한 로직 테스트
+  test_project_resolver.py        # 프로젝트 resolve 로직 테스트
+  test_migrations.py              # 스키마 마이그레이션 테스트
+  test_schema_v1.py               # V1 스키마 검증
+  test_plugin.py                  # 플러그인 진입점 (접두사 인식)
+  test_e2e.py                     # E2E 시나리오
+  test_db.py                      # DB 연결/설정 테스트
+  test_server.py                  # HTTP 서버 테스트
+  test_plugin_install_e2e.py      # 플러그인 설치 E2E 테스트
 ```
 
 ---
 
-## 3. Test Cases -- Unit Tests
+## 2. Critical Flows
 
-### 3.1 Parser Module
+플러그인의 핵심 비즈니스 흐름으로, 테스트 실패 시 서비스 전체에 영향이 있다. 스모크 테스트 및 회귀 테스트에서 최우선으로 검증한다.
 
-#### 3.1.1 Mention Extraction
+### CF-01: Task 생성 -> 조회 라운드트립
 
-| ID | Description | Input | Expected |
-|---|---|---|---|
-| P-MEN-01 | Single mention extracted | `"buy milk <@U123>"` | assignees=`["U123"]`, title=`"buy milk"` |
-| P-MEN-02 | Multiple mentions | `"task <@U1> <@U2>"` | assignees=`["U1","U2"]` |
-| P-MEN-03 | No mention defaults to sender | `"buy milk"` | assignees=`[sender_user_id]` |
-| P-MEN-04 | Mention-like text without `<@` ignored | `"email @someone"` | assignees=`[sender_user_id]`, title includes `"@someone"` |
+```
+todo: add <title> -> Added #N 응답 -> todo: list -> 해당 task 표시
+```
+- 검증 포인트: DB 삽입, default project(Inbox)/section(backlog)/assignee(sender), 응답 포맷
 
-#### 3.1.2 Project Token (`/p`)
+### CF-02: Task 상태 전이 (생명주기)
 
-| ID | Description | Input | Expected |
-|---|---|---|---|
-| P-PRJ-01 | Project parsed | `"task /p MyProj"` | project=`"MyProj"`, title=`"task"` |
-| P-PRJ-02 | No `/p` defaults to Inbox | `"task"` | project=`"Inbox"` |
-| P-PRJ-03 | `/p` at end of string | `"task /p Work"` | project=`"Work"` |
-| P-PRJ-04 | `/p` with no value is error | `"task /p"` | ParseError |
+```
+add -> move /s doing -> board에서 DOING 확인 -> done -> list(open)에서 미표시
+```
+- 검증 포인트: section/status 변경, closed_at 기록, 정렬/필터 정확성
 
-#### 3.1.3 Section Token (`/s`)
+### CF-03: Private 프로젝트 격리
 
-| ID | Description | Input | Expected |
-|---|---|---|---|
-| P-SEC-01 | Valid section parsed | `"task /s doing"` | section=`"doing"` |
-| P-SEC-02 | Default section is backlog | `"task"` | section=`"backlog"` |
-| P-SEC-03 | Invalid section rejected | `"task /s invalid"` | ParseError with message about valid sections |
-| P-SEC-04 | All 5 enum values accepted | `"/s backlog"`, `"/s doing"`, `"/s waiting"`, `"/s done"`, `"/s drop"` | Each parsed correctly |
+```
+U001: project set-private Secret -> add task /p Secret
+U002: list all -> Secret task 미표시
+U002: edit/move/done/drop <Secret task id> -> 권한 거부
+```
+- 검증 포인트: 읽기/쓰기 모두 non-owner 차단
 
-#### 3.1.4 Due Date Parsing
+### CF-04: Private 프로젝트 전환 검증
 
-| ID | Description | Input | Expected |
-|---|---|---|---|
-| P-DUE-01 | Full date `YYYY-MM-DD` | `"due:2026-03-15"` | `"2026-03-15"` |
-| P-DUE-02 | Short date `MM-DD` fills current year | `"due:03-15"` | `"2026-03-15"` (frozen year=2026) |
-| P-DUE-03 | Single-digit `M-D` | `"due:3-5"` | `"2026-03-05"` |
-| P-DUE-04 | Invalid date `02-30` | `"due:02-30"` | ParseError: invalid date |
-| P-DUE-05 | Due clear `due:-` | `"due:-"` | due=`None` (clear) |
-| P-DUE-06 | No due token | `"task"` | due=`None` |
-| P-DUE-07 | Leap year valid `02-29` | `"due:2028-02-29"` | `"2028-02-29"` |
-| P-DUE-08 | Non-leap year `02-29` | `"due:2026-02-29"` | ParseError |
+```
+shared project에 타인 assignee task 존재 -> project set-private -> 에러 (위반 task 정보 포함)
+shared project에 owner만 assignee -> project set-private -> 성공
+```
+- 검증 포인트: assignee 스캔, 에러 메시지 포맷, DB 상태 유지/변경
 
-#### 3.1.5 Combined Parsing
+### CF-05: Private 프로젝트 assignee 제한
 
-| ID | Description | Input | Expected |
-|---|---|---|---|
-| P-CMB-01 | All tokens present | `"buy milk <@U1> /p Home /s doing due:03-20"` | title=`"buy milk"`, assignees=`["U1"]`, project=`"Home"`, section=`"doing"`, due=`"2026-03-20"` |
-| P-CMB-02 | Tokens in any order | `"/p Home due:03-20 buy milk /s doing <@U1>"` | Same as above |
-| P-CMB-03 | Title is empty when only tokens | `"/p Home /s doing"` | title=`""` or ParseError (depends on command context) |
+```
+private project에 add <@타인> -> 경고 후 거부 (task 미생성)
+private project에 edit <id> <@타인> -> 경고 후 거부 (변경 미적용)
+```
+- 검증 포인트: 경고 메시지, DB 무변경 확인
 
----
+### CF-06: 프로젝트 이름 충돌 해소 (옵션 A)
 
-### 3.2 Due Date Normalization (standalone unit)
+```
+private "Work" (owner=sender) + shared "Work" 공존
+add task /p Work -> private "Work"에 생성됨 (private 우선)
+```
+- 검증 포인트: resolve 순서
 
-| ID | Description | Input | Expected |
-|---|---|---|---|
-| D-NORM-01 | Year auto-fill uses server year | `"06-15"` with frozen year 2026 | `"2026-06-15"` |
-| D-NORM-02 | Full date passes through | `"2025-12-01"` | `"2025-12-01"` |
-| D-NORM-03 | Garbage input rejected | `"abc"` | ValueError |
-| D-NORM-04 | Empty string rejected | `""` | ValueError |
+### CF-07: DB 초기화 + 마이그레이션
+
+```
+DB 파일 미존재 상태 -> 첫 todo: 커맨드 -> DB 생성 + 스키마 적용 + Inbox 프로젝트 생성
+```
+- 검증 포인트: 파일 생성, 테이블 존재, schema_version, Inbox 존재
 
 ---
 
-### 3.3 DB Operations (schema and CRUD)
+## 3. 테스트 픽스처 가이드
 
-#### 3.3.1 Schema Initialization
+### 3.1 핵심 픽스처 (`tests/conftest.py`)
 
-| ID | Description | Steps | Expected |
-|---|---|---|---|
-| DB-INIT-01 | Fresh DB creates all tables | Initialize on `:memory:` | Tables `projects`, `tasks`, `task_assignees`, `events`, `schema_version` exist |
-| DB-INIT-02 | `schema_version` set to 1 | After init | `SELECT version FROM schema_version` returns `1` |
-| DB-INIT-03 | Default `Inbox` project created | After init | Shared project named `Inbox` exists |
-| DB-INIT-04 | WAL journal mode set | After init | `PRAGMA journal_mode` returns `wal` |
-| DB-INIT-05 | Idempotent init (run twice) | Init -> Init again | No error, schema unchanged |
+| 픽스처 | 스코프 | 용도 |
+|--------|--------|------|
+| `_load_v1` (autouse) | function | V1 마이그레이션 등록을 보장한다. 모든 테스트에 자동 적용된다. |
+| `conn(tmp_path)` | function | 마이그레이션 완료된 SQLite Connection을 반환한다. `yield` 후 `close()` 한다. |
+| `seed_task(conn, ...)` | 헬퍼 함수 | project/task/assignee를 한 번에 삽입하는 헬퍼이다. `task_id`를 반환한다. |
 
-#### 3.3.2 Project CRUD
+`seed_task` 파라미터:
+```python
+seed_task(
+    conn,
+    project_name="Inbox",   # 프로젝트 이름 (없으면 자동 생성)
+    visibility="shared",     # shared | private
+    owner=None,              # private 프로젝트의 owner_user_id
+    title="Test task",       # task 제목
+    section="backlog",       # backlog | doing | waiting | done | drop
+    created_by="U001",       # task 생성자
+    assignees=None,          # None이면 created_by가 기본 assignee
+    due=None,                # YYYY-MM-DD 또는 None
+)
+```
 
-| ID | Description | Steps | Expected |
-|---|---|---|---|
-| DB-PRJ-01 | Create shared project | Insert `(name="Work", visibility="shared")` | Row inserted, id returned |
-| DB-PRJ-02 | Duplicate shared name rejected | Insert `Inbox` again | UNIQUE constraint error |
-| DB-PRJ-03 | Create private project | Insert `(name="Personal", visibility="private", owner="U1")` | Success |
-| DB-PRJ-04 | Same-name private for different owners | owner=U1 "X", owner=U2 "X" | Both succeed |
-| DB-PRJ-05 | Same-name private for same owner rejected | owner=U1 "X" twice | UNIQUE constraint error |
-| DB-PRJ-06 | Shared and private can share name | shared "Work" + private(U1) "Work" | Both exist |
+### 3.2 E2E 픽스처 (`tests/test_e2e.py`)
 
-#### 3.3.3 Task CRUD
+| 픽스처/헬퍼 | 용도 |
+|-------------|------|
+| `db_path(tmp_path)` | `str(tmp_path / "e2e.sqlite3")` 경로 문자열을 반환한다. |
+| `_msg(text, sender, db_path)` | `handle_message("todo: " + text, ...)` 호출 후 응답을 반환하는 헬퍼이다. |
+| `_extract_task_id(result)` | `"Added #N"` 응답에서 task ID를 추출한다. |
+| `_query_task(db_path, task_id, columns)` | SQL injection 방지 화이트리스트 기반 직접 DB 조회 헬퍼이다. |
 
-| ID | Description | Steps | Expected |
-|---|---|---|---|
-| DB-TSK-01 | Insert task with all fields | Full insert | Row with auto-increment id |
-| DB-TSK-02 | Section enum enforced | Insert section="invalid" | CHECK constraint error |
-| DB-TSK-03 | Status enum enforced | Insert status="pending" | CHECK constraint error |
-| DB-TSK-04 | Assignees linked correctly | Insert task -> insert 2 assignees | `task_assignees` has 2 rows |
-| DB-TSK-05 | Update section | Change backlog -> doing | section updated, updated_at changed |
-| DB-TSK-06 | Mark done sets closed_at | `done` command | status=`done`, section=`done`, closed_at not null |
+### 3.3 픽스처 작성 지침
 
----
-
-## 4. Test Cases -- Command Handlers
-
-### 4.1 `/todo add`
-
-| ID | Description | Input | Preconditions | Expected |
-|---|---|---|---|---|
-| CMD-ADD-01 | Basic add to Inbox | `add buy milk` | Inbox exists | Task in Inbox/backlog, assignee=sender |
-| CMD-ADD-02 | Add with project and section | `add task /p Work /s doing` | "Work" shared exists | Task in Work/doing |
-| CMD-ADD-03 | Add with assignees | `add task <@U2> <@U3>` | -- | assignees=[U2, U3] |
-| CMD-ADD-04 | Add with due date | `add task due:03-15` | -- | due="2026-03-15" |
-| CMD-ADD-05 | Add to nonexistent project (Inbox auto-create) | `add task` | No Inbox | Inbox auto-created, task added |
-| CMD-ADD-06 | **REJECT**: Add to private project with non-owner assignee | `add task <@U_OTHER> /p MyPrivate` | MyPrivate is private, owner=sender | Warning message, task NOT created |
-| CMD-ADD-07 | Add to private project with owner assignee | `add task /p MyPrivate` | owner=sender | Task created successfully |
-| CMD-ADD-08 | Response format matches spec | `add buy milk` | -- | Response contains `#id`, project/section, due, assignees, title |
-
-### 4.2 `/todo list`
-
-| ID | Description | Input | Preconditions | Expected |
-|---|---|---|---|---|
-| CMD-LST-01 | Default list (mine, open) | `list` | Tasks exist | Only sender's open tasks |
-| CMD-LST-02 | List all | `list all` | Shared + private tasks | Shared all + sender's private only |
-| CMD-LST-03 | List by user | `list <@U2>` | U2 has tasks | Only U2's tasks |
-| CMD-LST-04 | Filter by project | `list /p Work` | -- | Only Work project tasks |
-| CMD-LST-05 | Filter by section | `list /s doing` | -- | Only doing section |
-| CMD-LST-06 | Limit applied | `list limit:5` | 10+ tasks | Exactly 5 returned |
-| CMD-LST-07 | Default limit is 30 | `list` | 50 tasks | 30 returned |
-| CMD-LST-08 | Sort order: due first, due asc, id desc | `list` | Mixed due/no-due tasks | Correct ordering |
-| CMD-LST-09 | **HIDDEN**: Other user's private project tasks not visible | `list all` | U_OTHER has private project with tasks | Those tasks excluded |
-| CMD-LST-10 | Status filters: done, drop | `list done` | -- | Only done/dropped tasks respectively |
-
-### 4.3 `/todo board`
-
-| ID | Description | Input | Preconditions | Expected |
-|---|---|---|---|---|
-| CMD-BRD-01 | Board shows all 5 sections in order | `board` | Tasks in various sections | BACKLOG -> DOING -> WAITING -> DONE -> DROP |
-| CMD-BRD-02 | Default scope is mine | `board` | -- | Only sender's tasks |
-| CMD-BRD-03 | limitPerSection applied | `board limitPerSection:2` | 5 tasks per section | 2 per section max |
-| CMD-BRD-04 | Private project tasks only for owner | `board all` | Private project tasks exist | Sender sees own private, not others' |
-
-### 4.4 `/todo move`
-
-| ID | Description | Input | Preconditions | Expected |
-|---|---|---|---|---|
-| CMD-MOV-01 | Move to valid section | `move 1 doing` | Task #1 in backlog | section=doing |
-| CMD-MOV-02 | Invalid section rejected | `move 1 invalid` | -- | Error: invalid section |
-| CMD-MOV-03 | **REJECT**: Non-owner moves private task | `move 1 doing` (sender=U_OTHER) | Task #1 in private project, owner=U_OWNER | Permission denied |
-| CMD-MOV-04 | Shared task: assignee can move | `move 1 doing` (sender=assignee) | -- | Success |
-| CMD-MOV-05 | Shared task: creator can move | `move 1 doing` (sender=created_by) | -- | Success |
-| CMD-MOV-06 | Nonexistent task id | `move 999 doing` | -- | Error: task not found |
-
-### 4.5 `/todo done`
-
-| ID | Description | Input | Preconditions | Expected |
-|---|---|---|---|---|
-| CMD-DON-01 | Mark task done | `done 1` | Task #1 open | section=done, status=done, closed_at set |
-| CMD-DON-02 | Already done task | `done 1` | Task #1 already done | Idempotent or informational message |
-| CMD-DON-03 | Permission check on private task | `done 1` (non-owner) | Private project | Denied |
-
-### 4.6 `/todo drop`
-
-| ID | Description | Input | Preconditions | Expected |
-|---|---|---|---|---|
-| CMD-DRP-01 | Drop task | `drop 1` | Task #1 open | section=drop, status=dropped, closed_at set |
-| CMD-DRP-02 | Permission check | `drop 1` (non-owner) | Private project | Denied |
-
-### 4.7 `/todo edit`
-
-| ID | Description | Input | Preconditions | Expected |
-|---|---|---|---|---|
-| CMD-EDT-01 | Edit title only | `edit 1 new title` | Task #1 exists | title updated |
-| CMD-EDT-02 | Edit assignees (replace) | `edit 1 <@U2> <@U3>` | -- | assignees fully replaced |
-| CMD-EDT-03 | Clear due | `edit 1 due:-` | Task has due | due=NULL |
-| CMD-EDT-04 | Change project | `edit 1 /p NewProj` | -- | project_id updated |
-| CMD-EDT-05 | Change section | `edit 1 /s waiting` | -- | section updated |
-| CMD-EDT-06 | **REJECT**: Edit in private project with non-owner assignee | `edit 1 <@U_OTHER>` | Task in private project, owner=sender | Warning, no change applied |
-| CMD-EDT-07 | **REJECT**: Move task to private project with non-owner assignee | `edit 1 /p PrivateProj` | Task has assignee U_OTHER | Warning, no change applied |
-| CMD-EDT-08 | No title change when only option tokens given | `edit 1 /s doing` | title="original" | title remains "original" |
-| CMD-EDT-09 | Nonexistent task | `edit 999 new title` | -- | Error: task not found |
-
----
-
-## 5. Test Cases -- Project Commands
-
-### 5.1 `/todo project list`
-
-| ID | Description | Sender | Expected |
-|---|---|---|---|
-| PRJ-LST-01 | Returns shared projects | U1 | All shared projects |
-| PRJ-LST-02 | Returns sender's private projects | U1 | Only U1's private projects |
-| PRJ-LST-03 | Does not return other user's private | U1 | U2's private excluded |
-
-### 5.2 `/todo project set-private`
-
-| ID | Description | Preconditions | Expected |
-|---|---|---|---|
-| PRJ-SPR-01 | Already private -- noop | Private "X" owned by sender | Success/noop message |
-| PRJ-SPR-02 | Shared to private -- no tasks | Shared "X" with 0 tasks | Converted: visibility=private, owner=sender |
-| PRJ-SPR-03 | Shared to private -- all tasks owner-assigned | Shared "X", all assignees=sender | Converted successfully |
-| PRJ-SPR-04 | **REJECT**: Shared to private -- non-owner assignees exist | Shared "X", task #12 has assignee U_OTHER | Error with task ids and assignee list |
-| PRJ-SPR-05 | Error message includes violating task ids | Same as PRJ-SPR-04 | Message contains `#12` and `<@U_OTHER>` |
-| PRJ-SPR-06 | Error caps listed violations at 10 | 15+ violating tasks | Max 10 task ids shown |
-| PRJ-SPR-07 | Neither exists -- create new private | No project "X" | New private project created, owner=sender |
-
-### 5.3 `/todo project set-shared`
-
-| ID | Description | Preconditions | Expected |
-|---|---|---|---|
-| PRJ-SSH-01 | Create new shared project | Name does not exist | Created |
-| PRJ-SSH-02 | Already shared -- noop | Shared "X" exists | No error, noop |
-| PRJ-SSH-03 | Name conflict with existing shared | Shared "X" exists, try set-shared "X" | Noop or "already exists" |
-
----
-
-## 6. Test Cases -- Edge Cases and PRD-Specific Scenarios
-
-### 6.1 Project Name Collision Resolution (Option A: Private First)
-
-| ID | Description | Setup | Command | Expected |
-|---|---|---|---|---|
-| EDGE-COL-01 | Private and shared same name -- `/p` resolves to private | Private(U1) "Work" + Shared "Work" | `add task /p Work` (sender=U1) | Task added to **private** "Work" |
-| EDGE-COL-02 | No private -- falls to shared | Only shared "Work" | `add task /p Work` (sender=U1) | Task added to **shared** "Work" |
-| EDGE-COL-03 | Neither exists -- auto-create behavior | No "NewProj" | `add task /p NewProj` | Shared auto-create or error (per v1 policy) |
-
-### 6.2 Access Control Boundaries
-
-| ID | Description | Expected |
-|---|---|---|
-| EDGE-ACL-01 | Non-owner cannot list private project tasks | Empty result or error |
-| EDGE-ACL-02 | Non-owner cannot add to private project | Permission denied |
-| EDGE-ACL-03 | Non-owner cannot move/done/drop private task | Permission denied |
-| EDGE-ACL-04 | Non-owner cannot edit private task | Permission denied |
-
-### 6.3 Concurrency and DB Integrity
-
-| ID | Description | Expected |
-|---|---|---|
-| EDGE-DB-01 | Unique index prevents duplicate shared project names | UNIQUE constraint violation |
-| EDGE-DB-02 | Unique index allows same private name for different owners | Both inserted |
-| EDGE-DB-03 | WAL mode enabled on connection | `PRAGMA journal_mode` returns `wal` |
-
-### 6.4 Schema Migration
-
-| ID | Description | Expected |
-|---|---|---|
-| EDGE-MIG-01 | Fresh DB gets version 1 | schema_version=1 |
-| EDGE-MIG-02 | Re-init on existing DB is safe | No duplicate tables, version unchanged |
-| EDGE-MIG-03 | DB directory auto-created | `~/.openclaw/workspace/.todo/` created if missing |
-
----
-
-## 7. Acceptance Criteria Traceability
-
-Mapping each PRD acceptance criterion (Section 9) to test cases.
-
-| PRD Criterion | Test Case IDs |
-|---|---|
-| Shared project name collision rejected | DB-PRJ-02, PRJ-SSH-03, EDGE-COL-03 |
-| Private project owner-unique (cross-owner OK) | DB-PRJ-04, DB-PRJ-05, EDGE-DB-02 |
-| `set-private` rejects when non-owner assignees exist | PRJ-SPR-04, PRJ-SPR-05, PRJ-SPR-06 |
-| Private project + non-owner assignee = warning + reject | CMD-ADD-06, CMD-EDT-06, CMD-EDT-07 |
-| `due:MM-DD` fills current year | P-DUE-02, P-DUE-03, D-NORM-01 |
-| DB first-run: file + schema + Inbox | DB-INIT-01 through DB-INIT-05, EDGE-MIG-01, EDGE-MIG-03 |
-
----
-
-## 8. Automation Candidates
-
-### 8.1 High Priority (automate first)
-
-| Area | Rationale |
-|---|---|
-| **Parser unit tests** (Section 3.1) | Pure functions, fast, high regression value. Run on every commit. |
-| **Due date normalization** (Section 3.2) | Date logic is error-prone; requires time-freezing. |
-| **DB schema init** (Section 3.3.1) | Catches migration regressions early. |
-| **Private project access control** (Sections 4, 5, 6.2) | Security-critical; must never regress. |
-
-### 8.2 Medium Priority
-
-| Area | Rationale |
-|---|---|
-| **Command handler integration** (Section 4) | Parse-to-DB flow; requires fixture setup but high coverage value. |
-| **Project name collision resolution** (Section 6.1) | Logic is subtle (Option A). |
-
-### 8.3 Lower Priority / Manual
-
-| Area | Rationale |
-|---|---|
-| **Response message formatting** | Cosmetic; snapshot testing if desired. |
-| **Concurrency under load** | Harder to automate reliably in CI; manual or stress-test script. |
-
-### 8.4 Suggested pytest Marks
+- **ParsedCommand 헬퍼**: 각 커맨드 테스트 파일에서 `_make_parsed(...)` 팩토리 함수를 정의하여 `ParsedCommand` 생성을 간소화한다:
 
 ```python
-# conftest.py or pyproject.toml
+def _make_parsed(*, title_tokens=None, project=None, section=None,
+                 due=None, mentions=None) -> ParsedCommand:
+    return ParsedCommand(
+        command="add", args=[], project=project, section=section,
+        due=due, mentions=mentions or [], title_tokens=title_tokens or [],
+    )
+```
+
+- **sender_id 규칙**: 테스트에서 `U001`(owner/sender), `U002`(타인), `U003`(제3자) 등 일관된 ID를 사용한다.
+- **프로젝트 시드 데이터**: private/shared 프로젝트 생성이 필요한 테스트에서는 직접 SQL INSERT 또는 `seed_task()`를 사용한다.
+
+### 3.4 추가 권장 픽스처
+
+```python
+@pytest.fixture()
+def shared_project(conn):
+    """미리 생성된 shared project 'TestProj' 반환."""
+    conn.execute("INSERT INTO projects (name, visibility) VALUES ('TestProj', 'shared');")
+    conn.commit()
+    return conn.execute("SELECT id FROM projects WHERE name='TestProj'").fetchone()[0]
+
+@pytest.fixture()
+def private_project(conn):
+    """owner='U001'인 private project 'Secret' 반환."""
+    conn.execute(
+        "INSERT INTO projects (name, visibility, owner_user_id) "
+        "VALUES ('Secret', 'private', 'U001');"
+    )
+    conn.commit()
+    return conn.execute("SELECT id FROM projects WHERE name='Secret'").fetchone()[0]
+```
+
+---
+
+## 4. 테스트 케이스 -- 접두사 인식
+
+> 대상 모듈: `src/openclaw_todo/plugin.py` (`handle_message`, `_TODO_PREFIX`)
+> 테스트 파일: `tests/test_plugin.py`
+
+### TC-01: `todo:` 접두사 정상 인식
+
+| 항목 | 내용 |
+|------|------|
+| **ID** | TC-01 |
+| **설명** | `todo: add buy milk` 메시지가 정상 처리되어 응답을 반환한다 |
+| **사전 조건** | DB 경로 준비 (tmp_path) |
+| **단계** | `handle_message("todo: add buy milk", {"sender_id": "U1"}, db_path)` 호출 |
+| **기대 결과** | 문자열 응답 반환 (None이 아님), `isinstance(result, str)` |
+
+### TC-02: `todo:` 뒤에 공백 없이 문자가 이어지면 무시
+
+| 항목 | 내용 |
+|------|------|
+| **ID** | TC-02 |
+| **설명** | `todo:x something` 같은 메시지는 TODO 커맨드로 인식하지 않는다 |
+| **사전 조건** | 없음 |
+| **단계** | `handle_message("todo:x something", {"sender_id": "U1"}, db_path)` 호출 |
+| **기대 결과** | `None` 반환 |
+
+### TC-03: `/todo` 접두사 미지원
+
+| 항목 | 내용 |
+|------|------|
+| **ID** | TC-03 |
+| **설명** | `/todo add task` 메시지는 무시한다. Slack 슬래시 커맨드 미사용 정책에 따라 `/todo`는 지원하지 않는다 |
+| **사전 조건** | 없음 |
+| **단계** | `handle_message("/todo add task", {"sender_id": "U1"}, db_path)` 호출 |
+| **기대 결과** | `None` 반환 |
+
+### TC-04: `/todo:` 접두사 미지원
+
+| 항목 | 내용 |
+|------|------|
+| **ID** | TC-04 |
+| **설명** | `/todo: add task` 메시지도 무시한다 |
+| **사전 조건** | 없음 |
+| **단계** | `handle_message("/todo: add task", {"sender_id": "U1"}, db_path)` 호출 |
+| **기대 결과** | `None` 반환 |
+
+### TC-05: 일반 텍스트 무시
+
+| 항목 | 내용 |
+|------|------|
+| **ID** | TC-05 |
+| **설명** | `todo:` 접두사가 없는 일반 메시지는 무시한다 |
+| **사전 조건** | 없음 |
+| **단계** | `handle_message("hello world", ...)`, `handle_message("", ...)`, `handle_message("some random text", ...)` 각각 호출 |
+| **기대 결과** | 모두 `None` 반환 |
+
+### TC-06: `todo:` 만 입력 시 Usage 반환
+
+| 항목 | 내용 |
+|------|------|
+| **ID** | TC-06 |
+| **설명** | 커맨드 없이 `todo:` 만 입력하면 사용법 안내 메시지를 반환한다 |
+| **사전 조건** | 없음 |
+| **단계** | `handle_message("todo:", {"sender_id": "U1"}, db_path)` 호출 |
+| **기대 결과** | `"Usage"` 포함된 문자열 반환 |
+
+### TC-07: 선행/후행 공백 허용
+
+| 항목 | 내용 |
+|------|------|
+| **ID** | TC-07 |
+| **설명** | `"  todo: add task  "` 처럼 공백이 있어도 정상 인식한다 |
+| **사전 조건** | 없음 |
+| **단계** | `handle_message("  todo: add task  ", {"sender_id": "U1"}, db_path)` 호출 |
+| **기대 결과** | 문자열 응답 반환 (None이 아님) |
+
+### TC-08: 알 수 없는 커맨드 시 도움말 반환
+
+| 항목 | 내용 |
+|------|------|
+| **ID** | TC-08 |
+| **설명** | `todo: foobar`처럼 알 수 없는 커맨드 입력 시 "Unknown command"와 도움말을 반환한다 |
+| **사전 조건** | 없음 |
+| **단계** | dispatcher를 통해 `"foobar something"` 디스패치 |
+| **기대 결과** | 응답에 `"Unknown command"`, `"foobar"`, `"Commands:"` 포함 |
+
+---
+
+## 5. 테스트 케이스 -- 커맨드 파서
+
+> 대상 모듈: `src/openclaw_todo/parser.py`
+> 테스트 파일: `tests/test_parser.py`
+
+### 5.1 기본 커맨드/토큰 추출
+
+| ID | 설명 | 입력 | 기대 결과 |
+|----|------|------|-----------|
+| TC-09 | 첫 토큰이 command로 추출 | `"list mine /p Work"` | `command="list"`, `"mine" in title_tokens` |
+| TC-10 | `/p` project 추출 | `"add Buy milk /p MyProject"` | `project="MyProject"`, title에 `/p`/`MyProject` 없음 |
+| TC-11 | `/s` 유효 섹션 추출 (5가지) | `"add Task /s <section>"` | 각 유효 section 정상 설정 |
+| TC-12 | `/s` 무효 섹션 | `"add Task /s invalid_section"` | `ParseError("Invalid section")` |
+| TC-24 | command 대소문자 정규화 | `"ADD Task"`, `"LiSt"` | `command="add"`, `command="list"` |
+| TC-25 | section 대소문자 정규화 | `"add Task /s DOING"` | `section="doing"` |
+
+### 5.2 due 파서
+
+| ID | 설명 | 입력 | 기대 결과 |
+|----|------|------|-----------|
+| TC-13 | `MM-DD` 현재연도 보정 | `"add Task due:03-15"` | `due="{current_year}-03-15"` |
+| TC-14 | `M-D` 한 자리 보정 | `"add Task due:1-1"` | `due="{current_year}-01-01"` |
+| TC-15 | `YYYY-MM-DD` 그대로 유지 | `"add Task due:2026-06-01"` | `due="2026-06-01"` |
+| TC-16 | 무효 날짜 (02-30) | `"add Task due:2026-02-30"` | `ParseError("Invalid due date")` |
+| TC-17 | 월 범위 초과 (13-01) | `"add Task due:13-01"` | `ParseError` |
+| TC-18 | garbage 문자열 | `"add Task due:notadate"` | `ParseError` |
+| TC-19 | `due:-` 클리어 | `"add Task due:-"` | `due == DUE_CLEAR` |
+| TC-20 | 윤년 02-29 | `"add Task due:2028-02-29"` | `due="2028-02-29"` |
+| TC-21 | 비윤년 02-29 에러 | `"add Task due:2026-02-29"` | `ParseError` |
+
+### 5.3 Slack mention 추출
+
+| ID | 설명 | 입력 | 기대 결과 |
+|----|------|------|-----------|
+| TC-22 | 단일/복수 mention 추출 | `"add Task <@U12345> <@UABCDE>"` | `mentions=["U12345","UABCDE"]`, title에서 제거 |
+
+### 5.4 에러/edge case
+
+| ID | 설명 | 입력 | 기대 결과 |
+|----|------|------|-----------|
+| TC-23 | 빈 입력 / 공백만 | `""`, `"   "` | `ParseError("Empty command")` |
+| TC-26 | 한글/유니코드 title | `"add 우유 사기 /p 집"` | `title_tokens=["우유","사기"]`, `project="집"` |
+| TC-27 | `/p` 값 없이 끝남 | `"add Task /p"` | `ParseError("/p requires a project name")` |
+| TC-28 | `/s` 값 없이 끝남 | `"add Task /s"` | `ParseError("/s requires a section name")` |
+| TC-29 | 중복 옵션 마지막 우선 | `"add Task /p Alpha /p Beta"` | `project="Beta"` |
+| TC-30 | 옵션 위치 자유 | `"add /p Work /s doing due:... title"` | 모든 필드 정상 추출 |
+
+### 5.5 ID 추출 커맨드
+
+| ID | 설명 | 입력 | 기대 결과 |
+|----|------|------|-----------|
+| TC-31a | move ID 추출 | `"move 42 /s doing"` | `args=["42"]` |
+| TC-31b | done ID 추출 | `"done 99"` | `args=["99"]` |
+| TC-31c | drop ID 추출 | `"drop 7"` | `args=["7"]` |
+| TC-31d | edit ID + title | `"edit 3 New title"` | `args=["3"]`, `title_tokens=["New","title"]` |
+| TC-31e | add는 ID 미추출 | `"add 42 is answer"` | `args=[]`, title에 "42" 포함 |
+
+### 5.6 공백/탭 처리
+
+| ID | 설명 | 기대 결과 |
+|----|------|-----------|
+| TC-32a | 선행/후행 공백 strip | `"  add  Task  "` -> 정상 파싱 |
+| TC-32b | 다중 공백 | `"add   Buy   milk"` -> title 정상 |
+| TC-32c | 탭 문자 | `"add\tTask\t/s\tdoing"` -> 정상 파싱 |
+
+---
+
+## 6. 테스트 케이스 -- add
+
+> 대상 모듈: `src/openclaw_todo/cmd_add.py`
+> 테스트 파일: `tests/test_cmd_add.py`
+
+| ID | 설명 | 기대 결과 |
+|----|------|-----------|
+| TC-33 | 기본값으로 Inbox/backlog에 추가 | `"Added #1 (Inbox/backlog)"`, status="open", sender가 assignee |
+| TC-34 | 명시적 project/section/due | DB에 지정값 저장, 응답에 반영 |
+| TC-35 | assignee 미지정 시 sender 기본 | `task_assignees`에 sender만 |
+| TC-36 | 다중 assignee | `task_assignees`에 모두 기록 |
+| TC-37 | **private + 타인 assignee -> 경고 후 거부** | `"Warning"`, `"NOT created"`, task 미생성 |
+| TC-38 | private + owner assignee -> 허용 | `"Added #"` 정상 응답 |
+| TC-39 | 빈 title -> 에러 | `"Error"` 포함, task 미생성 |
+| TC-40 | 존재하지 않는 project -> 에러 | `"Error"` + project name 포함 |
+| TC-41 | `due:-` -> DB에 NULL 저장 | `due IS NULL` |
+| TC-42 | add 이벤트 로깅 | `events.action='task.add'`, payload에 title/project/section |
+
+---
+
+## 7. 테스트 케이스 -- list
+
+> 대상 모듈: `src/openclaw_todo/cmd_list.py`
+> 테스트 파일: `tests/test_cmd_list.py`
+
+| ID | 설명 | 기대 결과 |
+|----|------|-----------|
+| TC-43 | 기본 scope=mine, status=open | sender의 open task만 반환, done 미포함 |
+| TC-44 | scope=all (shared + sender private) | shared + sender private 포함, 타인 private 미포함 |
+| TC-45 | `/p <project>` 필터 | 해당 project task만 |
+| TC-46 | 정렬: due 우선, due ASC, id DESC | 올바른 정렬 순서 |
+| TC-47 | `limit:N` 적용 | 최대 N개 반환, 기본 30 |
+| TC-48 | private task가 타인에게 미노출 | U002의 `list all`에 U001 private 미포함 |
+
+---
+
+## 8. 테스트 케이스 -- board
+
+> 대상 모듈: `src/openclaw_todo/cmd_board.py`
+> 테스트 파일: `tests/test_cmd_board.py`
+
+| ID | 설명 | 기대 결과 |
+|----|------|-----------|
+| TC-49 | 섹션 헤더 순서 | BACKLOG -> DOING -> WAITING -> DONE -> DROP |
+| TC-50 | task가 올바른 섹션에 표시 | doing task가 DOING 아래 표시 |
+| TC-51 | `limitPerSection:N` 적용 | 섹션당 최대 N개, 기본 10 |
+| TC-52 | private task 격리 | sender private만 표시, 타인 private 미표시 |
+
+---
+
+## 9. 테스트 케이스 -- move
+
+> 대상 모듈: `src/openclaw_todo/cmd_move.py`
+> 테스트 파일: `tests/test_cmd_move.py`
+
+| ID | 설명 | 기대 결과 |
+|----|------|-----------|
+| TC-53 | 정상 섹션 이동 | `"moved"` 응답, DB section 변경 |
+| TC-54 | 존재하지 않는 task ID | 에러 응답 |
+| TC-55 | private task -- 비owner 접근 거부 | `"denied"` 또는 `"error"` 포함, DB 미변경 |
+| TC-56 | shared task -- assignee/created_by만 이동 가능 | 관련 user 성공, 무관 user 거부 |
+
+---
+
+## 10. 테스트 케이스 -- done / drop
+
+> 대상 모듈: `src/openclaw_todo/cmd_done_drop.py`
+> 테스트 파일: `tests/test_cmd_done_drop.py`
+
+| ID | 설명 | 기대 결과 |
+|----|------|-----------|
+| TC-57 | done 정상 처리 | status="done", section="done", closed_at NOT NULL |
+| TC-58 | done된 task가 기본 list에 미표시 | `list`(open)에서 미포함 |
+| TC-59 | drop 정상 처리 | status="dropped", section="drop", closed_at NOT NULL |
+| TC-60 | private task의 done/drop -- 비owner 거부 | 권한 거부 응답 |
+
+---
+
+## 11. 테스트 케이스 -- edit
+
+> 대상 모듈: `src/openclaw_todo/cmd_edit.py`
+> 테스트 파일: `tests/test_cmd_edit.py`
+
+| ID | 설명 | 기대 결과 |
+|----|------|-----------|
+| TC-61 | title 변경 | DB title 업데이트, `"Edited"` 응답 |
+| TC-62 | section 변경 | DB section 업데이트 |
+| TC-63 | due 변경 | DB due 업데이트 |
+| TC-64 | `due:-` 클리어 | DB `due IS NULL` |
+| TC-65 | assignee 완전 교체 | mention 제공 시 `task_assignees` 전체 교체 |
+| TC-66 | **private + 타인 assignee 교체 -> 거부** | `"Warning"`, 변경 미적용 |
+| TC-67 | **private project로 이동 + 비owner assignee -> 거부** | `"Warning"`, 변경 미적용 |
+| TC-68 | title 미지정 시 기존 값 유지 | 옵션만 변경, title 불변 |
+| TC-69 | 존재하지 않는 task ID | 에러 응답 |
+
+---
+
+## 12. 테스트 케이스 -- project
+
+> 대상 모듈: `src/openclaw_todo/cmd_project_list.py`, `cmd_project_set_private.py`, `cmd_project_set_shared.py`
+> 테스트 파일: `tests/test_cmd_project.py`, `test_cmd_project_set_private.py`, `test_cmd_project_set_shared.py`
+
+### project list
+
+| ID | 설명 | 기대 결과 |
+|----|------|-----------|
+| TC-70 | shared + sender private 반환 | shared 전체 + sender private만 표시 |
+| TC-71 | 타인의 private 미노출 | U002 private가 U001 `project list`에 미포함 |
+
+### project set-private
+
+| ID | 설명 | 기대 결과 |
+|----|------|-----------|
+| TC-72 | 이미 private -> noop | `"already private"` |
+| TC-73 | shared -> private 전환 성공 (owner만 assignee) | `"now private"`, DB 반영 |
+| TC-74 | shared -> private (task 없으면 성공) | `"now private"` |
+| TC-75 | **shared -> private 거부 (비owner assignee)** | `"cannot"`, DB visibility 유지 |
+| TC-76 | 에러 메시지에 위반 task ID + assignee 포함 | `"Cannot make"`, `"non-owner assignees"`, ID/user 포함 |
+| TC-77 | owner assignee만 있는 task는 위반 아님 | 해당 task ID 미포함, 위반 task만 보고 |
+| TC-78 | 둘 다 없으면 새 private 생성 | `"created private"`, DB 신규 행 |
+| TC-79 | 타인 동명 private 존재 시 별도 생성 | projects에 2행 공존 |
+| TC-80 | project name 누락 -> 에러 | `"project name required"` |
+| TC-81 | 전환/생성 시 이벤트 로깅 | events에 `project.set_private` / `project.create_private` |
+
+### project set-shared
+
+| ID | 설명 | 기대 결과 |
+|----|------|-----------|
+| TC-82 | 새 shared 생성 | `"created"`, DB 반영 |
+| TC-83 | 이미 shared 존재 -> noop | 중복 에러 없이 정상 |
+| TC-84 | shared 이름 충돌 (전역 유니크) | exists/noop 응답 |
+
+### 프로젝트 이름 충돌 해소
+
+| ID | 설명 | 기대 결과 |
+|----|------|-----------|
+| TC-85 | private 우선 (옵션 A) | sender private "Work" + shared "Work" 시 private 선택 |
+| TC-86 | private 없으면 shared 사용 | shared "Work"만 있으면 shared로 resolve |
+
+### 서브커맨드 라우팅
+
+| ID | 설명 | 기대 결과 |
+|----|------|-----------|
+| TC-87 | `project` 서브커맨드 미지정 | PROJECT_USAGE 반환 |
+| TC-88 | 미지원 서브커맨드 | `"Unknown project subcommand"` |
+
+---
+
+## 13. 테스트 케이스 -- LLM 바이패스 검증
+
+> PRD v1.2 핵심 요구사항: manifest에 `command_prefix: "todo:"`, `bypass_llm: true` 등록 시 Gateway가 LLM 없이 직접 플러그인을 호출한다
+
+| ID | 설명 | 검증 방식 |
+|----|------|-----------|
+| TC-89 | 코드 경로에 LLM 의존성 없음 | `plugin.py` -> `dispatcher.py` 경로에 LLM import/호출 없음 확인 |
+| TC-90 | manifest 설정 검증 | manifest 파일에 `command_prefix="todo:"`, `bypass_llm=true` 존재 |
+| TC-91 | Gateway 통합 검증 (수동) | 스테이징에서 `todo: add test` 전송 시 LLM 호출 로그 미발생 확인 |
+
+---
+
+## 14. 테스트 케이스 -- DB 초기화 및 마이그레이션
+
+> 대상 모듈: `src/openclaw_todo/db.py`, `migrations.py`, `schema_v1.py`
+> 테스트 파일: `tests/test_migrations.py`, `tests/test_schema_v1.py`, `tests/test_db.py`
+
+| ID | 설명 | 기대 결과 |
+|----|------|-----------|
+| TC-92 | 첫 실행 시 DB 파일 + 스키마 적용 | 파일 생성, schema_version >= 1 |
+| TC-93 | Inbox 기본 프로젝트 자동 생성 | name="Inbox", visibility="shared" |
+| TC-94 | 마이그레이션 멱등성 | 재실행 시 에러 없음, version 불변 |
+| TC-95 | WAL + busy_timeout 설정 | journal_mode="wal", busy_timeout=3000 |
+| TC-96 | shared 유니크 인덱스 | 동명 shared INSERT 시 IntegrityError |
+| TC-97 | private owner+name 유니크 인덱스 | 같은 owner+name -> 에러, 다른 owner -> 허용 |
+| TC-98 | 전체 테이블 존재 확인 | projects, tasks, task_assignees, events, schema_version |
+| TC-99 | section/status CHECK 제약 | 무효 값 INSERT 시 에러 |
+| TC-100 | migration 실패 시 rollback | 실패 migration 이전 version 유지, 성공 migration 보존 |
+| TC-101 | 두 connection 동시 접근 | WAL 기반 무충돌 |
+
+---
+
+## 15. Edge Case / Error Scenario 종합
+
+### 15.1 Private 프로젝트 제한
+
+| 시나리오 | 관련 TC | 기대 |
+|----------|---------|------|
+| private project에 `add` + 타인 assignee | TC-37 | 경고 후 거부, task 미생성 |
+| private project에서 `edit` + 타인 assignee 교체 | TC-66 | 경고 후 거부, 변경 미적용 |
+| shared -> private 전환 시 non-owner assignee 존재 | TC-75, TC-76 | 에러 (task ID + assignee 포함) |
+| non-owner가 private task에 `move`/`done`/`drop`/`edit` | TC-55, TC-60 | 권한 거부 |
+| non-owner가 private project task를 `list`/`board` | TC-48, TC-52 | 미표시 |
+
+### 15.2 Due Date 파싱 edge case
+
+| 시나리오 | 관련 TC | 기대 |
+|----------|---------|------|
+| `due:02-30` (2월 30일) | TC-16 | ParseError |
+| `due:13-01` (13월) | TC-17 | ParseError |
+| `due:2025-02-29` (비윤년) | TC-21 | ParseError |
+| `due:2028-02-29` (윤년) | TC-20 | 정상 |
+| `due:notadate` | TC-18 | ParseError |
+| `due:12-31` | TC-13 | 현재연도 12월 31일 |
+| `due:-` | TC-19 | DUE_CLEAR sentinel |
+
+### 15.3 이름 충돌
+
+| 시나리오 | 관련 TC | 기대 |
+|----------|---------|------|
+| shared project 동일 name 생성 시도 | TC-84, TC-96 | 거부 (전역 유니크) |
+| 같은 owner가 같은 이름 private 2개 | TC-97 | 거부 (owner+name 유니크) |
+| 다른 owner가 같은 이름 private | TC-79, TC-97 | 허용 |
+| private + shared 동일 이름 공존 시 resolve | TC-85 | private 우선 (옵션 A) |
+
+### 15.4 존재하지 않는 리소스
+
+| 시나리오 | 관련 TC | 기대 |
+|----------|---------|------|
+| 존재하지 않는 task ID로 `move`/`done`/`drop`/`edit` | TC-54, TC-69 | 에러 응답 |
+| 존재하지 않는 project로 `add` | TC-40 | 에러 응답 (Inbox 제외) |
+| 알 수 없는 command | TC-08 | USAGE 반환 |
+| 알 수 없는 project subcommand | TC-88 | PROJECT_USAGE 반환 |
+
+### 15.5 권한 모듈 (`permissions.py`)
+
+| 시나리오 | 기대 |
+|----------|------|
+| private owner -> `can_write_task` True | 허용 |
+| private non-owner -> `can_write_task` False | 거부 |
+| shared assignee -> True | 허용 |
+| shared created_by -> True | 허용 |
+| shared unrelated user -> False | 거부 |
+| 존재하지 않는 task -> False | 거부 |
+| `validate_private_assignees` private + 타인 -> Warning | Warning 문자열 반환 |
+| `validate_private_assignees` private + owner만 -> None | None |
+| `validate_private_assignees` shared -> 항상 None | None |
+
+---
+
+## 16. 수용 기준 추적표
+
+PRD Section 9의 각 수용 기준과 테스트 케이스의 매핑이다.
+
+| PRD 수용 기준 | 테스트 케이스 |
+|--------------|-------------|
+| shared 프로젝트 이름 충돌 시 생성/변경 거부 | TC-84, TC-96 |
+| private 프로젝트는 owner 단위로 유니크 | TC-79, TC-97 |
+| `set-private` 시 비owner assignee 존재하면 에러 | TC-75, TC-76, TC-77 |
+| private 프로젝트에 타 assignee 지정 시 경고 + 미생성/미수정 | TC-37, TC-38, TC-66, TC-67 |
+| due `MM-DD` 입력 시 올해로 보정 | TC-13, TC-14 |
+| DB 최초 실행 시 파일 생성 + schema + Inbox | TC-92, TC-93, TC-98 |
+| `todo:` 접두사로 커맨드 정상 인식 | TC-01, TC-07 |
+| `/todo` 접두사 미인식 | TC-03, TC-04 |
+| manifest `command_prefix`/`bypass_llm` 설정 시 LLM 바이패스 | TC-89, TC-90, TC-91 |
+| bridge `/todo` -> `todo:` 이중 변환 로직 제거 | TC-03, TC-04 (간접 검증) |
+
+---
+
+## 17. 자동화 후보
+
+### 17.1 즉시 자동화 (CI 포함 권장)
+
+| 대상 | 테스트 케이스 | 자동화 방식 | 이유 |
+|------|-------------|------------|------|
+| 접두사 인식 | TC-01 ~ TC-08 | pytest 단위 테스트 | `handle_message()` 단일 함수, 빠른 실행 |
+| 커맨드 파서 | TC-09 ~ TC-32 | pytest + `@pytest.mark.parametrize` | 순수 함수, 외부 의존 없음, 대량 케이스에 최적 |
+| add 핸들러 | TC-33 ~ TC-42 | pytest + tmp SQLite | 핵심 기능, private assignee 검증 포함 |
+| list/board | TC-43 ~ TC-52 | pytest + tmp SQLite | 정렬/필터/격리 로직 검증 |
+| move/done/drop | TC-53 ~ TC-60 | pytest + tmp SQLite | 상태 전이 + 권한 검증 |
+| edit | TC-61 ~ TC-69 | pytest + tmp SQLite | 교체 로직 + private 검증 |
+| project 커맨드 | TC-70 ~ TC-88 | pytest + tmp SQLite | set-private 검증이 핵심 비즈니스 로직 |
+| DB/마이그레이션 | TC-92 ~ TC-101 | pytest + tmp SQLite | 스키마 무결성 자동 검증 |
+| E2E 시나리오 | test_e2e.py 전체 | pytest + `handle_message()` | 전체 경로 회귀 방지 |
+| 권한 모듈 | permissions 테스트 | pytest + parametrize | 조합이 많으므로 parametrize 활용 |
+
+### 17.2 수동/반자동
+
+| 대상 | 테스트 케이스 | 방식 | 이유 |
+|------|-------------|------|------|
+| LLM 바이패스 코드 리뷰 | TC-89 | 코드 리뷰 / 정적 분석 | 코드 구조 검증은 리뷰가 적합 |
+| manifest 필드 검증 | TC-90 | CI에서 JSON 파싱 후 assert | manifest 파일 형식에 따라 구현 |
+| Gateway 통합 LLM 바이패스 | TC-91 | 스테이징 환경 수동 확인 | Gateway 측 동작이므로 단독 자동화 불가 |
+| Slack DM 실제 전송/수신 | - | 스테이징 수동 | Slack API 연동 최종 확인 |
+
+### 17.3 CI 설정 예시
+
+```yaml
+# .github/workflows/test.yml
+- name: Run tests
+  run: uv run pytest --cov=src/openclaw_todo --cov-report=term-missing -q
+```
+
+### 17.4 pytest 마크 권장
+
+```python
+# pyproject.toml
+[tool.pytest.ini_options]
 markers = [
-    "unit: Pure unit tests (no DB, no I/O)",
-    "integration: Tests requiring DB or multi-component interaction",
-    "slow: Tests with file I/O or significant setup",
+    "unit: 순수 단위 테스트 (DB 미사용)",
+    "integration: DB 또는 다중 컴포넌트 연동 테스트",
 ]
 ```
 
 ---
 
-## 9. Smoke Checklist
+## 18. 스모크 테스트 체크리스트
 
-A minimal set of tests to run before any release or deployment. If any fail, the build is not shippable.
+> 배포/릴리스 전 반드시 통과해야 하는 최소 검증 항목이다.
 
-- [ ] **SMOKE-01**: DB initializes without error on empty state (DB-INIT-01)
-- [ ] **SMOKE-02**: Default `Inbox` project exists after init (DB-INIT-03)
-- [ ] **SMOKE-03**: `/todo add buy milk` creates a task in Inbox/backlog (CMD-ADD-01)
-- [ ] **SMOKE-04**: `/todo list` returns the just-added task (CMD-LST-01)
-- [ ] **SMOKE-05**: `/todo done <id>` marks task done with closed_at (CMD-DON-01)
-- [ ] **SMOKE-06**: `/todo add task <@U_OTHER> /p PrivateProj` is rejected (CMD-ADD-06)
-- [ ] **SMOKE-07**: `/todo project set-private` with non-owner assignees fails (PRJ-SPR-04)
-- [ ] **SMOKE-08**: `due:03-15` parses to `2026-03-15` (P-DUE-02)
-- [ ] **SMOKE-09**: Invalid due `due:02-30` returns error (P-DUE-04)
-- [ ] **SMOKE-10**: `/todo board` renders sections in correct order (CMD-BRD-01)
+| # | 항목 | 관련 TC | 확인 |
+|---|------|---------|------|
+| S-01 | `todo: add 테스트 항목` -> `"Added #N"` 응답 | TC-33 | [ ] |
+| S-02 | `todo: list` -> 방금 추가한 항목 표시 | TC-43 | [ ] |
+| S-03 | `todo: board` -> BACKLOG 헤더 아래에 항목 표시 | TC-49 | [ ] |
+| S-04 | `todo: move <id> /s doing` -> `"moved"` 응답, board DOING 확인 | TC-53 | [ ] |
+| S-05 | `todo: done <id>` -> `list`에서 미표시 | TC-57, TC-58 | [ ] |
+| S-06 | `todo: drop <id>` -> status=dropped 확인 | TC-59 | [ ] |
+| S-07 | `todo: edit <id> 새 제목` -> title 변경 확인 | TC-61 | [ ] |
+| S-08 | `todo: project list` -> Inbox 포함 표시 | TC-70 | [ ] |
+| S-09 | `todo: project set-private MyProj` -> private 생성/전환 확인 | TC-78 | [ ] |
+| S-10 | `todo: project set-shared TeamProj` -> shared 생성 확인 | TC-82 | [ ] |
+| S-11 | `/todo add task` -> **무시** (None 반환) | TC-03 | [ ] |
+| S-12 | 일반 텍스트 -> **무시** | TC-05 | [ ] |
+| S-13 | private project에 타인 assignee -> **경고 후 거부** | TC-37 | [ ] |
+| S-14 | 비owner assignee 포함 project의 set-private -> **에러** | TC-75 | [ ] |
+| S-15 | `due:02-30` -> ParseError | TC-16 | [ ] |
+| S-16 | 신규 DB 경로 실행 -> 파일 생성 + Inbox 존재 | TC-92, TC-93 | [ ] |
 
-Run with:
+실행 방법:
 ```bash
-uv run pytest -m smoke -q --tb=short
+uv run pytest -q --tb=short
 ```
 
 ---
 
-## 10. Test Directory Structure (Recommended)
-
-```
-tests/
-  conftest.py              # Shared fixtures (db_conn, sender_ctx, etc.)
-  test_parser.py           # 3.1 Parser tests (P-MEN, P-PRJ, P-SEC, P-DUE, P-CMB)
-  test_due_normalization.py # 3.2 Date normalization
-  test_db_schema.py        # 3.3.1 Schema init and migration
-  test_db_projects.py      # 3.3.2 Project CRUD
-  test_db_tasks.py         # 3.3.3 Task CRUD
-  test_cmd_add.py          # 4.1 /todo add
-  test_cmd_list.py         # 4.2 /todo list
-  test_cmd_board.py        # 4.3 /todo board
-  test_cmd_move.py         # 4.4 /todo move
-  test_cmd_done_drop.py    # 4.5-4.6 /todo done, drop
-  test_cmd_edit.py         # 4.7 /todo edit
-  test_project_cmds.py     # 5.1-5.3 project list/set-private/set-shared
-  test_edge_cases.py       # 6.x Edge cases and collision resolution
-```
+> 본 테스트 계획서는 PRD v1.2 기준으로 작성되었다. PRD 변경 시 동기화가 필요하다.

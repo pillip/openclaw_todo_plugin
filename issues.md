@@ -1,975 +1,718 @@
-# OpenClaw TODO Plugin -- Issues
+# OpenClaw TODO Plugin -- Implementation Issues
 
-> Auto-generated from `openclaw_todo_plugin_prd.md` (PRD v1.1)
-> Date: 2026-02-20
+> SSOT: Progress and completion are tracked by the Status field in this document (not inferred from code analysis)
+> Rule: **1 Issue = 1 PR** (GitHub-first)
+> PRD v1.2 WBS(Section 10) 기반 구현 이슈 분해.
+> 각 이슈는 0.5~1.5d 단위로 분할. Track/Status/Priority/Estimate/Branch/GH-Issue/PR 컨벤션 준수.
+> Date: 2026-02-24
 
----
-
-## Issue #1: Plugin skeleton and entry point
-
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | Backend                                |
-| Milestone   | M0                                     |
-| Status      | done                                   |
-| Priority    | P0                                     |
-| Estimate    | 1d                                     |
-| Branch      | `feature/001-plugin-skeleton`          |
-| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/1 |
-| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/2 |
-
-**Description**
-Create the Python project scaffold: `pyproject.toml` (uv), `src/openclaw_todo/` package layout, and the plugin entry-point that the OpenClaw gateway will load. The plugin must expose a callable that receives raw Slack DM text and a sender context dict.
-
-**Acceptance Criteria**
-- [ ] `pyproject.toml` exists with Python >=3.11, pytest, pytest-cov dev deps
-- [ ] `src/openclaw_todo/__init__.py` exposes `__version__`
-- [ ] `src/openclaw_todo/plugin.py` contains `handle_message(text: str, context: dict) -> str` entry point
-- [ ] Messages not starting with `/todo` are silently ignored (returns `None`)
-- [ ] `uv sync && uv run pytest -q` passes (trivial smoke test)
-
-**Tests**
-- `tests/test_plugin.py::test_ignores_non_todo_message`
-- `tests/test_plugin.py::test_dispatches_todo_prefix`
-
-**Rollback**
-Delete branch; no runtime dependency.
-
-**Observability**
-`logger.debug` on every inbound message; `logger.info` when `/todo` prefix matched.
-
-**Dependencies**
-None.
+## Conventions
+- Track: `product` | `platform`
+- Status: `backlog` | `doing` | `waiting` | `done` | `drop`
+- Priority: `P0` | `P1` | `P2`
+- Estimate: `0.5d` | `1d` | `1.5d`
+- Branch: `issue/ISSUE-<NNN>-<slug>`
+- GitHub: **/implement creates a GH Issue (if missing) + PR and links them (Closes #N)**
 
 ---
 
-## Issue #2: DB module -- connection helper and pragma setup
+## Board
 
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | Backend / Data                         |
-| Milestone   | M1                                     |
-| Status      | done                                   |
-| Priority    | P0                                     |
-| Estimate    | 0.5d                                   |
-| Branch      | `feature/002-db-connection`            |
-| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/3 |
-| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/4 |
+### Backlog
+- [ ] ISSUE-029: manifest에 command_prefix 및 bypass_llm 필드 추가 _(track: platform, P0, 0.5d)_
+- [ ] ISSUE-030: list/board에서 open|done|drop status 필터 토큰 파싱 지원 _(track: product, P1, 1d)_
+- [ ] ISSUE-031: help 커맨드 및 빈 todo: 입력 시 상세 도움말 출력 _(track: product, P1, 0.5d)_
+- [ ] ISSUE-032: UX 명세에 맞는 응답 메시지 포맷 통일 _(track: product, P0, 1.5d)_
+- [ ] ISSUE-033: add 시 존재하지 않는 프로젝트 자동 생성 (shared) _(track: product, P1, 1d)_
+- [ ] ISSUE-034: move 커맨드에서 /s 없이 section 직접 지정 지원 _(track: product, P1, 0.5d)_
+- [ ] ISSUE-035: 에러 메시지 UX 명세 정합 _(track: product, P1, 1d)_
+- [ ] ISSUE-036: set-private 에러 메시지에 Slack 멘션 포맷 적용 _(track: product, P2, 0.5d)_
+- [ ] ISSUE-037: parser 단위 테스트 보강 -- 엣지 케이스 _(track: platform, P1, 1d)_
+- [ ] ISSUE-038: E2E 테스트 보강 -- scope 필터 및 다중 사용자 시나리오 _(track: platform, P1, 1d)_
+- [ ] ISSUE-039: server.py HTTP endpoint 테스트 보강 _(track: platform, P2, 0.5d)_
+- [ ] ISSUE-040: bridge TypeScript 빌드 및 npm 패키지 구성 _(track: platform, P1, 1d)_
 
-**Description**
-Implement `src/openclaw_todo/db.py` with a `get_connection(db_path)` helper that creates the `~/.openclaw/workspace/.todo/` directory tree if missing, opens (or creates) `todo.sqlite3`, and applies `PRAGMA journal_mode=WAL` and `PRAGMA busy_timeout=3000`.
+### Doing
 
-**Acceptance Criteria**
-- [ ] Directory is created recursively when absent
-- [ ] SQLite connection returned with WAL mode enabled
-- [ ] `busy_timeout` is 3000
-- [ ] Calling `get_connection` twice returns usable connections (no lock conflict)
+### Waiting
 
-**Tests**
-- `tests/test_db.py::test_creates_directory_and_file` (tmp_path)
-- `tests/test_db.py::test_wal_mode_enabled`
-- `tests/test_db.py::test_busy_timeout`
+### Done
+- [x] ISSUE-001 ~ ISSUE-026: M0~M5 핵심 구현 완료 (상세 내역은 하단 참조)
+- [x] ISSUE-027: ruff/black target-version 정합성 수정 -> **재개 (아래 참조)**
+- [x] ISSUE-028: Bridge serverUrl config 연동 -> **재개 (아래 참조)**
 
-**Rollback**
-Revert module; no schema changes yet.
-
-**Observability**
-`logger.info` on first DB creation; `logger.debug` on each connection open.
-
-**Dependencies**
-#1
+### Drop
 
 ---
 
-## Issue #3: Schema migration framework and schema_version table
+## 완료 이슈 요약 (ISSUE-001 ~ ISSUE-026)
 
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | Backend / Data                         |
-| Milestone   | M1                                     |
-| Status      | done                                   |
-| Priority    | P0                                     |
-| Estimate    | 1d                                     |
-| Branch      | `feature/003-schema-migration`         |
-| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/5 |
-| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/6 |
+> M0~M5 핵심 로직은 모두 구현 완료. 상세 내역은 git history 및 이전 버전의 이 문서 참조.
 
-**Description**
-Implement a simple sequential migration runner. On startup, read `schema_version` (create if missing), compare to available migrations list, and apply outstanding migrations in order inside a transaction.
-
-**Acceptance Criteria**
-- [ ] `schema_version` table created with single row `version=0` if absent
-- [ ] Migrations are Python callables registered in an ordered list
-- [ ] Each migration runs inside a transaction; version incremented on success
-- [ ] Re-running on an up-to-date DB is a no-op
-- [ ] Failing migration rolls back and raises with clear message
-
-**Tests**
-- `tests/test_migrations.py::test_fresh_db_gets_version_table`
-- `tests/test_migrations.py::test_applies_migrations_sequentially`
-- `tests/test_migrations.py::test_idempotent_on_rerun`
-- `tests/test_migrations.py::test_rollback_on_failure`
-
-**Rollback**
-Drop `schema_version` table; revert module.
-
-**Observability**
-`logger.info("Migrating from version %d to %d", current, target)` per step.
-
-**Dependencies**
-#2
+| Range | Milestone | Summary |
+|-------|-----------|---------|
+| #1 | M0 | Plugin skeleton + manifest + command prefix |
+| #2~#4 | M1 | DB init + migrations + V1 schema + Inbox seed |
+| #5~#6 | M2 | Parser tokenizer + Dispatcher routing |
+| #7~#14 | M3 | Project resolver, permissions, add/list/board/move/done/drop/edit commands, scope builder + event logger |
+| #15~#17 | M4 | project list/set-private/set-shared commands |
+| #18~#23 | M5 | Parser/command/E2E/infra/install tests |
+| #24~#26 | M6 | Packaging, HTTP bridge server, CI workflow |
 
 ---
 
-## Issue #4: V1 schema migration -- projects, tasks, task_assignees, events
-
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | Backend / Data                         |
-| Milestone   | M1                                     |
-| Status      | done                                   |
-| Priority    | P0                                     |
-| Estimate    | 1d                                     |
-| Branch      | `feature/004-v1-schema`                |
-| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/7 |
-| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/8 |
-
-**Description**
-Register migration v1 that creates the four tables (`projects`, `tasks`, `task_assignees`, `events`) with all columns, CHECK constraints, and partial unique indexes as specified in PRD section 6.3. Also seed shared project `Inbox`.
-
-**Acceptance Criteria**
-- [ ] `projects` table with `ux_projects_shared_name` and `ux_projects_private_owner_name` partial unique indexes
-- [ ] `tasks` table with section and status CHECK constraints
-- [ ] `task_assignees` table with composite PK and secondary index
-- [ ] `events` audit table created
-- [ ] Shared `Inbox` project auto-created (INSERT OR IGNORE)
-- [ ] `schema_version` = 1 after migration
-
-**Tests**
-- `tests/test_migrations.py::test_v1_tables_exist`
-- `tests/test_migrations.py::test_v1_inbox_created`
-- `tests/test_migrations.py::test_v1_shared_unique_index_enforced`
-- `tests/test_migrations.py::test_v1_private_unique_index_enforced`
-
-**Rollback**
-Drop all four tables + reset schema_version to 0.
-
-**Observability**
-Log table creation counts.
-
-**Dependencies**
-#3
+## 잔여 이슈 상세
 
 ---
 
-## Issue #5: Command parser -- tokenizer and option extraction
+### ISSUE-029: manifest에 command_prefix 및 bypass_llm 필드 추가
+- Track: platform
+- PRD-Ref: PRD#1.2, PRD#2.4, PRD#9 (AC 마지막 항목)
+- Priority: P0
+- Estimate: 0.5d
+- Status: backlog
+- Owner: --
+- Branch: `issue/ISSUE-029-manifest-bypass-llm`
+- GH-Issue: --
+- PR: --
 
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | Backend                                |
-| Milestone   | M2                                     |
-| Status      | doing                                  |
-| Priority    | P0                                     |
-| Estimate    | 1d                                     |
-| Branch      | `feature/005-parser-tokenizer`         |
-| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/9 |
-| PR          | --                                     |
+#### Goal
+PRD 1.2/2.4에 따라 `openclaw.plugin.json`에 `command_prefix: "todo:"` 및 `bypass_llm: true` 최상위 필드를 추가하여 Gateway가 LLM 없이 직접 플러그인을 호출하도록 한다.
 
-**Description**
-Implement `src/openclaw_todo/parser.py` that takes raw message text (after `/todo` prefix) and returns a `ParsedCommand` dataclass containing: `command` (str), `args` (list), `project` (str|None), `section` (str|None), `due` (str|None, normalised to YYYY-MM-DD), `mentions` (list of Slack user IDs), and remaining `title_tokens`.
+#### Scope
+- In:
+  - `bridge/openclaw-todo/openclaw.plugin.json`에 `command_prefix`, `bypass_llm` 필드 추가
+  - 기존 `triggers` 블록 유지 (폴백 호환)
+- Out:
+  - Gateway 측 코드 변경 (Gateway가 이 필드를 소비하는 것은 Gateway 측 책임)
 
-Parsing rules:
-- `/p <name>` extracts project
-- `/s <section>` extracts section (validate against enum)
-- `due:YYYY-MM-DD` or `due:MM-DD` extracts and normalises due date
-- `due:-` clears due (sentinel)
-- `<@U...>` patterns extracted as mentions
-- Everything else before first option token is title
+#### Acceptance Criteria (DoD)
+- [ ] `openclaw.plugin.json`에 `"command_prefix": "todo:"` 최상위 필드 존재
+- [ ] `openclaw.plugin.json`에 `"bypass_llm": true` 최상위 필드 존재
+- [ ] 기존 `triggers.dm.pattern` 블록 유지
+- [ ] JSON 유효성 검증 통과
 
-**Acceptance Criteria**
-- [ ] `/p MyProject` correctly extracted; token consumed
-- [ ] `/s doing` validated; invalid section raises `ParseError`
-- [ ] `due:03-15` normalised to `2026-03-15`
-- [ ] `due:2026-02-30` raises `ParseError` (invalid date)
-- [ ] `<@U12345>` extracted into mentions list
-- [ ] Multiple mentions supported
-- [ ] Title tokens are non-option, non-mention tokens before first option
+#### Tests
+- [ ] Unit: `tests/test_manifest.py` -- JSON 로드 후 `command_prefix`, `bypass_llm` 키 존재 및 값 검증
+- Test Command: `uv run pytest tests/test_manifest.py -q`
 
-**Tests**
-- `tests/test_parser.py::test_extract_project`
-- `tests/test_parser.py::test_extract_section_valid`
-- `tests/test_parser.py::test_extract_section_invalid`
-- `tests/test_parser.py::test_due_mm_dd_normalisation`
-- `tests/test_parser.py::test_due_full_date`
-- `tests/test_parser.py::test_due_invalid_date`
-- `tests/test_parser.py::test_due_clear`
-- `tests/test_parser.py::test_mentions_extraction`
-- `tests/test_parser.py::test_title_extraction`
+#### Observability (Minimal)
+- [ ] Logs: Gateway 로그에서 `bypass_llm=true` 매칭 여부 확인 (Gateway 측)
 
-**Rollback**
-Revert module; no side effects.
+#### Rollback
+- 필드 제거만으로 원복 가능 (기존 triggers로 폴백 동작)
 
-**Observability**
-`logger.debug("Parsed: %s", parsed_command)`
-
-**Dependencies**
-#1
+#### Dependencies / Blockers
+- 없음 (독립 작업)
 
 ---
 
-## Issue #6: /todo add command
+### ISSUE-030: list/board에서 open|done|drop status 필터 토큰 파싱 지원
+- Track: product
+- PRD-Ref: PRD#5.2, PRD#5.3
+- Priority: P1
+- Estimate: 1d
+- Status: backlog
+- Owner: --
+- Branch: `issue/ISSUE-030-status-filter-token`
+- GH-Issue: --
+- PR: --
 
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | Backend                                |
-| Milestone   | M3                                     |
-| Status      | TODO                                   |
-| Priority    | P0                                     |
-| Estimate    | 1.5d                                   |
-| Branch      | `feature/006-cmd-add`                  |
-| GH-Issue    | --                                     |
-| PR          | --                                     |
+#### Goal
+`todo: list done`, `todo: board drop` 처럼 title_tokens에 `open|done|drop` 키워드가 올 때 status 필터로 인식하도록 수정한다.
 
-**Description**
-Implement the `add` subcommand handler. Resolves project (default `Inbox`), applies defaults (section=`backlog`, assignees=sender if none mentioned), validates private-project assignee constraint (PRD 3.3), inserts task + task_assignees rows, logs event, and returns formatted confirmation.
+#### Scope
+- In:
+  - `src/openclaw_todo/cmd_list.py` -- title_tokens에서 `open|done|drop` 추출
+  - `src/openclaw_todo/cmd_board.py` -- 동일 로직 적용
+- Out:
+  - parser.py 자체는 변경하지 않음 (커맨드 핸들러에서 처리)
 
-**Acceptance Criteria**
-- [ ] Task inserted with correct project_id, section, due, status='open', created_by
-- [ ] Assignees default to sender when no mentions
-- [ ] Multiple mentions create multiple task_assignee rows
-- [ ] Private project + non-owner assignee returns warning and does NOT insert
-- [ ] Non-existent project: `Inbox` auto-created as shared; others return error
-- [ ] Response format: `Added #<id> (<project>/<section>) due:<due|-> assignees:<mentions> -- <title>`
-- [ ] Event row written to `events` table
+#### Acceptance Criteria (DoD)
+- [ ] `todo: list done` 입력 시 status=done인 태스크만 반환
+- [ ] `todo: list drop` 입력 시 status=dropped인 태스크만 반환
+- [ ] `todo: list open` 입력 시 status=open (기본값과 동일)
+- [ ] `todo: board done` 동일 동작
+- [ ] 기존 `/s done` 방식과 충돌 없음
 
-**Tests**
-- `tests/test_cmd_add.py::test_add_default_inbox`
-- `tests/test_cmd_add.py::test_add_with_project_section_due`
-- `tests/test_cmd_add.py::test_add_private_rejects_other_assignee`
-- `tests/test_cmd_add.py::test_add_assignee_defaults_to_sender`
-- `tests/test_cmd_add.py::test_add_multiple_assignees`
+#### Implementation Notes
+- 현재 `cmd_list.py`에서 `parsed.section`이 `done|drop`일 때만 status를 변경하는 로직이 있음
+- title_tokens 순회 시 `open|done|drop` 키워드를 별도 변수로 추출하여 status 필터에 반영
+- `/s done`과 `done` (title_token)이 동시에 오면 `/s`가 section 필터, title_token이 status 필터
 
-**Rollback**
-Revert handler; tasks table unchanged structurally.
+#### Tests
+- [ ] Unit: `tests/test_cmd_list.py` -- `list done`, `list drop`, `list open` 각각 검증
+- [ ] Unit: `tests/test_cmd_board.py` -- `board done` 검증
+- Test Command: `uv run pytest tests/test_cmd_list.py tests/test_cmd_board.py -q`
 
-**Observability**
-`logger.info("Task #%d created in %s/%s by %s", id, project, section, sender)`
+#### Observability (Minimal)
+- [ ] Logs: dispatcher 로그에 적용된 status 필터 값 기록
 
-**Dependencies**
-#4, #5
+#### Rollback
+- 토큰 인식 코드 제거로 원복 (기존 `/s` 방식만 지원)
 
----
-
-## Issue #7: Project resolver helper
-
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | Backend                                |
-| Milestone   | M3                                     |
-| Status      | TODO                                   |
-| Priority    | P0                                     |
-| Estimate    | 0.5d                                   |
-| Branch      | `feature/007-project-resolver`         |
-| GH-Issue    | --                                     |
-| PR          | --                                     |
-
-**Description**
-Implement `resolve_project(conn, name, sender_id) -> Project` following PRD 3.2 (Option A): sender's private project with that name takes priority, then shared, then error/auto-create for Inbox.
-
-**Acceptance Criteria**
-- [ ] Private project of sender matched first
-- [ ] Falls back to shared if no private match
-- [ ] Returns error when neither exists (except Inbox which is auto-created)
-- [ ] Returns project row with id, name, visibility, owner_user_id
-
-**Tests**
-- `tests/test_project_resolver.py::test_private_takes_priority`
-- `tests/test_project_resolver.py::test_falls_back_to_shared`
-- `tests/test_project_resolver.py::test_inbox_auto_created`
-- `tests/test_project_resolver.py::test_unknown_project_error`
-
-**Rollback**
-Revert module.
-
-**Observability**
-`logger.debug("Resolved project '%s' -> id=%d vis=%s", name, id, visibility)`
-
-**Dependencies**
-#4
+#### Dependencies / Blockers
+- 없음
 
 ---
 
-## Issue #8: /todo list command
+### ISSUE-031: help 커맨드 및 빈 todo: 입력 시 상세 도움말 출력
+- Track: product
+- PRD-Ref: UX 명세 7.2
+- Priority: P1
+- Estimate: 0.5d
+- Status: backlog
+- Owner: --
+- Branch: `issue/ISSUE-031-help-command`
+- GH-Issue: --
+- PR: --
 
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | Backend                                |
-| Milestone   | M3                                     |
-| Status      | TODO                                   |
-| Priority    | P1                                     |
-| Estimate    | 1d                                     |
-| Branch      | `feature/008-cmd-list`                 |
-| GH-Issue    | --                                     |
-| PR          | --                                     |
+#### Goal
+`todo:` 빈 입력 또는 `todo: help` 입력 시 UX 명세에 정의된 커맨드별 상세 도움말을 반환한다.
 
-**Description**
-Implement the `list` subcommand. Supports scope (mine/all/<@USER>), project filter, section filter, status filter (open/done/drop), and limit. Sorting: due ASC (NULLs last), then id DESC. Excludes other users' private projects.
+#### Scope
+- In:
+  - `src/openclaw_todo/dispatcher.py` -- `USAGE` 문자열을 상세 도움말로 교체
+  - `src/openclaw_todo/dispatcher.py` -- `help`를 유효 커맨드로 추가
+- Out:
+  - 커맨드 실행 로직 변경 없음
 
-**Acceptance Criteria**
-- [ ] Default scope=mine, status=open, limit=30
-- [ ] `mine` filters to tasks where sender is an assignee
-- [ ] `all` includes shared + sender's private (excludes others' private)
-- [ ] `/p` and `/s` filters applied correctly
-- [ ] Sorting: due NOT NULL first, due ASC, id DESC
-- [ ] limit:N respected
-- [ ] Output lists tasks in formatted lines
+#### Acceptance Criteria (DoD)
+- [ ] `todo:` (빈 입력) 시 UX 명세 7.2의 상세 도움말 반환
+- [ ] `todo: help` 입력 시 동일 도움말 반환
+- [ ] `help`가 "Unknown command"로 처리되지 않음
+- [ ] 도움말에 모든 커맨드(add, list, board, move, done, drop, edit, project) 포함
 
-**Tests**
-- `tests/test_cmd_list.py::test_list_mine_default`
-- `tests/test_cmd_list.py::test_list_all_excludes_others_private`
-- `tests/test_cmd_list.py::test_list_with_project_filter`
-- `tests/test_cmd_list.py::test_list_sorting_order`
-- `tests/test_cmd_list.py::test_list_limit`
+#### Tests
+- [ ] Unit: `tests/test_plugin.py` -- `handle_message("todo:", ...)` 응답에 `add`, `list`, `board` 포함
+- [ ] Unit: `tests/test_dispatcher.py` -- `dispatch("help", ...)` 응답 검증
+- Test Command: `uv run pytest tests/test_plugin.py tests/test_dispatcher.py -q`
 
-**Rollback**
-Revert handler; read-only operation.
+#### Observability (Minimal)
+- [ ] Logs: N/A (단순 문자열 반환)
 
-**Observability**
-`logger.info("list: scope=%s project=%s returned %d rows", scope, project, count)`
+#### Rollback
+- 기존 한 줄짜리 USAGE 문자열로 원복
 
-**Dependencies**
-#6, #7
-
----
-
-## Issue #9: /todo board command
-
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | Backend                                |
-| Milestone   | M3                                     |
-| Status      | done                                   |
-| Priority    | P1                                     |
-| Estimate    | 1d                                     |
-| Branch      | `feature/009-cmd-board`                |
-| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/30 |
-| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/31 |
-
-**Description**
-Implement the `board` subcommand. Groups tasks by section in fixed order (BACKLOG, DOING, WAITING, DONE, DROP), applies scope/project/status filters, and limits per section. Format: section headers with task lines underneath.
-
-**Acceptance Criteria**
-- [ ] Sections displayed in order: BACKLOG -> DOING -> WAITING -> DONE -> DROP
-- [ ] Empty sections shown with "(empty)" or omitted (decide and document)
-- [ ] `limitPerSection:N` caps items per section (default 10)
-- [ ] Scope/project filters identical to `list`
-- [ ] Each task line: `#id due:<date|-> assignees:<@U..> title`
-
-**Tests**
-- `tests/test_cmd_board.py::test_board_section_order`
-- `tests/test_cmd_board.py::test_board_limit_per_section`
-- `tests/test_cmd_board.py::test_board_scope_filter`
-
-**Rollback**
-Revert handler; read-only operation.
-
-**Observability**
-`logger.info("board: scope=%s project=%s sections=%s", ...)`
-
-**Dependencies**
-#8
+#### Dependencies / Blockers
+- 없음
 
 ---
 
-## Issue #10: /todo move command
+### ISSUE-032: UX 명세에 맞는 응답 메시지 포맷 통일
+- Track: product
+- PRD-Ref: UX 명세 4.1~4.3, PRD#5.1~5.7
+- Priority: P0
+- Estimate: 1.5d
+- Status: backlog
+- Owner: --
+- Branch: `issue/ISSUE-032-ux-response-format`
+- GH-Issue: --
+- PR: --
 
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | Backend                                |
-| Milestone   | M3                                     |
-| Status      | done                                   |
-| Priority    | P1                                     |
-| Estimate    | 0.5d                                   |
-| Branch      | `feature/010-cmd-move`                 |
-| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/23 |
-| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/24 |
+#### Goal
+모든 커맨드 핸들러의 응답 메시지를 UX 명세(ux_spec.md) 4.1~4.3에 정의된 포맷으로 통일한다.
 
-**Description**
-Implement the `move` subcommand. Validates section enum, checks permissions (private: owner only; shared: assignee or created_by), updates task section and updated_at, logs event.
+#### Scope
+- In:
+  - `src/openclaw_todo/cmd_add.py` -- 응답 포맷 수정
+  - `src/openclaw_todo/cmd_done_drop.py` -- project/title 정보 포함, 포맷 수정
+  - `src/openclaw_todo/cmd_move.py` -- title 포함, 포맷 수정
+  - `src/openclaw_todo/cmd_edit.py` -- 전체 태스크 상태 표시
+  - `src/openclaw_todo/cmd_list.py` -- 헤더/footer 포맷 수정
+  - `src/openclaw_todo/cmd_board.py` -- 헤더 포맷 수정
+- Out:
+  - 에러 메시지는 ISSUE-035에서 별도 처리
 
-**Acceptance Criteria**
-- [ ] Section validated against enum; invalid returns error
-- [ ] Private project: only owner can move
-- [ ] Shared project: only assignee or created_by can move
-- [ ] `updated_at` set on change
-- [ ] Event logged
-- [ ] Response confirms new section
+#### Acceptance Criteria (DoD)
+- [ ] `add` 응답: `"Added #N (project/section) due:X assignees:Y -- title"` 포맷 (PRD 5.1)
+- [ ] `done` 응답: `"Done #N (project) -- title"` 포맷 (UX 4.3)
+- [ ] `drop` 응답: `"Dropped #N (project) -- title"` 포맷 (UX 4.3)
+- [ ] `move` 응답: `"Moved #N to section (project) -- title"` 포맷 (UX 4.3)
+- [ ] `edit` 응답: `"Edited #N (project/section) due:X assignees:Y -- title"` 포맷 (UX 4.3)
+- [ ] `list` 헤더: `"TODO List (scope / status) [/p project] -- N tasks"` 포맷 (UX 6.2)
+- [ ] `list` footer: `"Showing N of M. Use limit:N to see more."` limit 초과 시 (UX 6.2)
+- [ ] `board` 헤더: `"Board (scope / status) [/p project]"` 포맷 (UX 5.2)
 
-**Tests**
-- `tests/test_cmd_move.py::test_move_valid_section`
-- `tests/test_cmd_move.py::test_move_invalid_section`
-- `tests/test_cmd_move.py::test_move_private_owner_only`
-- `tests/test_cmd_move.py::test_move_shared_permission`
+#### Implementation Notes
+- 현재 `cmd_done_drop.py`의 `_close_task()`는 title/project를 DB에서 조회하지 않음 -- 추가 SELECT 필요
+- 현재 `cmd_move.py`는 title을 응답에 포함하지 않음 -- 기존 SELECT에서 title 가져오기
+- `cmd_list.py`는 total count를 위해 COUNT 쿼리 또는 limit+1 페치 필요
+- 기존 테스트의 assertion 문자열도 함께 업데이트 필요
 
-**Rollback**
-Revert handler.
+#### Tests
+- [ ] Unit: 기존 `tests/test_cmd_*.py`의 응답 assertion을 새 포맷에 맞게 업데이트
+- [ ] Integration: `tests/test_e2e.py`의 assertion 업데이트
+- Test Command: `uv run pytest -q`
 
-**Observability**
-`logger.info("Task #%d moved to %s by %s", id, section, sender)`
+#### Observability (Minimal)
+- [ ] Logs: 변경 없음 (표현 계층만 수정)
 
-**Dependencies**
-#6, #7
+#### Rollback
+- git revert로 이전 메시지 포맷 원복
 
----
-
-## Issue #11: /todo done and /todo drop commands
-
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | Backend                                |
-| Milestone   | M3                                     |
-| Status      | done                                   |
-| Priority    | P1                                     |
-| Estimate    | 0.5d                                   |
-| Branch      | `feature/011-cmd-done-drop`            |
-| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/26 |
-| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/27 |
-
-**Description**
-Implement `done` and `drop` subcommands. Both set section and status accordingly, record `closed_at`, validate permissions same as `move`, and log event.
-
-**Acceptance Criteria**
-- [ ] `done`: section='done', status='done', closed_at=now
-- [ ] `drop`: section='drop', status='dropped', closed_at=now
-- [ ] Permissions enforced (same as move)
-- [ ] Already-closed task returns informational message (idempotent or error -- decide)
-- [ ] Event logged for each
-
-**Tests**
-- `tests/test_cmd_done_drop.py::test_done_sets_fields`
-- `tests/test_cmd_done_drop.py::test_drop_sets_fields`
-- `tests/test_cmd_done_drop.py::test_permission_check`
-- `tests/test_cmd_done_drop.py::test_already_done`
-
-**Rollback**
-Revert handler.
-
-**Observability**
-`logger.info("Task #%d %s by %s", id, action, sender)`
-
-**Dependencies**
-#10
+#### Dependencies / Blockers
+- ISSUE-035 (에러 메시지)와 병행 시 코드 충돌 가능 -- 순차 작업 권장
 
 ---
 
-## Issue #12: /todo edit command
+### ISSUE-033: add 시 존재하지 않는 프로젝트 자동 생성 (shared)
+- Track: product
+- PRD-Ref: UX 명세 7.6, PRD#5.1
+- Priority: P1
+- Estimate: 1d
+- Status: backlog
+- Owner: --
+- Branch: `issue/ISSUE-033-auto-create-project`
+- GH-Issue: --
+- PR: --
 
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | Backend                                |
-| Milestone   | M3                                     |
-| Status      | done                                   |
-| Priority    | P1                                     |
-| Estimate    | 1.5d                                   |
-| Branch      | `feature/012-cmd-edit`                 |
-| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/34 |
-| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/35 |
+#### Goal
+`todo: add ... /p NewProject`에서 존재하지 않는 프로젝트명을 지정하면 shared 프로젝트를 자동 생성하고 태스크를 추가한다.
 
-**Description**
-Implement the `edit` subcommand (v1 replace semantics). Supports changing title, assignees (full replace), project, section, and due. Validates private-project assignee constraint on both source and target project. Logs event with old/new diff in payload.
+#### Scope
+- In:
+  - `src/openclaw_todo/cmd_add.py` -- `ProjectNotFoundError` 발생 시 shared 프로젝트 자동 생성
+  - 응답에 프로젝트 자동 생성 안내 추가
+- Out:
+  - `list`, `board`, `move`, `edit` 등에서는 자동 생성하지 않음 (add 전용)
+  - `project_resolver.py` 자체는 변경하지 않음 (cmd_add에서 처리)
 
-**Acceptance Criteria**
-- [ ] Title updated only if non-option tokens present
-- [ ] Mentions present -> assignees fully replaced (DELETE + INSERT)
-- [ ] `due:-` clears due to NULL
-- [ ] `/p <newProject>` moves task to new project (project_id updated)
-- [ ] Private project assignee validation applied to target project
-- [ ] If moving to private project with non-owner assignees -> warning, no change
-- [ ] Event payload contains changed fields
-- [ ] Permissions: private owner only; shared assignee/created_by
+#### Acceptance Criteria (DoD)
+- [ ] `todo: add task /p NewProject` 시 `NewProject` shared 프로젝트 자동 생성
+- [ ] 응답에 프로젝트 자동 생성 안내 포함 (`Project "NewProject" was created (shared).`)
+- [ ] 이미 존재하는 프로젝트명이면 기존 동작 유지
+- [ ] 자동 생성된 프로젝트가 shared, owner_user_id=NULL인지 확인
+- [ ] private 이름 충돌 시 private 우선 resolve 규칙 유지
 
-**Tests**
-- `tests/test_cmd_edit.py::test_edit_title`
-- `tests/test_cmd_edit.py::test_edit_assignees_replace`
-- `tests/test_cmd_edit.py::test_edit_due_clear`
-- `tests/test_cmd_edit.py::test_edit_move_project`
-- `tests/test_cmd_edit.py::test_edit_private_assignee_rejected`
-- `tests/test_cmd_edit.py::test_edit_no_change_fields`
+#### Tests
+- [ ] Unit: `tests/test_cmd_add.py` -- 미존재 프로젝트로 add 시 프로젝트 생성 + 태스크 생성
+- [ ] Unit: `tests/test_cmd_add.py` -- 자동 생성된 프로젝트의 visibility=shared 확인
+- [ ] Integration: `tests/test_e2e.py` -- 전체 흐름 테스트
+- Test Command: `uv run pytest tests/test_cmd_add.py tests/test_e2e.py -q`
 
-**Rollback**
-Revert handler.
+#### Observability (Minimal)
+- [ ] Logs: `event_logger`에 `project.auto_create` 이벤트 기록
 
-**Observability**
-`logger.info("Task #%d edited by %s: fields=%s", id, sender, changed_fields)`
+#### Rollback
+- `cmd_add.py`에서 자동 생성 로직 제거, 기존 에러 반환으로 원복
 
-**Dependencies**
-#6, #7, #10
-
----
-
-## Issue #13: /todo project list command
-
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | Backend                                |
-| Milestone   | M4                                     |
-| Status      | done                                   |
-| Priority    | P1                                     |
-| Estimate    | 0.5d                                   |
-| Branch      | `feature/013-cmd-project-list`         |
-| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/28 |
-| PR          | Merged via PR #27 (bundled with Issue #11) |
-
-**Description**
-Implement `/todo project list`. Returns all shared projects and the sender's private projects. Format: grouped by visibility with name and task count.
-
-**Acceptance Criteria**
-- [ ] Shared projects listed regardless of sender
-- [ ] Sender's private projects listed
-- [ ] Other users' private projects NOT shown
-- [ ] Each project shows name, visibility, task count
-
-**Tests**
-- `tests/test_cmd_project.py::test_project_list_shows_shared`
-- `tests/test_cmd_project.py::test_project_list_shows_own_private`
-- `tests/test_cmd_project.py::test_project_list_hides_others_private`
-
-**Rollback**
-Revert handler; read-only.
-
-**Observability**
-`logger.info("project list: %d shared, %d private for %s", ...)`
-
-**Dependencies**
-#7
+#### Dependencies / Blockers
+- 없음
 
 ---
 
-## Issue #14: /todo project set-private command with assignee validation
+### ISSUE-034: move 커맨드에서 /s 없이 section 직접 지정 지원
+- Track: product
+- PRD-Ref: PRD#5.4
+- Priority: P1
+- Estimate: 0.5d
+- Status: backlog
+- Owner: --
+- Branch: `issue/ISSUE-034-move-section-shorthand`
+- GH-Issue: --
+- PR: --
 
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | Backend                                |
-| Milestone   | M4                                     |
-| Status      | done                                   |
-| Priority    | P0                                     |
-| Estimate    | 1.5d                                   |
-| Branch      | `feature/014-cmd-project-set-private`  |
-| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/32 |
-| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/33 |
+#### Goal
+PRD 5.4 문법 `todo: move <id> <section>`을 지원한다. 현재는 `todo: move 50 /s doing`만 동작하고 `todo: move 50 doing`은 동작하지 않는다.
 
-**Description**
-Implement `/todo project set-private <name>` with the assignee validation described in PRD 3.4. Resolution flow: if sender already has private with that name -> noop; if shared exists -> attempt conversion; if neither -> create new private. Conversion scans all tasks in the project and rejects if any task has a non-owner assignee.
+#### Scope
+- In:
+  - `src/openclaw_todo/cmd_move.py` -- title_tokens에서 유효한 section enum 값 추출
+- Out:
+  - parser.py 변경 없음
 
-**Acceptance Criteria**
-- [ ] Already-private for sender: returns "already private" message
-- [ ] Shared -> private: scans tasks; all assignees are owner -> success (visibility='private', owner_user_id=sender)
-- [ ] Shared -> private: at least one non-owner assignee -> error with task IDs and violating assignee list (max 10)
-- [ ] Neither exists: creates new private project with owner=sender
-- [ ] Error message format matches PRD example
-- [ ] Event logged
+#### Acceptance Criteria (DoD)
+- [ ] `todo: move 50 doing` 정상 동작 (section=doing으로 이동)
+- [ ] `todo: move 50 /s doing` 기존 방식도 유지
+- [ ] 무효한 section 입력 시 에러 메시지 반환
+- [ ] section 없이 `todo: move 50` 입력 시 적절한 에러
 
-**Tests**
-- `tests/test_cmd_project.py::test_set_private_already_private`
-- `tests/test_cmd_project.py::test_set_private_shared_success`
-- `tests/test_cmd_project.py::test_set_private_shared_rejected_non_owner_assignee`
-- `tests/test_cmd_project.py::test_set_private_creates_new`
-- `tests/test_cmd_project.py::test_set_private_error_message_format`
+#### Implementation Notes
+- `cmd_move.py`에서 `parsed.section`이 None일 때 `parsed.title_tokens`에서 유효한 section 검색
+- VALID_SECTIONS = `{backlog, doing, waiting, done, drop}`과 매칭
 
-**Rollback**
-Revert handler; no schema change.
+#### Tests
+- [ ] Unit: `tests/test_cmd_move.py` -- `/s` 없이 section 직접 지정 테스트
+- [ ] Unit: `tests/test_cmd_move.py` -- 잘못된 section 입력 테스트
+- Test Command: `uv run pytest tests/test_cmd_move.py -q`
 
-**Observability**
-`logger.info("project set-private: %s result=%s by %s", name, result, sender)`
+#### Observability (Minimal)
+- [ ] Logs: 기존 로그에 target_section 이미 포함
 
-**Dependencies**
-#7, #13
+#### Rollback
+- title_tokens 파싱 로직 제거, `/s` 전용으로 원복
 
----
-
-## Issue #15: /todo project set-shared command
-
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | Backend                                |
-| Milestone   | M4                                     |
-| Status      | done                                   |
-| Priority    | P1                                     |
-| Estimate    | 0.5d                                   |
-| Branch      | `feature/015-cmd-project-set-shared`   |
-| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/36 |
-| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/37 |
-
-**Description**
-Implement `/todo project set-shared <name>`. Creates a shared project if none exists. If a shared project with that name already exists, noop. Global uniqueness enforced by DB index.
-
-**Acceptance Criteria**
-- [ ] New shared project created when name is free
-- [ ] Existing shared project: returns "already shared" / noop
-- [ ] Name conflict with existing shared: returns exists message (index enforces)
-- [ ] Event logged
-
-**Tests**
-- `tests/test_cmd_project.py::test_set_shared_creates_new`
-- `tests/test_cmd_project.py::test_set_shared_already_exists_noop`
-- `tests/test_cmd_project.py::test_set_shared_name_conflict`
-
-**Rollback**
-Revert handler.
-
-**Observability**
-`logger.info("project set-shared: %s result=%s", name, result)`
-
-**Dependencies**
-#7, #13
+#### Dependencies / Blockers
+- 없음
 
 ---
 
-## Issue #16: Command dispatcher and routing
+### ISSUE-035: 에러 메시지 UX 명세 정합
+- Track: product
+- PRD-Ref: UX 명세 3.1~3.5
+- Priority: P1
+- Estimate: 1d
+- Status: backlog
+- Owner: --
+- Branch: `issue/ISSUE-035-error-message-alignment`
+- GH-Issue: --
+- PR: --
 
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | Backend                                |
-| Milestone   | M3                                     |
-| Status      | TODO                                   |
-| Priority    | P0                                     |
-| Estimate    | 0.5d                                   |
-| Branch      | `feature/016-dispatcher`               |
-| GH-Issue    | --                                     |
-| PR          | --                                     |
+#### Goal
+UX 명세 3.1~3.5에 정의된 에러 메시지 패턴과 현재 코드의 에러 메시지를 일치시킨다.
 
-**Description**
-Implement the dispatcher in `plugin.py` that maps the parsed command name to handler functions: `add`, `list`, `board`, `move`, `done`, `drop`, `edit`, `project`. The `project` command further dispatches to `list`, `set-private`, `set-shared`. Unknown commands return a help/error message.
+#### Scope
+- In:
+  - 모든 커맨드 핸들러의 에러 응답 문자열 수정
+  - `src/openclaw_todo/dispatcher.py` -- unknown command 메시지
+  - `src/openclaw_todo/parser.py` -- parse error 메시지
+  - `src/openclaw_todo/cmd_*.py` -- 각 핸들러 에러 메시지
+- Out:
+  - 성공 메시지 포맷은 ISSUE-032에서 처리
 
-**Acceptance Criteria**
-- [ ] All valid command names routed to correct handler
-- [ ] `project` subcommands routed correctly
-- [ ] Unknown command returns usage hint
-- [ ] DB connection initialised (migration check) before first command execution
+#### Acceptance Criteria (DoD)
+- [ ] unknown command: `"Unknown command. Available: add, list, board, move, done, drop, edit, project"`
+- [ ] title 누락: `"Title is required. Usage: todo: add <title> [options]"`
+- [ ] task ID 누락: `"Task ID is required. Usage: todo: <command> <id>"`
+- [ ] invalid task ID: `"Invalid task ID \"<input>\". Must be a number."`
+- [ ] task not found: `"Task #<id> not found."`
+- [ ] invalid section: `"Invalid section \"<input>\". Must be one of: backlog, doing, waiting, done, drop"`
+- [ ] permission denied: `"You don't have permission to modify task #<id>."`
+- [ ] private assignee 거부: UX 명세 3.4 한국어 메시지 준수
+- [ ] set-private 검증 실패: UX 명세 3.3 포맷 준수
 
-**Tests**
-- `tests/test_dispatcher.py::test_routes_known_commands`
-- `tests/test_dispatcher.py::test_project_sub_routing`
-- `tests/test_dispatcher.py::test_unknown_command_help`
+#### Tests
+- [ ] Unit: 기존 에러 케이스 테스트의 assertion 문자열 업데이트
+- [ ] Unit: 에러 메시지 패턴별 단위 테스트 추가
+- Test Command: `uv run pytest -q`
 
-**Rollback**
-Revert module.
+#### Observability (Minimal)
+- [ ] Logs: 변경 없음
 
-**Observability**
-`logger.info("Dispatching command=%s sub=%s", command, sub)`
+#### Rollback
+- git revert
 
-**Dependencies**
-#5
-
----
-
-## Issue #17: Permission helper module
-
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | Backend                                |
-| Milestone   | M3                                     |
-| Status      | done                                   |
-| Priority    | P0                                     |
-| Estimate    | 0.5d                                   |
-| Branch      | `feature/017-permissions`              |
-| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/21 |
-| PR          | (merged directly on main)              |
-
-**Description**
-Extract shared permission-checking logic into `src/openclaw_todo/permissions.py`. Provides `can_write_task(conn, task_id, sender_id) -> bool` and `validate_private_assignees(project, assignees, owner_id) -> Optional[str]` (returns warning message or None).
-
-**Acceptance Criteria**
-- [ ] Private project: only owner can write
-- [ ] Shared project: only assignee or created_by can write
-- [ ] `validate_private_assignees` returns warning string when non-owner assignees present for private project
-- [ ] Returns None for shared projects or when all assignees are owner
-
-**Tests**
-- `tests/test_permissions.py::test_private_owner_can_write`
-- `tests/test_permissions.py::test_private_non_owner_rejected`
-- `tests/test_permissions.py::test_shared_assignee_can_write`
-- `tests/test_permissions.py::test_shared_creator_can_write`
-- `tests/test_permissions.py::test_validate_private_assignees_warning`
-
-**Rollback**
-Revert module.
-
-**Observability**
-`logger.debug("Permission check: task=%d sender=%s result=%s", ...)`
-
-**Dependencies**
-#4
+#### Dependencies / Blockers
+- ISSUE-032와 병행 시 충돌 주의 -- 순차 작업 권장 (ISSUE-032 이후)
 
 ---
 
-## Issue #18: Parser unit tests (comprehensive)
+### ISSUE-036: set-private 에러 메시지에 Slack 멘션 포맷 적용
+- Track: product
+- PRD-Ref: PRD#3.4, UX 명세 3.3
+- Priority: P2
+- Estimate: 0.5d
+- Status: backlog
+- Owner: --
+- Branch: `issue/ISSUE-036-set-private-mention-format`
+- GH-Issue: --
+- PR: --
 
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | QA                                     |
-| Milestone   | M5                                     |
-| Status      | done                                   |
-| Priority    | P1                                     |
-| Estimate    | 1d                                     |
-| Branch      | `feature/018-parser-tests`             |
-| GH-Issue    | issues/39                              |
-| PR          | pull/40                                |
+#### Goal
+`cmd_project_set_private.py`의 에러 메시지에서 assignee를 `<@UXXXX>` Slack 멘션 포맷으로 표시하고, task별 assignee를 그룹화하여 PRD 3.4 에러 예시와 일치시킨다.
 
-**Description**
-Expand parser test coverage to include edge cases: multiple options in varied order, due at year boundary, empty title, mentions mixed with options, unicode in titles, extra whitespace handling.
+#### Scope
+- In:
+  - `src/openclaw_todo/cmd_project_set_private.py` -- `_convert_shared_to_private()` 에러 메시지 수정
+- Out:
+  - 성공 메시지는 변경 없음
 
-**Acceptance Criteria**
-- [ ] >=95% line coverage on `parser.py`
-- [ ] Edge cases documented in test docstrings
-- [ ] All tests pass with `uv run pytest tests/test_parser.py -v`
+#### Acceptance Criteria (DoD)
+- [ ] 에러 메시지에 assignee가 `<@UXXXX>` 포맷으로 표시
+- [ ] task별 assignee 그룹화: `#12 assignees:<@U2>, #18 assignees:<@U3>`
+- [ ] 최대 10개 task 표시 유지
+- [ ] 10개 초과 시 `... and N more tasks` 접미사
 
-**Tests**
-- `tests/test_parser.py::test_options_in_any_order`
-- `tests/test_parser.py::test_due_year_boundary`
-- `tests/test_parser.py::test_empty_title_no_crash`
-- `tests/test_parser.py::test_unicode_title`
-- `tests/test_parser.py::test_extra_whitespace`
-- `tests/test_parser.py::test_mixed_mentions_and_options`
+#### Tests
+- [ ] Unit: `tests/test_cmd_project_set_private.py` -- 에러 메시지에 `<@` 포맷 포함 확인
+- Test Command: `uv run pytest tests/test_cmd_project_set_private.py -q`
 
-**Rollback**
-Revert test file; no production code change.
+#### Observability (Minimal)
+- [ ] Logs: 기존 로그에 violation 수 포함
 
-**Observability**
-CI coverage report.
+#### Rollback
+- 포맷 변경 원복
 
-**Dependencies**
-#5
-
----
-
-## Issue #19: SQLite end-to-end integration tests
-
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | QA                                     |
-| Milestone   | M5                                     |
-| Status      | done                                   |
-| Priority    | P1                                     |
-| Estimate    | 1.5d                                   |
-| Branch      | `feature/019-e2e-tests`               |
-| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/38 |
-| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/41 |
-
-**Description**
-Write integration tests that exercise the full flow through `handle_message` with a real (tmp_path) SQLite database. Cover the main user stories: add a task, list it, move it, mark done, edit it, manage projects, and validate private project constraints.
-
-**Acceptance Criteria**
-- [ ] Each test uses a fresh DB via `tmp_path` fixture
-- [ ] Scenarios: add->list, add->move->board, add->done, add->edit, project set-private rejection
-- [ ] Private project visibility enforced end-to-end
-- [ ] Due normalisation verified in DB
-- [ ] All tests pass with `uv run pytest tests/test_e2e.py -v`
-
-**Tests**
-- `tests/test_e2e.py::test_add_and_list_roundtrip`
-- `tests/test_e2e.py::test_add_move_board`
-- `tests/test_e2e.py::test_done_and_drop`
-- `tests/test_e2e.py::test_edit_title_and_assignees`
-- `tests/test_e2e.py::test_private_project_isolation`
-- `tests/test_e2e.py::test_set_private_rejects_foreign_assignees`
-- `tests/test_e2e.py::test_due_normalisation_stored_correctly`
-
-**Rollback**
-Revert test file.
-
-**Observability**
-CI test results and coverage delta.
-
-**Dependencies**
-#6, #8, #9, #10, #11, #12, #14, #15
+#### Dependencies / Blockers
+- ISSUE-035 이후 권장 (에러 메시지 통일 후 세부 포맷 조정)
 
 ---
 
-## Issue #20: Packaging and distribution setup
+### ISSUE-037: parser 단위 테스트 보강 -- 엣지 케이스
+- Track: platform
+- PRD-Ref: UX 명세 7.7~7.9
+- Priority: P1
+- Estimate: 1d
+- Status: backlog
+- Owner: --
+- Branch: `issue/ISSUE-037-parser-test-edge-cases`
+- GH-Issue: --
+- PR: --
 
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | DevOps                                 |
-| Milestone   | M6                                     |
-| Status      | done                                   |
-| Priority    | P2                                     |
-| Estimate    | 1d                                     |
-| Branch      | `feature/020-packaging`               |
-| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/42 |
-| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/43 |
+#### Goal
+UX 명세 7.7~7.9에 정의된 엣지 케이스에 대한 parser 테스트를 보강한다.
 
-**Description**
-Finalise `pyproject.toml` metadata (name, version, description, license, entry-points), add a `Makefile` with targets for lint/test/build, and document installation instructions in README. Ensure the plugin can be installed as a package and discovered by the OpenClaw gateway.
+#### Scope
+- In:
+  - `tests/test_parser.py` -- 엣지 케이스 테스트 추가
+- Out:
+  - parser.py 자체 수정은 테스트 실패 시에만 (버그 발견 시)
 
-**Acceptance Criteria**
-- [ ] `pyproject.toml` has complete metadata and entry-point for OpenClaw plugin discovery
-- [ ] `make lint` runs ruff + black --check
-- [ ] `make test` runs pytest with coverage
-- [ ] `make build` produces a wheel via `uv build`
-- [ ] `pip install <wheel>` in a clean venv makes the plugin importable
-- [ ] README documents installation and configuration (DB path env var)
+#### Acceptance Criteria (DoD)
+- [ ] 대소문자 처리: `parse("ADD task")` -> command="add"
+- [ ] section 대소문자: `parse("add /s DOING task")` -> section="doing"
+- [ ] 무효 날짜: `due:02-29` (비윤년), `due:00-01`, `due:12-32` -> ParseError
+- [ ] 연속 공백 제목 테스트
+- [ ] due 클리어: `due:-` -> DUE_CLEAR
+- [ ] 빈 title: `parse("add")` -> title_tokens=[]
 
-**Tests**
-- Manual: install wheel in fresh venv, import module, call `handle_message`
-- `make test` passes in CI
+#### Tests
+- [ ] Unit: `tests/test_parser.py`에 위 케이스 추가
+- Test Command: `uv run pytest tests/test_parser.py -q`
 
-**Rollback**
-Revert packaging changes.
+#### Observability (Minimal)
+- [ ] Logs: N/A
 
-**Observability**
-Build artifact size logged; CI publishes wheel as artifact.
+#### Rollback
+- 테스트 코드 제거 (프로덕션 코드 무영향)
 
-**Dependencies**
-#19
+#### Dependencies / Blockers
+- ISSUE-030 이후 권장 (status 필터 토큰이 추가되면 관련 테스트도 포함)
 
 ---
 
-## Dependency Graph (summary)
+### ISSUE-038: E2E 테스트 보강 -- scope 필터 및 다중 사용자 시나리오
+- Track: platform
+- PRD-Ref: PRD#5.2 scope, PRD#3.2 이름 충돌
+- Priority: P1
+- Estimate: 1d
+- Status: backlog
+- Owner: --
+- Branch: `issue/ISSUE-038-e2e-scope-multiuser`
+- GH-Issue: --
+- PR: --
+
+#### Goal
+E2E 테스트에 scope 필터 및 다중 사용자 시나리오를 추가하여 커버리지를 높인다.
+
+#### Scope
+- In:
+  - `tests/test_e2e.py` -- 새 시나리오 클래스 추가
+- Out:
+  - 프로덕션 코드 변경 없음 (테스트만)
+
+#### Acceptance Criteria (DoD)
+- [ ] `list <@U002>` 특정 유저 scope 테스트 통과
+- [ ] 다중 사용자 shared 프로젝트 작업 테스트 통과
+- [ ] assignee 기반 권한 (U002가 할당받은 task를 수정) 테스트 통과
+- [ ] private/shared 이름 충돌 resolve (private 우선) 테스트 통과
+
+#### Tests
+- [ ] Integration: `tests/test_e2e.py`에 새 시나리오 클래스 추가
+- Test Command: `uv run pytest tests/test_e2e.py -q`
+
+#### Observability (Minimal)
+- [ ] Logs: N/A
+
+#### Rollback
+- 테스트 코드 제거
+
+#### Dependencies / Blockers
+- ISSUE-030, ISSUE-032, ISSUE-033, ISSUE-034 이후 권장 (기능 변경 반영 후 테스트)
+
+---
+
+### ISSUE-039: server.py HTTP endpoint 테스트 보강
+- Track: platform
+- PRD-Ref: N/A (품질 향상)
+- Priority: P2
+- Estimate: 0.5d
+- Status: backlog
+- Owner: --
+- Branch: `issue/ISSUE-039-server-test-coverage`
+- GH-Issue: --
+- PR: --
+
+#### Goal
+`test_server.py`의 커버리지를 확인하고 누락된 시나리오를 추가한다.
+
+#### Scope
+- In:
+  - `tests/test_server.py` -- 테스트 보강
+- Out:
+  - server.py 코드 변경 없음
+
+#### Acceptance Criteria (DoD)
+- [ ] `GET /health` 200 응답 테스트
+- [ ] `POST /message` 정상 요청 테스트
+- [ ] `POST /message` 누락 필드 (422) 테스트
+- [ ] `POST /message` 잘못된 JSON (400) 테스트
+- [ ] `POST /message` body 초과 (413) 테스트
+- [ ] 알 수 없는 경로 (404) 테스트
+
+#### Tests
+- [ ] Unit: `tests/test_server.py` 보강
+- Test Command: `uv run pytest tests/test_server.py -q`
+
+#### Observability (Minimal)
+- [ ] Logs: N/A
+
+#### Rollback
+- 테스트 코드 제거
+
+#### Dependencies / Blockers
+- 없음 (독립 작업)
+
+---
+
+### ISSUE-027 (재개): ruff/black target-version 정합성 수정
+- Track: platform
+- PRD-Ref: PR #49 review follow-up
+- Priority: P2
+- Estimate: 0.5d
+- Status: backlog
+- Owner: --
+- Branch: `issue/ISSUE-027-lint-target-version`
+- GH-Issue: --
+- PR: --
+
+#### Goal
+`pyproject.toml`의 `requires-python >= 3.10`과 ruff/black target-version을 `py310`으로 통일한다.
+
+#### Acceptance Criteria (DoD)
+- [ ] `tool.ruff.target-version` = `"py310"`
+- [ ] `tool.black.target-version` = `["py310"]`
+- [ ] `uv run ruff check .` 통과
+- [ ] `uv run black --check .` 통과
+
+#### Tests
+- [ ] Smoke: CI에서 ruff/black 체크 통과 확인
+- Test Command: `uv run ruff check . && uv run black --check .`
+
+#### Observability (Minimal)
+- [ ] Logs: N/A
+
+#### Rollback
+- `py311`로 원복
+
+#### Dependencies / Blockers
+- 없음
+
+---
+
+### ISSUE-028 (재개): Bridge serverUrl config 연동
+- Track: platform
+- PRD-Ref: PR #49 review follow-up
+- Priority: P2
+- Estimate: 0.5d
+- Status: backlog
+- Owner: --
+- Branch: `issue/ISSUE-028-bridge-config`
+- GH-Issue: --
+- PR: --
+
+#### Goal
+`bridge/openclaw-todo/index.ts`에서 plugin config의 `serverUrl`을 참조하거나, env var 우선 정책을 문서화한다.
+
+#### Acceptance Criteria (DoD)
+- [ ] `index.ts`에서 plugin config의 `serverUrl`을 우선 사용, env var 폴백
+- [ ] config/env var 모두 없으면 `http://127.0.0.1:8200` 기본값
+- [ ] 사용 중인 URL 출처를 로그에 출력
+
+#### Tests
+- [ ] Smoke: TypeScript 빌드 성공 확인 (`npm run build`)
+- Test Command: `cd bridge/openclaw-todo && npm run build`
+
+#### Observability (Minimal)
+- [ ] Logs: 서버 URL 출처(config vs env) 로그 출력
+
+#### Rollback
+- 기존 env var 전용 로직으로 원복
+
+#### Dependencies / Blockers
+- 없음
+
+---
+
+### ISSUE-040: bridge TypeScript 빌드 및 npm 패키지 구성
+- Track: platform
+- PRD-Ref: PRD#10 M6
+- Priority: P1
+- Estimate: 1d
+- Status: backlog
+- Owner: --
+- Branch: `issue/ISSUE-040-bridge-npm-package`
+- GH-Issue: --
+- PR: --
+
+#### Goal
+bridge 디렉토리의 TypeScript 코드를 빌드 가능한 npm 패키지로 구성한다.
+
+#### Scope
+- In:
+  - `bridge/openclaw-todo/package.json` -- `files` 필드 추가
+  - `bridge/openclaw-todo/tsconfig.json` -- 빌드 설정 확인
+  - `.npmignore` 또는 `files` 필드로 배포 대상 명시
+- Out:
+  - 실제 npm publish (별도 릴리스 프로세스)
+
+#### Acceptance Criteria (DoD)
+- [ ] `cd bridge/openclaw-todo && npm install && npm run build` 성공
+- [ ] `dist/index.js` 생성 확인
+- [ ] `package.json`에 `files` 필드로 배포 대상 명시
+- [ ] 소스/설정 파일이 배포 대상에서 제외
+
+#### Tests
+- [ ] Smoke: CI에서 TypeScript 빌드 성공 확인
+- Test Command: `cd bridge/openclaw-todo && npm install && npm run build`
+
+#### Observability (Minimal)
+- [ ] Logs: 빌드 아티팩트 크기 확인
+
+#### Rollback
+- package.json 변경 원복
+
+#### Dependencies / Blockers
+- ISSUE-029, ISSUE-028 이후 권장
+
+---
+
+## 이슈 의존성 그래프
 
 ```
-#1  Plugin skeleton
- |
- +--#2  DB connection
- |   |
- |   +--#3  Migration framework
- |       |
- |       +--#4  V1 schema
- |           |
- |           +--#7  Project resolver
- |           |   |
- |           |   +--#13 project list
- |           |   +--#14 project set-private
- |           |   +--#15 project set-shared
- |           |
- |           +--#17 Permissions helper
- |
- +--#5  Parser
- |   |
- |   +--#18 Parser tests (M5)
- |
- +--#16 Dispatcher
-     |
-     +--#6  cmd add       (#4,#5,#7,#17)
-     +--#8  cmd list      (#6,#7)
-     +--#9  cmd board     (#8)
-     +--#10 cmd move      (#6,#7,#17)
-     +--#11 cmd done/drop (#10)
-     +--#12 cmd edit      (#6,#7,#10,#17)
+Phase 1 (핵심 기능 정합 -- P0/P1):
+  #029 (manifest)       -- 독립
+  #030 (status filter)  -- 독립
+  #032 (response format)-- 독립, #035와 순차
+  #033 (auto-create)    -- 독립
+  #034 (move shorthand) -- 독립
 
-#19 E2E tests    (all commands)
-#20 Packaging    (#19)
-#21 CI workflow   (standalone)
+Phase 2 (UX 정합 -- P1):
+  #031 (help command)   -- 독립
+  #035 (error messages) -- #032 이후
+  #036 (mention format) -- #035 이후
+
+Phase 3 (테스트 보강 -- P1/P2):
+  #037 (parser tests)   -- #030 이후
+  #038 (e2e tests)      -- #030, #032, #033, #034 이후
+  #039 (server tests)   -- 독립
+
+Phase 4 (패키징/정리 -- P2):
+  #027 (lint version)   -- 독립
+  #028 (bridge config)  -- 독립
+  #040 (npm build)      -- #029, #028 이후
 ```
 
----
+## 진행 현황 요약
 
-## Issue #21: GitHub Actions CI 워크플로우
-
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | DevOps                                 |
-| Milestone   | M0                                     |
-| Status      | done                                   |
-| Priority    | P0                                     |
-| Estimate    | 0.5d                                   |
-| Branch      | `feature/021-ci-workflow`              |
-| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/19 |
-| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/20 |
-
-**Description**
-PR 머지 전 자동 테스트 검증을 위한 GitHub Actions CI 파이프라인을 추가합니다. push (main) + pull_request (main) 트리거로 Python 3.11 + uv + pytest 기반 테스트를 실행합니다.
-
-**Acceptance Criteria**
-- [ ] `.github/workflows/ci.yml` 생성
-- [ ] PR 생성 시 CI가 자동 실행됨
-- [ ] `uv run pytest -q --tb=short` 통과가 머지 조건
-
-**Dependencies**
-None.
-
----
-
-## Issue #22: Plugin install E2E tests via entry-point discovery
-
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | QA                                     |
-| Milestone   | M5                                     |
-| Status      | done                                   |
-| Priority    | P1                                     |
-| Estimate    | 0.5d                                   |
-| Branch      | `feature/022-plugin-install-e2e`       |
-| GH-Issue    | https://github.com/pillip/openclaw_todo_plugin/issues/44 |
-| PR          | https://github.com/pillip/openclaw_todo_plugin/pull/45 |
-
-**Description**
-Add E2E tests that discover the plugin via `importlib.metadata.entry_points(group="openclaw.plugins")`, load the `todo` entry-point, and exercise the full command flow through the discovered function. Unlike `test_e2e.py` which imports `handle_message` directly, these tests verify that the package installation and entry-point registration work correctly.
-
-**Acceptance Criteria**
-- [ ] `openclaw.plugins` group contains `todo` entry-point after `uv sync`
-- [ ] Loaded function is callable with correct signature (text, context, db_path)
-- [ ] Full command flow works via entry-point-loaded function (add, list, move, edit, done)
-- [ ] Private project isolation verified via entry-point path
-- [ ] Multi-user shared project collaboration verified
-- [ ] Tests marked with `@pytest.mark.install` for selective execution
-
-**Tests**
-- `tests/test_plugin_install_e2e.py::TestEntryPointDiscovery::test_todo_entry_point_exists`
-- `tests/test_plugin_install_e2e.py::TestEntryPointDiscovery::test_loaded_function_is_callable`
-- `tests/test_plugin_install_e2e.py::TestEntryPointDiscovery::test_loaded_function_signature`
-- `tests/test_plugin_install_e2e.py::TestPluginViaEntryPoint::test_non_todo_returns_none`
-- `tests/test_plugin_install_e2e.py::TestPluginViaEntryPoint::test_add_and_list_roundtrip`
-- `tests/test_plugin_install_e2e.py::TestPluginViaEntryPoint::test_full_lifecycle`
-- `tests/test_plugin_install_e2e.py::TestPluginViaEntryPoint::test_private_project_isolation`
-- `tests/test_plugin_install_e2e.py::TestPluginViaEntryPoint::test_multiple_users_shared_project`
-
-**Rollback**
-Revert test file; no production code change.
-
-**Dependencies**
-#20
-
----
-
-## Issue #23: HTTP Server Bridge for OpenClaw JS Gateway
-
-| Field       | Value                                  |
-|-------------|----------------------------------------|
-| Track       | Backend / Integration                  |
-| Milestone   | M7                                     |
-| Status      | done                                   |
-| Priority    | P1                                     |
-| Estimate    | 1.5d                                   |
-| Branch      | `feature/023-http-bridge`              |
-| GH-Issue    | --                                     |
-| PR          | --                                     |
-
-**Description**
-Add an HTTP server bridge so the Python plugin can be used from JS/TS-only OpenClaw gateways. The Python side wraps `handle_message` in a stdlib `http.server` (`POST /message`, `GET /health`). A thin JS/TS bridge plugin calls it via `fetch`. Zero runtime dependencies on both sides.
-
-**Acceptance Criteria**
-- [ ] `src/openclaw_todo/server.py` — HTTP server with `/message` and `/health` endpoints
-- [ ] `src/openclaw_todo/__main__.py` — `python -m openclaw_todo` runs the server
-- [ ] `pyproject.toml` — `openclaw-todo-server` CLI entry point
-- [ ] `bridge/openclaw-todo/` — JS bridge plugin (openclaw.plugin.json, index.ts, package.json, tsconfig.json)
-- [ ] `tests/test_server.py` — health, message, error handling tests
-- [ ] Environment variables: `OPENCLAW_TODO_PORT`, `OPENCLAW_TODO_DB_PATH`, `OPENCLAW_TODO_URL`
-- [ ] 127.0.0.1 binding, graceful SIGINT/SIGTERM shutdown
-
-**Tests**
-- `tests/test_server.py::TestHealthEndpoint::test_health_ok`
-- `tests/test_server.py::TestHealthEndpoint::test_unknown_get_path_404`
-- `tests/test_server.py::TestMessageEndpoint::test_todo_add_returns_response`
-- `tests/test_server.py::TestMessageEndpoint::test_non_todo_returns_null`
-- `tests/test_server.py::TestMessageEndpoint::test_todo_usage`
-- `tests/test_server.py::TestErrorHandling::test_empty_body_400`
-- `tests/test_server.py::TestErrorHandling::test_invalid_json_400`
-- `tests/test_server.py::TestErrorHandling::test_missing_fields_422`
-- `tests/test_server.py::TestErrorHandling::test_unknown_post_path_404`
-
-**Rollback**
-Remove server.py, __main__.py, bridge/ directory; revert pyproject.toml scripts.
-
-**Dependencies**
-#1, #20
+| Milestone | 이슈 수 | Done | Backlog |
+|-----------|---------|------|---------|
+| M0 | 2 | 2 | 0 |
+| M1 | 3 | 3 | 0 |
+| M2 | 4 | 2 | 2 (#030, #031) |
+| M3 | 11 | 7 | 4 (#032, #033, #034, #035) |
+| M4 | 4 | 3 | 1 (#036) |
+| M5 | 8 | 5 | 3 (#037, #038, #039) |
+| M6 | 8 | 4 | 4 (#027, #028, #029, #040) |
+| **Total** | **40** | **26** | **14** |

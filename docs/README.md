@@ -1,6 +1,7 @@
 # OpenClaw TODO Plugin
 
 Slack DM-based team/personal TODO system — an OpenClaw plugin.
+`todo:` 접두사로 LLM 없이 직접 실행되는 결정적(deterministic) TODO 관리 도구.
 
 ## Prerequisites
 
@@ -20,16 +21,23 @@ uv sync
 
 ## Run
 
-The plugin runs within the OpenClaw Gateway. It registers a `/todo` command handler that processes messages in Slack DMs.
+### Native mode (OpenClaw Gateway)
+
+플러그인은 OpenClaw Gateway에 설치되어 `todo:` 접두사 메시지를 LLM 없이 직접 처리합니다.
+manifest의 `command_prefix: "todo:"` 및 `bypass_llm: true` 설정을 통해 Gateway가 LLM 파이프라인을 건너뛰고 플러그인 핸들러를 직접 호출합니다.
+
+### Bridge mode (HTTP 서버)
+
+JS/TS Gateway와 연동 시 HTTP bridge 서버를 사용합니다:
 
 ```bash
-# Start via OpenClaw Gateway (details TBD based on Gateway docs)
-uv run openclaw-gateway
+# Bridge 서버 시작 (port 8200)
+uv run openclaw-todo-server
 ```
 
 ### DB Location
 
-The SQLite database is automatically created at:
+SQLite 데이터베이스는 첫 커맨드 실행 시 자동 생성됩니다:
 ```
 ~/.openclaw/workspace/.todo/todo.sqlite3
 ```
@@ -43,39 +51,54 @@ uv run pytest -q
 # Run with coverage
 uv run pytest --cov=src --cov-report=term-missing
 
-# Run smoke tests only
-uv run pytest -m smoke -q
+# Run specific test file
+uv run pytest tests/test_parser.py -q
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `/todo add <title> [@user] [/p project] [/s section] [due:date]` | Create a task |
-| `/todo list [mine\|all\|@user] [/p project] [/s section]` | List tasks |
-| `/todo board [mine\|all\|@user] [/p project]` | Kanban board view |
-| `/todo move <id> <section>` | Move task to section |
-| `/todo done <id>` | Mark task done |
-| `/todo drop <id>` | Drop a task |
-| `/todo edit <id> [new title] [@user] [/p project] [/s section] [due:date]` | Edit a task |
-| `/todo project list` | List projects |
-| `/todo project set-private <name>` | Make project private |
-| `/todo project set-shared <name>` | Make project shared |
+| `todo: add <title> [@user] [/p project] [/s section] [due:date]` | Create a task |
+| `todo: list [mine\|all\|@user] [/p project] [/s section]` | List tasks |
+| `todo: board [mine\|all\|@user] [/p project]` | Kanban board view |
+| `todo: move <id> <section>` | Move task to section |
+| `todo: done <id>` | Mark task done |
+| `todo: drop <id>` | Drop a task |
+| `todo: edit <id> [new title] [@user] [/p project] [/s section] [due:date]` | Edit a task |
+| `todo: project list` | List projects |
+| `todo: project set-private <name>` | Make project private |
+| `todo: project set-shared <name>` | Make project shared |
+
+> **Note**: `/todo` 접두사는 지원하지 않습니다. Slack에서 `/`로 시작하는 메시지는 슬래시 커맨드로 오인식되므로 `todo:` 단일 접두사를 사용합니다.
 
 ## Project Structure
 
 ```
 openclaw_todo_plugin/
 ├── src/
-│   └── openclaw_todo_plugin/
-│       ├── __init__.py          # Plugin entry point
-│       ├── commands/            # Command handlers
-│       ├── db/                  # Connection + migrations
-│       ├── repositories/        # SQL data access
-│       ├── services/            # Business logic + permissions
-│       ├── parser.py            # Input tokenizer/parser
-│       ├── formatter.py         # Response formatting
-│       └── errors.py            # Custom exceptions
+│   └── openclaw_todo/
+│       ├── plugin.py              # Entry point (handle_message)
+│       ├── dispatcher.py          # Command routing + handler registry
+│       ├── parser.py              # Input tokenizer/parser
+│       ├── db.py                  # SQLite connection factory (WAL)
+│       ├── migrations.py          # Sequential migration runner
+│       ├── schema_v1.py           # V1 DDL
+│       ├── permissions.py         # can_write_task + validate_private_assignees
+│       ├── project_resolver.py    # Option A (private-first) name resolution
+│       ├── scope_builder.py       # list/board scope query builder
+│       ├── event_logger.py        # Audit event logging
+│       ├── server.py              # HTTP bridge server (port 8200)
+│       ├── cmd_add.py             # add handler
+│       ├── cmd_list.py            # list handler
+│       ├── cmd_board.py           # board handler
+│       ├── cmd_move.py            # move handler
+│       ├── cmd_done_drop.py       # done/drop handler
+│       ├── cmd_edit.py            # edit handler
+│       ├── cmd_project_list.py    # project list handler
+│       ├── cmd_project_set_private.py  # set-private handler
+│       └── cmd_project_set_shared.py   # set-shared handler
+├── bridge/openclaw-todo/          # JS/TS bridge for Gateway
 ├── tests/
 ├── docs/
 ├── issues.md

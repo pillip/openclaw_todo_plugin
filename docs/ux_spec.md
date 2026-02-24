@@ -1,330 +1,318 @@
-# OpenClaw TODO Plugin -- UX Specification
+# OpenClaw TODO Plugin — UX 명세서
 
-> Version 1.0 | 2026-02-20
-> Based on PRD v1.1 (DM-based)
-
----
-
-## Table of Contents
-
-1. [Overview](#1-overview)
-2. [Interaction Model](#2-interaction-model)
-3. [Command Reference and User Flows](#3-command-reference-and-user-flows)
-4. [Response Formatting](#4-response-formatting)
-5. [Error Messages](#5-error-messages)
-6. [Edge Cases](#6-edge-cases)
-7. [Input Parsing Rules](#7-input-parsing-rules)
+> Version 2.0 | 2026-02-24
+> PRD v1.2 (DM 기반) 기준 작성
 
 ---
 
-## 1. Overview
+## 목차
 
-The OpenClaw TODO Plugin is a text-based task management system that lives inside Slack DMs. Users interact with the bot by sending messages that start with `/todo`. The bot parses the command and replies in the same DM thread with structured, plain-text responses.
-
-### Design Principles
-
-- **Zero ambiguity**: Every command produces exactly one response. The user always knows whether the action succeeded or failed.
-- **Minimal typing**: Sensible defaults (project = `Inbox`, section = `backlog`, assignee = sender) mean most commands need only a title.
-- **Scannable output**: Responses use fixed-width IDs, consistent emoji prefixes, and aligned columns so users can scan quickly.
-- **Fail loudly**: Invalid input is rejected with a clear reason and the original request is not applied. No partial writes.
+1. [사용자 인터랙션 흐름](#1-사용자-인터랙션-흐름)
+2. [커맨드별 예시와 기대 응답](#2-커맨드별-예시와-기대-응답)
+3. [에러 메시지 패턴](#3-에러-메시지-패턴)
+4. [성공 메시지 패턴](#4-성공-메시지-패턴)
+5. [Board 출력 포맷](#5-board-출력-포맷)
+6. [List 출력 포맷](#6-list-출력-포맷)
+7. [엣지 케이스 UX](#7-엣지-케이스-ux)
 
 ---
 
-## 2. Interaction Model
+## 1. 사용자 인터랙션 흐름
 
-### 2.1 Entry Point
+### 1.1 진입점
 
-The user opens a DM conversation with the OpenClaw Slack bot and types messages beginning with `/todo`.
+사용자는 OpenClaw Slack 앱(봇)과의 **1:1 DM 채널**에서 `todo:` 접두사로 메시지를 보낸다.
 
-### 2.2 Message Recognition
+```
+사용자 → Slack DM → "todo: add 장보기"
+                         ↓
+              OpenClaw Gateway (command_prefix 매칭)
+                         ↓ (LLM 바이패스)
+              플러그인 handle_message() 직접 호출
+                         ↓
+              응답 메시지 → Slack DM
+```
 
-| Message pattern | Bot behavior |
+### 1.2 메시지 인식 규칙
+
+| 메시지 패턴 | 봇 동작 |
 |---|---|
-| Starts with `/todo` | Parsed as a command |
-| Anything else | Ignored silently (no reply) |
+| `todo:`로 시작 | 커맨드로 파싱하여 처리 |
+| `/todo`로 시작 | **미지원** — 안내 메시지 반환 (7.1절 참고) |
+| 그 외 모든 메시지 | 무시 (응답 없음) |
 
-### 2.3 Response Timing
+### 1.3 응답 방식
 
-The bot replies in the same DM channel. All responses are ephemeral-style (visible only to the sender) when technically possible; otherwise they appear as normal bot messages in the DM.
+- 봇은 동일 DM 채널에 일반 메시지로 응답한다.
+- v1에서는 인터랙티브 버튼, 모달, 확인 다이얼로그를 사용하지 않는다.
+- 모든 커맨드는 수신 즉시 실행되거나 거부된다 (확인 절차 없음).
 
-### 2.4 No Confirmation Dialogs
+### 1.4 설계 원칙
 
-v1 has no interactive buttons, modals, or confirmation prompts. Every command is executed (or rejected) immediately upon receipt.
+- **모호함 제로**: 모든 커맨드는 정확히 하나의 응답을 생성한다. 성공/실패를 항상 알 수 있다.
+- **최소 타이핑**: 기본값(project=`Inbox`, section=`backlog`, assignee=sender)이 적용되므로 대부분 제목만 입력하면 된다.
+- **스캔 가능한 출력**: 고정 이모지 접두사, 일관된 포맷으로 빠르게 훑어볼 수 있다.
+- **명시적 실패**: 잘못된 입력은 명확한 사유와 함께 거부된다. 부분 적용 없음.
 
 ---
 
-## 3. Command Reference and User Flows
+## 2. 커맨드별 예시와 기대 응답
 
-### 3.1 `/todo add` -- Create a Task
+### 2.1 `todo: add` — 태스크 생성
 
-**Purpose**: Create a new task with optional project, section, assignees, and due date.
-
-**Syntax**:
+**문법**:
 ```
-/todo add <title> [@user ...] [/p <project>] [/s <section>] [due:<date>]
+todo: add <title> [<@USER> ...] [/p <project>] [/s <section>] [due:YYYY-MM-DD|MM-DD]
 ```
 
-**Defaults**:
-| Parameter | Default |
+**기본값**:
+| 파라미터 | 기본값 |
 |---|---|
 | project | `Inbox` |
 | section | `backlog` |
-| assignees | sender |
-| due | none |
+| assignees | sender (본인) |
+| due | 없음 (NULL) |
 
-**Flow**:
-1. User sends `/todo add Buy groceries`
-2. Bot creates task in Inbox/backlog, assigns to sender
-3. Bot replies with confirmation
-
-**Examples**:
-
+**예시 1 — 최소 입력**:
 ```
-Input:  /todo add Buy groceries
-Output: :white_check_mark: Added #42 (Inbox/backlog) due:- assignees:@phil -- Buy groceries
+입력:  todo: add 장보기
+응답:  ✅ Added #42 (Inbox/backlog) due:- assignees:<@U1234> — 장보기
 ```
 
+**예시 2 — 전체 옵션 사용**:
 ```
-Input:  /todo add Fix login bug @alice /p Backend /s doing due:2026-03-15
-Output: :white_check_mark: Added #43 (Backend/doing) due:2026-03-15 assignees:@alice -- Fix login bug
-```
-
-```
-Input:  /todo add Review PR @bob @carol /p Frontend
-Output: :white_check_mark: Added #44 (Frontend/backlog) due:- assignees:@bob, @carol -- Review PR
+입력:  todo: add 로그인 버그 수정 <@U5678> /p Backend /s doing due:2026-03-15
+응답:  ✅ Added #43 (Backend/doing) due:2026-03-15 assignees:<@U5678> — 로그인 버그 수정
 ```
 
-**Success response format**:
+**예시 3 — 다중 담당자**:
 ```
-:white_check_mark: Added #<id> (<project>/<section>) due:<date|-> assignees:<@user>[, <@user>...] -- <title>
+입력:  todo: add PR 리뷰 <@U5678> <@U9999> /p Frontend
+응답:  ✅ Added #44 (Frontend/backlog) due:- assignees:<@U5678>, <@U9999> — PR 리뷰
+```
+
+**예시 4 — 연도 생략 due**:
+```
+입력:  todo: add 보고서 작성 due:03-15
+응답:  ✅ Added #45 (Inbox/backlog) due:2026-03-15 assignees:<@U1234> — 보고서 작성
 ```
 
 ---
 
-### 3.2 `/todo list` -- List Tasks
+### 2.2 `todo: list` — 태스크 목록 조회
 
-**Purpose**: Display a filtered, sorted list of tasks.
-
-**Syntax**:
+**문법**:
 ```
-/todo list [mine|all|@user] [/p <project>] [/s <section>] [open|done|drop] [limit:N]
+todo: list [mine|all|<@USER>] [/p <project>] [/s <section>] [open|done|drop] [limit:N]
 ```
 
-**Defaults**:
-| Parameter | Default |
+**기본값**:
+| 파라미터 | 기본값 |
 |---|---|
 | scope | `mine` |
-| status filter | `open` |
+| status | `open` |
 | limit | 30 |
 
-**Flow**:
-1. User sends `/todo list`
-2. Bot queries tasks where sender is an assignee, status is open
-3. Bot returns a numbered list sorted by due date (ascending, nulls last), then by ID (descending)
-
-**Example output**:
+**예시 1 — 기본 조회 (내 태스크)**:
 ```
-:clipboard: TODO List (mine / open) -- 3 tasks
+입력:  todo: list
+응답:
+📋 TODO List (mine / open) — 3 tasks
 
-#50  due:2026-02-21  (Backend/doing)    @phil        Deploy hotfix
-#48  due:2026-03-01  (Inbox/backlog)    @phil        Buy groceries
-#45  due:-           (Frontend/waiting) @phil, @bob  Review PR
+#50  due:2026-02-21  (Backend/doing)    <@U1234>          Deploy hotfix
+#48  due:2026-03-01  (Inbox/backlog)    <@U1234>          장보기
+#45  due:-           (Frontend/waiting) <@U1234>, <@U5678> PR 리뷰
 
 Showing 3 of 3. Use limit:N to see more.
 ```
 
-**Empty state**:
+**예시 2 — 프로젝트 필터링**:
 ```
-:clipboard: TODO List (mine / open) -- 0 tasks
+입력:  todo: list /p Backend
+응답:
+📋 TODO List (mine / open) /p Backend — 1 task
+
+#50  due:2026-02-21  (Backend/doing)  <@U1234>  Deploy hotfix
+
+Showing 1 of 1. Use limit:N to see more.
+```
+
+**예시 3 — 전체 범위 조회**:
+```
+입력:  todo: list all
+응답:
+📋 TODO List (all / open) — 5 tasks
+...
+```
+
+**예시 4 — 빈 결과**:
+```
+입력:  todo: list /p Backend /s waiting
+응답:
+📋 TODO List (mine / open) /p Backend /s waiting — 0 tasks
 
 No tasks found.
 ```
 
-**Scope behavior**:
-| Scope | What it shows |
+**scope 동작**:
+| scope | 조회 범위 |
 |---|---|
-| `mine` | Tasks where sender is in the assignee list |
-| `all` | All shared tasks + sender's private tasks (never other users' private tasks) |
-| `@user` | Tasks where the mentioned user is an assignee (shared projects only, plus sender's private if sender = mentioned user) |
+| `mine` (기본) | sender가 assignee에 포함된 태스크 |
+| `all` | shared 전체 + sender의 private 프로젝트 (타인 private는 제외) |
+| `<@USER>` | 해당 유저가 assignee인 태스크 (shared + sender==해당유저면 private 포함) |
+
+**정렬 규칙**:
+1. due 있는 것 우선
+2. due 오름차순
+3. id 내림차순
 
 ---
 
-### 3.3 `/todo board` -- Kanban Board View
+### 2.3 `todo: board` — 칸반 보드 뷰
 
-**Purpose**: Display tasks grouped by section in a kanban-style text layout.
-
-**Syntax**:
+**문법**:
 ```
-/todo board [mine|all|@user] [/p <project>] [open|done|drop] [limitPerSection:N]
+todo: board [mine|all|<@USER>] [/p <project>] [open|done|drop] [limitPerSection:N]
 ```
 
-**Defaults**:
-| Parameter | Default |
+**기본값**:
+| 파라미터 | 기본값 |
 |---|---|
 | scope | `mine` |
-| status filter | `open` |
+| status | `open` |
 | limitPerSection | 10 |
 
-**Flow**:
-1. User sends `/todo board /p Backend`
-2. Bot queries matching tasks and groups them by section
-3. Bot returns sections in fixed order: BACKLOG, DOING, WAITING, DONE, DROP
-
-**Example output**:
+**예시**:
 ```
-:bar_chart: Board (mine / open) /p Backend
+입력:  todo: board /p Backend
+응답:
+📊 Board (mine / open) /p Backend
 
--- BACKLOG (2) --
-#50  due:2026-03-10  @phil        Set up CI pipeline
-#47  due:-           @phil        Write migration script
+— BACKLOG (2) —
+#50  due:2026-03-10  <@U1234>  CI 파이프라인 구축
+#47  due:-           <@U1234>  마이그레이션 스크립트 작성
 
--- DOING (1) --
-#51  due:2026-02-22  @phil        Deploy hotfix
+— DOING (1) —
+#51  due:2026-02-22  <@U1234>  Deploy hotfix
 
--- WAITING (0) --
+— WAITING (0) —
 (empty)
 
--- DONE (0) --
+— DONE (0) —
 (empty)
 
--- DROP (0) --
+— DROP (0) —
 (empty)
 ```
 
-**Notes**:
-- Sections with zero items still appear with `(empty)` to maintain the full board structure.
-- Each section header shows the count of items.
-- When `limitPerSection` is reached, append `... and N more` below the last item in that section.
+**섹션 규칙**:
+- 출력 순서는 항상 고정: BACKLOG → DOING → WAITING → DONE → DROP
+- 항목이 0개인 섹션도 `(empty)`로 표시하여 전체 보드 구조를 유지
+- 각 섹션 헤더에 항목 수를 표시
+- `limitPerSection` 초과 시 마지막 항목 아래에 `... and N more` 표시
 
 ---
 
-### 3.4 `/todo move` -- Move a Task to a Different Section
+### 2.4 `todo: move` — 태스크 섹션 이동
 
-**Purpose**: Change the section (kanban column) of a task.
-
-**Syntax**:
+**문법**:
 ```
-/todo move <id> <section>
+todo: move <id> <section>
 ```
 
-**Valid sections**: `backlog`, `doing`, `waiting`, `done`, `drop`
+**유효 섹션**: `backlog`, `doing`, `waiting`, `done`, `drop`
 
-**Flow**:
-1. User sends `/todo move 50 doing`
-2. Bot validates permission and section name
-3. Bot updates the task and replies
+**예시**:
+```
+입력:  todo: move 50 doing
+응답:  ➡️ Moved #50 to doing (Backend) — Deploy hotfix
+```
 
-**Example**:
-```
-Input:  /todo move 50 doing
-Output: :arrow_right: Moved #50 to doing (Backend) -- Deploy hotfix
-```
+**권한**:
+- private 프로젝트: owner만 가능
+- shared 프로젝트: assignee 또는 created_by만 가능
 
 ---
 
-### 3.5 `/todo done` -- Mark a Task as Done
+### 2.5 `todo: done` — 태스크 완료 처리
 
-**Purpose**: Shortcut to move a task to the `done` section and set its status to `done`.
-
-**Syntax**:
+**문법**:
 ```
-/todo done <id>
+todo: done <id>
 ```
 
-**Flow**:
-1. User sends `/todo done 50`
-2. Bot sets section=done, status=done, records closed_at
-3. Bot replies with confirmation
+**동작**: section=`done`, status=`done`, `closed_at` 기록
 
-**Example**:
+**예시**:
 ```
-Input:  /todo done 50
-Output: :white_check_mark: Done #50 (Backend) -- Deploy hotfix
+입력:  todo: done 50
+응답:  ✅ Done #50 (Backend) — Deploy hotfix
 ```
 
 ---
 
-### 3.6 `/todo drop` -- Drop a Task
+### 2.6 `todo: drop` — 태스크 드롭(취소)
 
-**Purpose**: Mark a task as dropped (cancelled/abandoned).
-
-**Syntax**:
+**문법**:
 ```
-/todo drop <id>
+todo: drop <id>
 ```
 
-**Flow**:
-1. User sends `/todo drop 50`
-2. Bot sets section=drop, status=dropped, records closed_at
-3. Bot replies with confirmation
+**동작**: section=`drop`, status=`dropped`, `closed_at` 기록
 
-**Example**:
+**예시**:
 ```
-Input:  /todo drop 50
-Output: :wastebasket: Dropped #50 (Backend) -- Deploy hotfix
+입력:  todo: drop 50
+응답:  🗑️ Dropped #50 (Backend) — Deploy hotfix
 ```
 
 ---
 
-### 3.7 `/todo edit` -- Edit a Task
+### 2.7 `todo: edit` — 태스크 수정
 
-**Purpose**: Modify one or more fields of an existing task.
-
-**Syntax**:
+**문법**:
 ```
-/todo edit <id> [<new title>] [@user ...] [/p <project>] [/s <section>] [due:<date>|due:-]
+todo: edit <id> [<new title>] [<@USER> ...] [/p <project>] [/s <section>] [due:YYYY-MM-DD|MM-DD|due:-]
 ```
 
-**Rules**:
-- If `@user` mentions are present, the assignee list is **fully replaced** (not appended).
-- `due:-` clears the due date (sets it to null).
-- New title text is everything before the first option token (`/p`, `/s`, `due:`, or `@mention`). If empty, the title is unchanged.
-- Fields not specified in the command remain unchanged.
+**규칙**:
+- `<@USER>` 멘션이 있으면 assignees를 **완전 교체** (추가가 아님)
+- `due:-`는 due를 NULL로 클리어
+- 옵션 토큰(`/p`, `/s`, `due:`, `<@...>`) 이전의 텍스트가 새 title (비어 있으면 title 변경 없음)
+- 명시하지 않은 필드는 기존 값 유지
 
-**Flow**:
-1. User sends `/todo edit 50 Deploy hotfix v2 due:2026-03-01`
-2. Bot updates title and due date
-3. Bot replies with the updated state
-
-**Example**:
+**예시 1 — 제목과 due 변경**:
 ```
-Input:  /todo edit 50 Deploy hotfix v2 due:2026-03-01
-Output: :pencil2: Edited #50 (Backend/doing) due:2026-03-01 assignees:@phil -- Deploy hotfix v2
+입력:  todo: edit 50 Deploy hotfix v2 due:2026-03-01
+응답:  ✏️ Edited #50 (Backend/doing) due:2026-03-01 assignees:<@U1234> — Deploy hotfix v2
 ```
 
+**예시 2 — 담당자 교체**:
 ```
-Input:  /todo edit 50 @alice @bob
-Output: :pencil2: Edited #50 (Backend/doing) due:2026-03-01 assignees:@alice, @bob -- Deploy hotfix v2
-```
-
-```
-Input:  /todo edit 50 due:-
-Output: :pencil2: Edited #50 (Backend/doing) due:- assignees:@alice, @bob -- Deploy hotfix v2
+입력:  todo: edit 50 <@U5678> <@U9999>
+응답:  ✏️ Edited #50 (Backend/doing) due:2026-03-01 assignees:<@U5678>, <@U9999> — Deploy hotfix v2
 ```
 
-**Success response format** (same structure as add):
+**예시 3 — due 클리어**:
 ```
-:pencil2: Edited #<id> (<project>/<section>) due:<date|-> assignees:<@user>[, ...] -- <title>
+입력:  todo: edit 50 due:-
+응답:  ✏️ Edited #50 (Backend/doing) due:- assignees:<@U5678>, <@U9999> — Deploy hotfix v2
 ```
 
 ---
 
-### 3.8 `/todo project list` -- List Projects
+### 2.8 `todo: project list` — 프로젝트 목록 조회
 
-**Purpose**: Show all projects visible to the sender.
-
-**Syntax**:
+**문법**:
 ```
-/todo project list
+todo: project list
 ```
 
-**Flow**:
-1. User sends `/todo project list`
-2. Bot returns shared projects and the sender's private projects
-
-**Example output**:
+**예시 — 프로젝트가 있는 경우**:
 ```
-:file_folder: Projects
+입력:  todo: project list
+응답:
+📁 Projects
 
 Shared:
   - Inbox (12 tasks)
@@ -336,9 +324,11 @@ Private (yours):
   - Side Project (1 task)
 ```
 
-**Empty state**:
+**예시 — private 프로젝트가 없는 경우**:
 ```
-:file_folder: Projects
+입력:  todo: project list
+응답:
+📁 Projects
 
 Shared:
   - Inbox (0 tasks)
@@ -349,330 +339,418 @@ Private (yours):
 
 ---
 
-### 3.9 `/todo project set-private <name>` -- Make a Project Private
+### 2.9 `todo: project set-private` — 프로젝트 비공개 전환
 
-**Purpose**: Convert a shared project to private or create a new private project.
-
-**Syntax**:
+**문법**:
 ```
-/todo project set-private <name>
+todo: project set-private <name>
 ```
 
-**Flow**:
+**Case A — 프로젝트가 존재하지 않음** (신규 private 생성):
+```
+입력:  todo: project set-private Personal
+응답:  🔒 Created private project "Personal".
+```
 
-Case A -- Project does not exist:
-1. Bot creates a new private project owned by the sender.
-2. Reply: `:lock: Created private project "<name>".`
+**Case B — 이미 sender의 private 프로젝트임**:
+```
+입력:  todo: project set-private Personal
+응답:  🔒 Project "Personal" is already private.
+```
 
-Case B -- Sender already has a private project with this name:
-1. Reply: `:lock: Project "<name>" is already private.`
+**Case C — shared 프로젝트를 private로 전환 (성공)**:
+```
+입력:  todo: project set-private MyProject
+응답:  🔒 Project "MyProject" is now private.
+```
 
-Case C -- Shared project exists, conversion attempt:
-1. Bot scans all tasks in the project for non-owner assignees.
-2. If none found: convert to private, reply `:lock: Project "<name>" is now private.`
-3. If found: reject with error (see [Section 5.3](#53-set-private-validation-error)).
+**Case D — shared 프로젝트를 private로 전환 (실패 — 비owner assignee 존재)**:
+```
+입력:  todo: project set-private Biz
+응답:  ❌ Cannot set project "Biz" to private: found tasks assigned to non-owner users.
+       e.g. #12 assignees:<@U2222>, #18 assignees:<@U3333>
+       Please reassign or remove these assignees first.
+```
+
+- 위반 태스크는 최대 10개까지 표시
+- 10개 초과 시: `... and N more tasks with external assignees.` 추가
 
 ---
 
-### 3.10 `/todo project set-shared <name>` -- Make a Project Shared
+### 2.10 `todo: project set-shared` — 프로젝트 공유 전환
 
-**Purpose**: Convert a private project to shared or create a new shared project.
-
-**Syntax**:
+**문법**:
 ```
-/todo project set-shared <name>
+todo: project set-shared <name>
 ```
 
-**Flow**:
+**Case A — shared 프로젝트가 이미 존재**:
+```
+입력:  todo: project set-shared Backend
+응답:  🌐 Project "Backend" is already shared.
+```
 
-Case A -- Shared project with this name already exists:
-1. Reply: `:globe_with_meridians: Project "<name>" is already shared.`
+**Case B — 신규 shared 프로젝트 생성 또는 private에서 전환 성공**:
+```
+입력:  todo: project set-shared NewProject
+응답:  🌐 Project "NewProject" is now shared.
+```
 
-Case B -- No shared project with this name:
-1. Bot creates (or converts) the project to shared visibility.
-2. Reply: `:globe_with_meridians: Project "<name>" is now shared.`
-
-Case C -- Name conflict with an existing shared project:
-1. Reply: `:x: A shared project named "<name>" already exists.`
+**Case C — shared 이름 충돌**:
+```
+입력:  todo: project set-shared Backend
+응답:  ❌ A shared project named "Backend" already exists.
+```
 
 ---
 
-## 4. Response Formatting
+## 3. 에러 메시지 패턴
 
-### 4.1 General Structure
+### 3.1 입력 검증 에러
 
-All bot responses follow this pattern:
-
-```
-<emoji> <Action verb> <details>
-```
-
-| Action | Emoji | Verb |
-|---|---|---|
-| Add | :white_check_mark: | Added |
-| List | :clipboard: | TODO List |
-| Board | :bar_chart: | Board |
-| Move | :arrow_right: | Moved |
-| Done | :white_check_mark: | Done |
-| Drop | :wastebasket: | Dropped |
-| Edit | :pencil2: | Edited |
-| Project list | :file_folder: | Projects |
-| Set private | :lock: | (varies by case) |
-| Set shared | :globe_with_meridians: | (varies by case) |
-| Error | :x: | (error message) |
-| Warning/reject | :warning: | (warning message) |
-
-### 4.2 Task Line Format
-
-Whenever a single task is displayed inline (in list, board, or as a command result), it uses:
-
-```
-#<id>  due:<YYYY-MM-DD|->  (<project>/<section>)  <assignees>  <title>
-```
-
-- `id`: Left-padded for alignment in lists (e.g., `#42`, `# 7` -- optional, simple left-align is acceptable in v1).
-- `due`: Always shown. `-` when no due date.
-- `assignees`: Comma-separated Slack mentions. Displayed as `@username` in Slack's rendered view.
-- `title`: The full task title, untruncated.
-
-### 4.3 List/Board Headers
-
-Lists and boards begin with a header line summarizing the query:
-
-```
-:clipboard: TODO List (<scope> / <status>) -- <count> tasks
-```
-```
-:bar_chart: Board (<scope> / <status>) [/p <project>]
-```
-
-### 4.4 Pagination Footer
-
-When the result set exceeds the limit:
-```
-Showing <displayed> of <total>. Use limit:N to see more.
-```
-
-For board view:
-```
-... and <N> more
-```
-(appears below the last item in a section that hit `limitPerSection`)
-
-### 4.5 Text Encoding
-
-- All responses are plain Slack mrkdwn (Slack's markdown variant).
-- No block kit or attachments in v1.
-- User mentions are rendered as `<@UXXXXXXXX>` which Slack auto-formats.
-
----
-
-## 5. Error Messages
-
-### 5.1 Input Validation Errors
-
-| Condition | Error message |
+| 상황 | 에러 메시지 |
 |---|---|
-| Unknown command | `:x: Unknown command. Available: add, list, board, move, done, drop, edit, project` |
-| Missing title on add | `:x: Title is required. Usage: /todo add <title> [options]` |
-| Missing task ID | `:x: Task ID is required. Usage: /todo <command> <id>` |
-| Invalid task ID (not a number) | `:x: Invalid task ID "<input>". Must be a number.` |
-| Task not found | `:x: Task #<id> not found.` |
-| Invalid section name | `:x: Invalid section "<input>". Must be one of: backlog, doing, waiting, done, drop` |
-| Invalid date format | `:x: Invalid date "<input>". Use YYYY-MM-DD or MM-DD.` |
-| Invalid date value (e.g. 02-30) | `:x: Invalid date "02-30". This date does not exist.` |
-| Empty project name | `:x: Project name is required after /p.` |
+| 알 수 없는 커맨드 | `❌ Unknown command. Available: add, list, board, move, done, drop, edit, project` |
+| add에 제목 누락 | `❌ Title is required. Usage: todo: add <title> [options]` |
+| 태스크 ID 누락 | `❌ Task ID is required. Usage: todo: <command> <id>` |
+| 태스크 ID가 숫자가 아님 | `❌ Invalid task ID "<input>". Must be a number.` |
+| 태스크를 찾을 수 없음 | `❌ Task #<id> not found.` |
+| 잘못된 섹션 이름 | `❌ Invalid section "<input>". Must be one of: backlog, doing, waiting, done, drop` |
+| 잘못된 날짜 형식 | `❌ Invalid date "<input>". Use YYYY-MM-DD or MM-DD.` |
+| 존재하지 않는 날짜 (예: 02-30) | `❌ Invalid date "02-30". This date does not exist.` |
+| /p 뒤에 프로젝트 이름 누락 | `❌ Project name is required after /p.` |
 
-### 5.2 Permission Errors
+### 3.2 권한 에러
 
-| Condition | Error message |
+| 상황 | 에러 메시지 |
 |---|---|
-| Accessing another user's private project | `:x: Project "<name>" not found.` (deliberately vague to avoid leaking existence) |
-| Editing a task without permission | `:x: You don't have permission to modify task #<id>.` |
+| 타인의 private 프로젝트 접근 시도 | `❌ Project "<name>" not found.` (존재 여부를 의도적으로 숨김) |
+| 권한 없는 태스크 수정 시도 | `❌ You don't have permission to modify task #<id>.` |
 
-### 5.3 Set-Private Validation Error
+### 3.3 set-private 검증 에러
 
-When `/todo project set-private` fails due to non-owner assignees:
-
+shared 프로젝트를 private로 전환할 때 비owner assignee가 존재하는 경우:
 ```
-:x: Cannot set project "<name>" to private: found tasks assigned to non-owner users.
-e.g. #12 assignees:@alice, #18 assignees:@carol, #21 assignees:@bob
+❌ Cannot set project "<name>" to private: found tasks assigned to non-owner users.
+e.g. #12 assignees:<@U2222>, #18 assignees:<@U3333>, #21 assignees:<@U4444>
 Please reassign or remove these assignees first.
 ```
+- 위반 태스크 최대 10개 표시
+- 10개 초과 시: `... and N more tasks with external assignees.`
 
-- Show up to 10 violating tasks.
-- If more than 10, append: `... and <N> more tasks with external assignees.`
+### 3.4 private 프로젝트 assignee 거부
 
-### 5.4 Private Project Assignee Rejection
-
-When trying to assign a non-owner user to a task in a private project (on add or edit):
-
+private 프로젝트에 owner가 아닌 유저를 assignee로 지정하려 할 때 (add 또는 edit):
 ```
-:warning: Private project "<name>" is owner-only. Cannot assign <@user> (not the owner).
-Request was not applied.
+⚠️ Private 프로젝트("<name>")는 owner만 볼 수 있어요. 다른 담당자(<@U...>)를 지정할 수 없습니다.
+(요청이 적용되지 않았습니다.)
 ```
 
-### 5.5 Project Name Conflicts
+### 3.5 프로젝트 이름 충돌
 
-| Condition | Error message |
+| 상황 | 에러 메시지 |
 |---|---|
-| Creating/renaming to an existing shared name | `:x: A shared project named "<name>" already exists.` |
-| Private name conflict for same owner | `:x: You already have a private project named "<name>".` |
+| 기존 shared 이름과 충돌 | `❌ A shared project named "<name>" already exists.` |
+| 동일 owner의 private 이름 충돌 | `❌ You already have a private project named "<name>".` |
 
 ---
 
-## 6. Edge Cases
+## 4. 성공 메시지 패턴
 
-### 6.1 Empty Inputs
+### 4.1 이모지 및 동사 매핑
 
-| Scenario | Behavior |
+| 액션 | 이모지 | 동사/키워드 |
+|---|---|---|
+| add | ✅ | Added |
+| list | 📋 | TODO List |
+| board | 📊 | Board |
+| move | ➡️ | Moved |
+| done | ✅ | Done |
+| drop | 🗑️ | Dropped |
+| edit | ✏️ | Edited |
+| project list | 📁 | Projects |
+| set-private | 🔒 | (상황에 따라 다름) |
+| set-shared | 🌐 | (상황에 따라 다름) |
+| 에러 | ❌ | (에러 메시지) |
+| 경고/거부 | ⚠️ | (경고 메시지) |
+| 정보성 안내 | ℹ️ | (안내 메시지) |
+
+### 4.2 태스크 라인 포맷
+
+성공 응답에서 태스크 정보를 표시하는 표준 포맷:
+```
+#<id> (<project>/<section>) due:<YYYY-MM-DD|-> assignees:<@U...>[, <@U...>] — <title>
+```
+
+### 4.3 단일 태스크 액션 응답 포맷
+
+```
+✅ Added #123 (Inbox/backlog) due:- assignees:<@U1234> — 장보기
+➡️ Moved #123 to doing (Inbox) — 장보기
+✅ Done #123 (Inbox) — 장보기
+🗑️ Dropped #123 (Inbox) — 장보기
+✏️ Edited #123 (Inbox/backlog) due:2026-03-15 assignees:<@U1234> — 장보기 수정
+```
+
+### 4.4 프로젝트 자동 생성 안내
+
+존재하지 않는 프로젝트명으로 `todo: add`를 실행하면 shared 프로젝트를 자동 생성하고 안내:
+```
+✅ Added #55 (NewProject/backlog) due:- assignees:<@U1234> — 태스크 제목
+ℹ️ Project "NewProject" was created (shared).
+```
+
+---
+
+## 5. Board 출력 포맷
+
+### 5.1 전체 구조 예시
+
+```
+📊 Board (mine / open) /p Backend
+
+— BACKLOG (2) —
+#50  due:2026-03-10  <@U1234>  CI 파이프라인 구축
+#47  due:-           <@U1234>  마이그레이션 스크립트 작성
+
+— DOING (1) —
+#51  due:2026-02-22  <@U1234>  Deploy hotfix
+
+— WAITING (0) —
+(empty)
+
+— DONE (0) —
+(empty)
+
+— DROP (0) —
+(empty)
+```
+
+### 5.2 포맷 규칙
+
+- **헤더**: `📊 Board (<scope> / <status>) [/p <project>]`
+- **섹션 구분**: `— <SECTION_NAME> (<count>) —`
+- **섹션 순서**: BACKLOG → DOING → WAITING → DONE → DROP (항상 고정)
+- **빈 섹션**: `(empty)`로 표시 — 보드 구조의 완전성 유지
+- **항목 포맷**: `#<id>  due:<YYYY-MM-DD|->  <assignees>  <title>`
+- **limit 초과 시**: 해당 섹션 마지막에 `... and N more` 표시
+
+### 5.3 limitPerSection 초과 예시
+
+```
+— BACKLOG (15) —
+#60  due:2026-03-01  <@U1234>  태스크 1
+#59  due:2026-03-02  <@U1234>  태스크 2
+...
+#51  due:2026-03-10  <@U1234>  태스크 10
+... and 5 more
+```
+
+---
+
+## 6. List 출력 포맷
+
+### 6.1 전체 구조 예시
+
+```
+📋 TODO List (mine / open) — 3 tasks
+
+#50  due:2026-02-21  (Backend/doing)    <@U1234>          Deploy hotfix
+#48  due:2026-03-01  (Inbox/backlog)    <@U1234>          장보기
+#45  due:-           (Frontend/waiting) <@U1234>, <@U5678> PR 리뷰
+
+Showing 3 of 3. Use limit:N to see more.
+```
+
+### 6.2 포맷 규칙
+
+- **헤더**: `📋 TODO List (<scope> / <status>) [/p <project>] [/s <section>] — <count> tasks`
+- **항목 포맷**: `#<id>  due:<YYYY-MM-DD|->  (<project>/<section>)  <assignees>  <title>`
+- **정렬**: due 있는 것 우선 → due 오름차순 → id 내림차순
+- **limit 초과 시**: `Showing <displayed> of <total>. Use limit:N to see more.`
+
+### 6.3 빈 결과 예시
+
+```
+📋 TODO List (mine / open) — 0 tasks
+
+No tasks found.
+```
+
+### 6.4 scope별 필터 예시
+
+```
+입력:  todo: list all /p Backend done
+응답:
+📋 TODO List (all / done) /p Backend — 2 tasks
+
+#40  due:2026-02-10  (Backend/done)  <@U1234>  API 리팩토링
+#38  due:2026-02-05  (Backend/done)  <@U5678>  DB 마이그레이션
+
+Showing 2 of 2. Use limit:N to see more.
+```
+
+---
+
+## 7. 엣지 케이스 UX
+
+### 7.1 `/todo` 입력 시 (미지원)
+
+Slack에서 `/`로 시작하는 메시지는 슬래시 커맨드로 오인식될 수 있어 의도적으로 미지원한다.
+
+만약 사용자가 `/todo`로 시작하는 메시지를 보낸 경우 (Slack이 슬래시 커맨드 오류를 표시하지 않고 통과시킨 경우):
+```
+응답:  ℹ️ `/todo`는 지원하지 않습니다. `todo:` 접두사를 사용해 주세요.
+       예: todo: add 장보기
+```
+
+> **참고**: 실제로는 Slack이 `/todo`를 슬래시 커맨드로 해석하여 "명령어를 찾을 수 없습니다" 에러를 표시할 가능성이 높다. 이 경우 봇까지 메시지가 도달하지 않으므로 봇 측 처리는 불필요하다.
+
+### 7.2 빈 커맨드 (`todo:` 만 입력)
+
+서브커맨드 없이 `todo:` 만 입력하면 도움말을 표시한다:
+```
+입력:  todo:
+응답:
+📖 OpenClaw TODO — Commands
+
+todo: add <title> [@user] [/p project] [/s section] [due:date]
+    Create a new task.
+
+todo: list [mine|all|@user] [/p project] [/s section] [open|done|drop] [limit:N]
+    List tasks.
+
+todo: board [mine|all|@user] [/p project] [open|done|drop] [limitPerSection:N]
+    Show kanban board view.
+
+todo: move <id> <section>
+    Move a task to a section (backlog, doing, waiting, done, drop).
+
+todo: done <id>
+    Mark a task as done.
+
+todo: drop <id>
+    Drop (cancel) a task.
+
+todo: edit <id> [title] [@user] [/p project] [/s section] [due:date|due:-]
+    Edit a task. Mentions replace all assignees. due:- clears the date.
+
+todo: project list
+    Show all visible projects.
+
+todo: project set-private <name>
+    Make a project private (owner-only).
+
+todo: project set-shared <name>
+    Make a project shared.
+```
+
+`todo: help`도 동일한 도움말을 표시한다.
+
+### 7.3 알 수 없는 서브커맨드
+
+```
+입력:  todo: delete 50
+응답:  ❌ Unknown command "delete". Available: add, list, board, move, done, drop, edit, project
+```
+
+### 7.4 중복 동작
+
+| 상황 | 응답 |
 |---|---|
-| `/todo` (no subcommand) | Reply with help text listing available commands |
-| `/todo add` (no title) | Error: title required |
-| `/todo edit 50` (no changes) | Reply: `:information_source: No changes specified for #50.` |
-| `/todo list /p NonExistent` | Error: project not found |
+| `todo: done 50` — 이미 done인 태스크 | `ℹ️ Task #50 is already done.` |
+| `todo: drop 50` — 이미 dropped인 태스크 | `ℹ️ Task #50 is already dropped.` |
+| `todo: move 50 doing` — 이미 doing인 태스크 | `ℹ️ Task #50 is already in doing.` |
 
-### 6.2 Duplicate Operations
+### 7.5 edit에 변경사항 없음
 
-| Scenario | Behavior |
+```
+입력:  todo: edit 50
+응답:  ℹ️ No changes specified for #50.
+```
+
+### 7.6 프로젝트 자동 생성
+
+`todo: add ... /p NewProject`에서 존재하지 않는 프로젝트를 참조하면 **shared** 프로젝트로 자동 생성한다:
+```
+입력:  todo: add 새 태스크 /p NewProject
+응답:  ✅ Added #55 (NewProject/backlog) due:- assignees:<@U1234> — 새 태스크
+       ℹ️ Project "NewProject" was created (shared).
+```
+
+`Inbox`는 DB 초기화 시 자동 생성되며, 존재하지 않을 경우에도 shared로 자동 생성된다.
+
+### 7.7 대소문자 처리
+
+| 대상 | 규칙 |
 |---|---|
-| `/todo done 50` when already done | Reply: `:information_source: Task #50 is already done.` |
-| `/todo drop 50` when already dropped | Reply: `:information_source: Task #50 is already dropped.` |
-| `/todo move 50 doing` when already in doing | Reply: `:information_source: Task #50 is already in doing.` |
+| 커맨드 (`add`, `LIST`, `Board`) | 대소문자 무시 — 모두 동일하게 처리 |
+| 섹션 이름 (`DOING`, `Doing`, `doing`) | 대소문자 무시 — 저장 시 소문자로 정규화 |
+| 프로젝트 이름 (`Backend` vs `backend`) | **대소문자 구분** — 서로 다른 프로젝트 |
 
-### 6.3 Project Auto-Creation
+### 7.8 공백 및 제목 정규화
 
-- When `/todo add ... /p NewProject` references a project that does not exist, the bot creates it as a **shared** project automatically and includes a note in the response:
-  ```
-  :white_check_mark: Added #55 (NewProject/backlog) due:- assignees:@phil -- Task title
-  :information_source: Project "NewProject" was created (shared).
-  ```
-- Exception: `Inbox` is always auto-created as shared if it does not exist.
+- 제목의 앞뒤 공백은 제거 (trim)
+- 단어 사이 연속 공백은 단일 공백으로 축약
+- trim 후 빈 제목은 "title required" 에러
 
-### 6.4 Case Sensitivity
+### 7.9 Due 날짜 엣지 케이스
 
-- **Section names**: Case-insensitive input, stored lowercase. `DOING`, `Doing`, `doing` all resolve to `doing`.
-- **Project names**: Case-sensitive. `Backend` and `backend` are different projects.
-- **Commands**: Case-insensitive. `/todo ADD`, `/TODO add`, `/todo Add` all work.
-
-### 6.5 Whitespace and Formatting
-
-- Leading/trailing whitespace in titles is trimmed.
-- Multiple spaces between words in a title are collapsed to a single space.
-- Empty title after trimming triggers the "title required" error.
-
-### 6.6 Special Characters in Titles
-
-- Titles may contain any UTF-8 characters except newlines.
-- Slack mrkdwn special characters (`*`, `_`, `~`, `` ` ``) in titles are escaped in the response to prevent formatting artifacts.
-
-### 6.7 Due Date Edge Cases
-
-| Input | Resolved date (assuming current year 2026) |
+| 입력 | 결과 (현재 연도 2026 기준) |
 |---|---|
 | `due:2026-03-15` | `2026-03-15` |
 | `due:03-15` | `2026-03-15` |
 | `due:3-5` | `2026-03-05` |
-| `due:02-29` | Error (2026 is not a leap year) |
-| `due:00-01` | Error (invalid month) |
-| `due:12-32` | Error (invalid day) |
-| `due:-` | Clears due date (null) |
-| `due:yesterday` | Error (invalid format) |
+| `due:02-29` | 에러 (2026년은 윤년이 아님) |
+| `due:00-01` | 에러 (유효하지 않은 월) |
+| `due:12-32` | 에러 (유효하지 않은 일) |
+| `due:-` | due 클리어 (NULL) |
+| `due:yesterday` | 에러 (잘못된 형식) |
+
+### 7.10 제목의 특수 문자
+
+- 제목에는 줄바꿈을 제외한 모든 UTF-8 문자 사용 가능
+- Slack mrkdwn 특수 문자(`*`, `_`, `~`, `` ` ``)는 응답 시 이스케이프 처리하여 포맷 깨짐 방지
 
 ---
 
-## 7. Input Parsing Rules
+## 부록: 입력 파싱 규칙
 
-### 7.1 Token Order
+### A.1 토큰 인식
 
-The parser processes the message left to right. Recognized option tokens are:
+파서는 메시지를 좌→우로 처리한다. 인식되는 옵션 토큰:
 
-| Token | Pattern | Notes |
+| 토큰 | 패턴 | 설명 |
 |---|---|---|
-| `/p` | `/p <word>` | Next whitespace-delimited word is the project name |
-| `/s` | `/s <word>` | Next word is the section name |
-| `due:` | `due:<value>` | No space between `due:` and the value |
-| `@mention` | `<@UXXXXXXXX>` | Slack user mention (may appear multiple times) |
-| `limit:` | `limit:<N>` | Positive integer |
-| `limitPerSection:` | `limitPerSection:<N>` | Positive integer |
+| `/p` | `/p <word>` | 다음 공백 구분 단어가 프로젝트 이름 |
+| `/s` | `/s <word>` | 다음 공백 구분 단어가 섹션 이름 |
+| `due:` | `due:<value>` | `due:`와 값 사이 공백 없음 |
+| `@mention` | `<@UXXXXXXXX>` | Slack 유저 멘션 (복수 가능) |
+| `limit:` | `limit:<N>` | 양의 정수 |
+| `limitPerSection:` | `limitPerSection:<N>` | 양의 정수 |
 
-### 7.2 Title Extraction (for add/edit)
+### A.2 제목 추출 (add/edit)
 
-Everything that is **not** a recognized option token or mention is treated as the title. The title words are concatenated in their original order.
+인식된 옵션 토큰이나 멘션이 **아닌** 모든 텍스트가 제목으로 결합된다. 원래 순서가 유지된다.
 
-Example parse:
+파싱 예시:
 ```
-/todo add Fix the login bug @alice /p Backend due:03-15
+todo: add 로그인 버그 수정 <@U5678> /p Backend due:03-15
 
-Parsed:
+파싱 결과:
   command   = add
-  title     = "Fix the login bug"
-  assignees = [@alice]
+  title     = "로그인 버그 수정"
+  assignees = [<@U5678>]
   project   = "Backend"
   due       = "2026-03-15"
-  section   = (default: backlog)
+  section   = (기본값: backlog)
 ```
 
-### 7.3 Mention Handling
+### A.3 프로젝트 이름 충돌 해소 (옵션 A — private 우선)
 
-- Slack internally sends mentions as `<@U04ABCD1234>`.
-- The bot resolves these to display names in responses when possible.
-- If a mentioned user cannot be resolved, the raw `<@U...>` format is preserved.
+`/p <name>` 해석 우선순위:
+1. sender(owner)의 private 프로젝트 `<name>`이 존재하면 **private 우선**
+2. 없으면 shared `<name>` 사용
+3. 둘 다 없으면 shared 자동 생성 (add 시) 또는 에러 (list/board 등)
 
-### 7.4 Scope Keywords (for list/board)
-
-The first non-option argument after the subcommand determines scope:
-
-| Keyword | Meaning |
-|---|---|
-| `mine` (or omitted) | Tasks assigned to sender |
-| `all` | Shared tasks + sender's private tasks |
-| `@user` | Tasks assigned to the mentioned user |
-
-### 7.5 Status Keywords (for list/board)
-
-| Keyword | Meaning |
-|---|---|
-| `open` (or omitted) | Tasks with status = open |
-| `done` | Tasks with status = done |
-| `drop` | Tasks with status = dropped |
-
----
-
-## Appendix: Help Text
-
-When the user sends `/todo` with no subcommand (or `/todo help`), the bot replies:
-
-```
-:book: OpenClaw TODO -- Commands
-
-/todo add <title> [@user] [/p project] [/s section] [due:date]
-    Create a new task.
-
-/todo list [mine|all|@user] [/p project] [/s section] [open|done|drop] [limit:N]
-    List tasks.
-
-/todo board [mine|all|@user] [/p project] [open|done|drop] [limitPerSection:N]
-    Show kanban board view.
-
-/todo move <id> <section>
-    Move a task to a section (backlog, doing, waiting, done, drop).
-
-/todo done <id>
-    Mark a task as done.
-
-/todo drop <id>
-    Drop (cancel) a task.
-
-/todo edit <id> [title] [@user] [/p project] [/s section] [due:date|due:-]
-    Edit a task. Mentions replace all assignees. due:- clears the date.
-
-/todo project list
-    Show all visible projects.
-
-/todo project set-private <name>
-    Make a project private (owner-only).
-
-/todo project set-shared <name>
-    Make a project shared.
-```
+> **운영 권장**: private와 shared에 같은 이름을 사용하지 않는 것을 권장 (혼란 방지).
