@@ -85,7 +85,7 @@ class TestMessageEndpoint:
         status, body = _post(f"{server_url}/message", payload)
         assert status == 200
         assert body["response"] is not None
-        assert "Usage" in body["response"]
+        assert "📖 OpenClaw TODO" in body["response"]
 
 
 # --- Error handling ---
