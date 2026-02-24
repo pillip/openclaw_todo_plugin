@@ -307,11 +307,11 @@ PRD 1.2/2.4에 따라 `openclaw.plugin.json`에 `command_prefix: "todo:"` 및 `b
 - PRD-Ref: PRD#5.4
 - Priority: P1
 - Estimate: 0.5d
-- Status: backlog
-- Owner: --
+- Status: done
+- Owner: pillip
 - Branch: `issue/ISSUE-034-move-section-shorthand`
-- GH-Issue: --
-- PR: --
+- GH-Issue: #60
+- PR: #61
 
 #### Goal
 PRD 5.4 문법 `todo: move <id> <section>`을 지원한다. 현재는 `todo: move 50 /s doing`만 동작하고 `todo: move 50 doing`은 동작하지 않는다.
