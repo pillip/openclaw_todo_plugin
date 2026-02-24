@@ -353,10 +353,10 @@ PRD 5.4 문법 `todo: move <id> <section>`을 지원한다. 현재는 `todo: mov
 - PRD-Ref: UX 명세 3.1~3.5
 - Priority: P1
 - Estimate: 1d
-- Status: backlog
-- Owner: --
+- Status: done
+- Owner: pillip
 - Branch: `issue/ISSUE-035-error-message-alignment`
-- GH-Issue: --
+- GH-Issue: #62
 - PR: --
 
 #### Goal
