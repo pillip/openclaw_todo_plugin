@@ -7,7 +7,7 @@ import sqlite3
 
 from openclaw_todo.event_logger import log_event
 from openclaw_todo.parser import DUE_CLEAR, ParsedCommand
-from openclaw_todo.project_resolver import ProjectNotFoundError, resolve_project
+from openclaw_todo.project_resolver import Project, ProjectNotFoundError, resolve_project
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +25,35 @@ def add_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) 
     if not title:
         return "Error: task title is required. Usage: todo: add <title> [options]"
 
-    # --- Resolve project ---
+    # --- Resolve project (auto-create as shared if not found) ---
     project_name = parsed.project or "Inbox"
+    project_auto_created = False
     try:
         project = resolve_project(conn, project_name, sender_id)
     except ProjectNotFoundError:
-        return f"Error: project {project_name!r} not found."
+        # Validate project name before auto-creating
+        stripped = project_name.strip()
+        if not stripped or len(stripped) > 128:
+            return "Error: project name must be 1-128 characters."
+        if not all(c.isalnum() or c in " _-" for c in stripped):
+            return "Error: project name may only contain letters, digits, spaces, hyphens, and underscores."
+
+        try:
+            conn.execute(
+                "INSERT INTO projects (name, visibility, owner_user_id) VALUES (?, 'shared', NULL);",
+                (stripped,),
+            )
+        except sqlite3.IntegrityError:
+            # Race condition: another concurrent request already created it
+            logger.debug("Concurrent auto-create for project '%s'; falling back to SELECT", stripped)
+
+        row = conn.execute(
+            "SELECT id, name, visibility, owner_user_id FROM projects WHERE name = ? AND visibility = 'shared';",
+            (stripped,),
+        ).fetchone()
+        project = Project(id=row[0], name=row[1], visibility=row[2], owner_user_id=row[3])
+        project_auto_created = True
+        logger.info("Auto-created shared project '%s' for add command", project_name)
 
     # --- Defaults ---
     section = parsed.section or "backlog"
@@ -62,7 +85,16 @@ def add_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) 
             (task_id, assignee),
         )
 
-    # --- Log event ---
+    # --- Log events ---
+    if project_auto_created:
+        log_event(
+            conn,
+            actor_user_id=sender_id,
+            action="project.auto_create",
+            task_id=None,
+            payload={"project": project.name, "visibility": "shared"},
+        )
+
     log_event(
         conn,
         actor_user_id=sender_id,
@@ -84,4 +116,7 @@ def add_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) 
     # --- Format response ---
     due_str = due if due else "-"
     assignee_str = ", ".join(f"<@{a}>" for a in assignees)
-    return f"✅ Added #{task_id} ({project.name}/{section}) due:{due_str} assignees:{assignee_str} — {title}"
+    response = f"✅ Added #{task_id} ({project.name}/{section}) due:{due_str} assignees:{assignee_str} — {title}"
+    if project_auto_created:
+        response = f'Project "{project.name}" was created (shared).\n{response}'
+    return response

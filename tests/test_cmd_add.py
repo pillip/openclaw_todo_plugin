@@ -199,17 +199,63 @@ class TestAddEdgeCases:
         assert "Error" in result
         assert "title" in result.lower()
 
-    def test_add_nonexistent_project_returns_error(self, conn):
+    def test_add_nonexistent_project_auto_creates(self, conn):
         parsed = _make_parsed(
             title_tokens=["Some", "task"],
-            project="NonExistent",
+            project="NewProject",
         )
         ctx = {"sender_id": "U001"}
 
         result = add_handler(parsed, conn, ctx)
 
-        assert "Error" in result
-        assert "NonExistent" in result
+        assert "Added #" in result
+        assert "(NewProject/backlog)" in result
+        assert 'Project "NewProject" was created (shared).' in result
+
+        # Verify project was created as shared with no owner
+        proj = conn.execute("SELECT visibility, owner_user_id FROM projects WHERE name = 'NewProject'").fetchone()
+        assert proj[0] == "shared"
+        assert proj[1] is None
+
+    def test_add_existing_project_no_auto_create_message(self, conn):
+        """Existing project should not show auto-create message."""
+        parsed = _make_parsed(title_tokens=["Task"], project="Inbox")
+        ctx = {"sender_id": "U001"}
+
+        result = add_handler(parsed, conn, ctx)
+
+        assert "Added #" in result
+        assert "was created" not in result
+
+    def test_add_auto_create_logs_event(self, conn):
+        """Auto-created project should log a project.auto_create event."""
+        parsed = _make_parsed(title_tokens=["Task"], project="AutoProj")
+        ctx = {"sender_id": "U001"}
+
+        add_handler(parsed, conn, ctx)
+
+        event = conn.execute(
+            "SELECT actor_user_id, action, payload FROM events WHERE action = 'project.auto_create'"
+        ).fetchone()
+        assert event is not None
+        assert event[0] == "U001"
+
+    def test_add_auto_create_private_takes_priority(self, conn):
+        """If a private project with same name exists, it should be used (no auto-create)."""
+        conn.execute(
+            "INSERT INTO projects (name, visibility, owner_user_id) VALUES ('MyProj', 'private', 'U001');"
+        )
+        conn.commit()
+
+        parsed = _make_parsed(title_tokens=["Task"], project="MyProj")
+        ctx = {"sender_id": "U001"}
+
+        result = add_handler(parsed, conn, ctx)
+
+        assert "Added #" in result
+        assert "was created" not in result
+        # Should use the private project
+        assert "(MyProj/backlog)" in result
 
     def test_add_due_clear_sentinel_stored_as_null(self, conn):
         parsed = _make_parsed(title_tokens=["Task"], due="-")
