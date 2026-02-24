@@ -204,11 +204,11 @@ PRD 1.2/2.4에 따라 `openclaw.plugin.json`에 `command_prefix: "todo:"` 및 `b
 - PRD-Ref: UX 명세 4.1~4.3, PRD#5.1~5.7
 - Priority: P0
 - Estimate: 1.5d
-- Status: backlog
-- Owner: --
+- Status: done
+- Owner: pillip
 - Branch: `issue/ISSUE-032-ux-response-format`
-- GH-Issue: --
-- PR: --
+- GH-Issue: #52
+- PR: #53
 
 #### Goal
 모든 커맨드 핸들러의 응답 메시지를 UX 명세(ux_spec.md) 4.1~4.3에 정의된 포맷으로 통일한다.
