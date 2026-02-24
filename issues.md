@@ -116,7 +116,7 @@ PRD 1.2/2.4에 따라 `openclaw.plugin.json`에 `command_prefix: "todo:"` 및 `b
 - Owner: pillip
 - Branch: `issue/ISSUE-030-status-filter-token`
 - GH-Issue: #54
-- PR: --
+- PR: #55
 
 #### Goal
 `todo: list done`, `todo: board drop` 처럼 title_tokens에 `open|done|drop` 키워드가 올 때 status 필터로 인식하도록 수정한다.
