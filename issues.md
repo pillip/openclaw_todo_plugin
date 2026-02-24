@@ -161,10 +161,10 @@ PRD 1.2/2.4에 따라 `openclaw.plugin.json`에 `command_prefix: "todo:"` 및 `b
 - PRD-Ref: UX 명세 7.2
 - Priority: P1
 - Estimate: 0.5d
-- Status: backlog
-- Owner: --
+- Status: done
+- Owner: pillip
 - Branch: `issue/ISSUE-031-help-command`
-- GH-Issue: --
+- GH-Issue: #56
 - PR: --
 
 #### Goal

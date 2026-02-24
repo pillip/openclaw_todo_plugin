@@ -27,7 +27,7 @@
 |---|-------|----------|----------|
 | ~~#029~~ | ~~manifest에 command_prefix 및 bypass_llm 필드 추가~~ | ~~P0~~ | Done → PR #51 |
 | ~~#030~~ | ~~list/board에서 open/done/drop status 필터 토큰 파싱~~ | ~~P1~~ | Done |
-| #031 | help 커맨드 및 상세 도움말 출력 | P1 | 0.5d |
+| ~~#031~~ | ~~help 커맨드 및 상세 도움말 출력~~ | ~~P1~~ | Done |
 | ~~#032~~ | ~~UX 명세에 맞는 응답 메시지 포맷 통일~~ | ~~P0~~ | Done → PR #53 |
 | #033 | add 시 존재하지 않는 프로젝트 자동 생성 (shared) | P1 | 1d |
 | #034 | move 커맨드에서 /s 없이 section 직접 지정 | P1 | 0.5d |
