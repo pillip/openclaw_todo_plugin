@@ -27,7 +27,7 @@ def set_private_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context
     # Extract project name from title_tokens (tokens after "set-private")
     name_tokens = parsed.title_tokens[1:] if len(parsed.title_tokens) > 1 else []
     if not name_tokens:
-        return "Error: project name required. Usage: todo: project set-private <name>"
+        return "❌ Project name is required. Usage: todo: project set-private <name>"
     project_name = name_tokens[0]
 
     # Step 1: Check if sender already has a private project with this name
@@ -37,7 +37,7 @@ def set_private_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context
     ).fetchone()
     if row is not None:
         logger.info("project set-private: %s result=already_private by %s", project_name, sender_id)
-        return f"Project '{project_name}' is already private for you."
+        return f'🔒 Project "{project_name}" is already private.'
 
     # Step 2: Check if a shared project with this name exists
     shared_row = conn.execute(
@@ -65,7 +65,7 @@ def set_private_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context
     conn.commit()
 
     logger.info("project set-private: %s result=created by %s", project_name, sender_id)
-    return f"Created private project '{project_name}'."
+    return f'🔒 Created private project "{project_name}".'
 
 
 def _convert_shared_to_private(
@@ -89,26 +89,21 @@ def _convert_shared_to_private(
     ).fetchall()
 
     if violations:
-        # Group by task ID
-        task_ids: list[int] = []
-        assignees: set[str] = set()
+        # Group assignees by task ID
+        task_assignees: dict[int, list[str]] = {}
         for task_id, assignee in violations:
-            if task_id not in task_ids:
-                task_ids.append(task_id)
-            assignees.add(assignee)
+            task_assignees.setdefault(task_id, []).append(assignee)
 
-        # Truncate to max violations
+        task_ids = list(task_assignees.keys())
         shown_tasks = task_ids[:_MAX_VIOLATIONS]
-        shown_assignees = sorted(assignees)[:_MAX_VIOLATIONS]
 
-        task_list = ", ".join(f"#{tid}" for tid in shown_tasks)
-        assignee_list = ", ".join(shown_assignees)
+        task_lines = ", ".join(
+            f"#{tid} assignees:{', '.join(f'<@{a}>' for a in task_assignees[tid])}" for tid in shown_tasks
+        )
 
         suffix = ""
         if len(task_ids) > _MAX_VIOLATIONS:
-            suffix += f" (+{len(task_ids) - _MAX_VIOLATIONS} more tasks)"
-        if len(assignees) > _MAX_VIOLATIONS:
-            suffix += f" (+{len(assignees) - _MAX_VIOLATIONS} more assignees)"
+            suffix = f"\n... and {len(task_ids) - _MAX_VIOLATIONS} more tasks with external assignees."
 
         logger.info(
             "project set-private: %s result=rejected by %s (%d violations)",
@@ -117,8 +112,10 @@ def _convert_shared_to_private(
             len(violations),
         )
         return (
-            f"Cannot make '{project_name}' private: "
-            f"tasks [{task_list}] have non-owner assignees [{assignee_list}].{suffix}"
+            f'❌ Cannot set project "{project_name}" to private: '
+            f"found tasks assigned to non-owner users.\n"
+            f"e.g. {task_lines}"
+            f"\nPlease reassign or remove these assignees first.{suffix}"
         )
 
     # All clear — convert
@@ -140,4 +137,4 @@ def _convert_shared_to_private(
     conn.commit()
 
     logger.info("project set-private: %s result=converted by %s", project_name, sender_id)
-    return f"Project '{project_name}' is now private."
+    return f'🔒 Project "{project_name}" is now private.'

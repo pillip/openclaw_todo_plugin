@@ -101,8 +101,8 @@ class TestAddPrivateRejectsOtherAssignee:
 
         result = add_handler(parsed, conn, ctx)
 
-        assert "Warning" in result
-        assert "NOT created" in result
+        assert "⚠️" in result
+        assert "적용되지 않았습니다" in result
         assert "<@U002>" in result
 
         # Verify no task was inserted
@@ -196,8 +196,8 @@ class TestAddEdgeCases:
 
         result = add_handler(parsed, conn, ctx)
 
-        assert "Error" in result
-        assert "title" in result.lower()
+        assert "❌" in result
+        assert "Title is required" in result
 
     def test_add_nonexistent_project_auto_creates(self, conn):
         parsed = _make_parsed(
@@ -210,7 +210,7 @@ class TestAddEdgeCases:
 
         assert "Added #" in result
         assert "(NewProject/backlog)" in result
-        assert 'Project "NewProject" was created (shared).' in result
+        assert 'ℹ️ Project "NewProject" was created (shared).' in result
 
         # Verify project was created as shared with no owner
         proj = conn.execute("SELECT visibility, owner_user_id FROM projects WHERE name = 'NewProject'").fetchone()

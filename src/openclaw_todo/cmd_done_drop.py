@@ -31,12 +31,12 @@ def _close_task(
 
     # --- Validate task ID ---
     if not parsed.args:
-        return f"Error: task ID required. Usage: todo: {action} <id>"
+        return f"❌ Task ID is required. Usage: todo: {action} <id>"
 
     try:
         task_id = int(parsed.args[0])
     except ValueError:
-        return f"Error: invalid task ID: {parsed.args[0]!r}"
+        return f'❌ Invalid task ID "{parsed.args[0]}". Must be a number.'
 
     # --- Check task exists ---
     row = conn.execute(
@@ -46,17 +46,17 @@ def _close_task(
         (task_id,),
     ).fetchone()
     if row is None:
-        return f"Error: task #{task_id} not found."
+        return f"❌ Task #{task_id} not found."
 
     title, current_section, current_status, project_name = row
 
     # --- Already closed? ---
     if current_status in ("done", "dropped"):
-        return f"Task #{task_id} is already {current_status}."
+        return f"ℹ️ Task #{task_id} is already {current_status}."
 
     # --- Check permission ---
     if not can_write_task(conn, task_id, sender_id):
-        return f"Error: permission denied for task #{task_id}."
+        return f"❌ You don't have permission to modify task #{task_id}."
 
     # --- Update task ---
     conn.execute(

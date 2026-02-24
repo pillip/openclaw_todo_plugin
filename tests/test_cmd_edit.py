@@ -34,7 +34,7 @@ class TestEditTitle:
         parsed = _make_parsed(args=[str(task_id)], title_tokens=["Same", "title"])
         result = edit_handler(parsed, conn, {"sender_id": "U001"})
 
-        assert "No changes" in result
+        assert "No changes specified" in result
 
 
 class TestEditAssignees:
@@ -58,7 +58,7 @@ class TestEditAssignees:
         parsed = _make_parsed(args=[str(task_id)], mentions=["U001"])
         result = edit_handler(parsed, conn, {"sender_id": "U001"})
 
-        assert "No changes" in result
+        assert "No changes specified" in result
 
 
 class TestEditDue:
@@ -89,7 +89,7 @@ class TestEditDue:
         parsed = _make_parsed(args=[str(task_id)], due="2026-03-15")
         result = edit_handler(parsed, conn, {"sender_id": "U001"})
 
-        assert "No changes" in result
+        assert "No changes specified" in result
 
 
 class TestEditProject:
@@ -137,7 +137,8 @@ class TestEditPrivateAssignee:
         parsed = _make_parsed(args=[str(task_id)], mentions=["UOTHER"])
         result = edit_handler(parsed, conn, {"sender_id": "UOWNER"})
 
-        assert "Private project" in result or "non-owner" in result
+        assert "⚠️" in result
+        assert "Private" in result or "owner" in result
 
     def test_edit_private_owner_assignee_allowed(self, conn):
         task_id = _seed_task(
@@ -205,14 +206,14 @@ class TestEditPermissions:
         parsed = _make_parsed(args=[str(task_id)], title_tokens=["Hacked"])
         result = edit_handler(parsed, conn, {"sender_id": "UOTHER"})
 
-        assert "permission denied" in result
+        assert "don't have permission" in result
 
     def test_edit_shared_unrelated_rejected(self, conn):
         task_id = _seed_task(conn, created_by="UCREATOR", assignees=["UASSIGNEE"])
         parsed = _make_parsed(args=[str(task_id)], title_tokens=["Hacked"])
         result = edit_handler(parsed, conn, {"sender_id": "URANDOM"})
 
-        assert "permission denied" in result
+        assert "don't have permission" in result
 
     def test_edit_shared_assignee_allowed(self, conn):
         task_id = _seed_task(conn, created_by="UCREATOR", assignees=["UASSIGNEE"])
@@ -227,11 +228,11 @@ class TestEditEdgeCases:
 
     def test_missing_task_id(self, conn):
         result = edit_handler(_make_parsed(args=[]), conn, {"sender_id": "U001"})
-        assert "task ID required" in result
+        assert "Task ID is required" in result
 
     def test_invalid_task_id(self, conn):
         result = edit_handler(_make_parsed(args=["abc"]), conn, {"sender_id": "U001"})
-        assert "invalid task ID" in result
+        assert "Invalid task ID" in result
 
     def test_nonexistent_task(self, conn):
         result = edit_handler(_make_parsed(args=["9999"]), conn, {"sender_id": "U001"})
@@ -242,7 +243,7 @@ class TestEditEdgeCases:
         parsed = _make_parsed(args=[str(task_id)])
         result = edit_handler(parsed, conn, {"sender_id": "U001"})
 
-        assert "No changes" in result
+        assert "No changes specified" in result
 
     def test_multiple_fields_at_once(self, conn):
         task_id = _seed_task(conn, title="Old", section="backlog")

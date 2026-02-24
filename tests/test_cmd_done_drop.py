@@ -89,7 +89,7 @@ class TestPermissionCheck:
         )
         result = done_handler(_make_parsed("done", args=[str(task_id)]), conn, {"sender_id": "UOWNER"})
         assert "Done" in result
-        assert "Error" not in result
+        assert "❌" not in result
 
     def test_done_private_non_owner_rejected(self, conn):
         task_id = _seed_task(
@@ -101,7 +101,7 @@ class TestPermissionCheck:
             assignees=["UOWNER"],
         )
         result = done_handler(_make_parsed("done", args=[str(task_id)]), conn, {"sender_id": "UOTHER"})
-        assert "permission denied" in result
+        assert "don't have permission" in result
 
     def test_drop_shared_assignee_allowed(self, conn):
         task_id = _seed_task(conn, created_by="UCREATOR", assignees=["UASSIGNEE"])
@@ -111,7 +111,7 @@ class TestPermissionCheck:
     def test_drop_shared_unrelated_rejected(self, conn):
         task_id = _seed_task(conn, created_by="UCREATOR", assignees=["UASSIGNEE"])
         result = drop_handler(_make_parsed("drop", args=[str(task_id)]), conn, {"sender_id": "URANDOM"})
-        assert "permission denied" in result
+        assert "don't have permission" in result
 
 
 class TestAlreadyClosed:
@@ -144,11 +144,11 @@ class TestEdgeCases:
 
     def test_missing_task_id(self, conn):
         result = done_handler(_make_parsed("done", args=[]), conn, {"sender_id": "U001"})
-        assert "task ID required" in result
+        assert "Task ID is required" in result
 
     def test_invalid_task_id(self, conn):
         result = done_handler(_make_parsed("done", args=["abc"]), conn, {"sender_id": "U001"})
-        assert "invalid task ID" in result
+        assert "Invalid task ID" in result
 
     def test_nonexistent_task(self, conn):
         result = done_handler(_make_parsed("done", args=["9999"]), conn, {"sender_id": "U001"})

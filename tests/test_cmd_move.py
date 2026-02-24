@@ -66,7 +66,7 @@ class TestMoveValidSection:
 
         result = move_handler(parsed, conn, {"sender_id": "U001"})
 
-        assert "already in section" in result
+        assert "already in" in result
 
 
 class TestMoveInvalidSection:
@@ -78,31 +78,31 @@ class TestMoveInvalidSection:
 
         result = move_handler(parsed, conn, {"sender_id": "U001"})
 
-        assert "Error" in result
-        assert "section required" in result
+        assert "❌" in result
+        assert "section is required" in result
 
     def test_move_missing_task_id(self, conn):
         parsed = _make_parsed(args=[], section="doing")
 
         result = move_handler(parsed, conn, {"sender_id": "U001"})
 
-        assert "Error" in result
-        assert "task ID required" in result
+        assert "❌" in result
+        assert "Task ID is required" in result
 
     def test_move_invalid_task_id(self, conn):
         parsed = _make_parsed(args=["abc"], section="doing")
 
         result = move_handler(parsed, conn, {"sender_id": "U001"})
 
-        assert "Error" in result
-        assert "invalid task ID" in result
+        assert "❌" in result
+        assert "Invalid task ID" in result
 
     def test_move_nonexistent_task(self, conn):
         parsed = _make_parsed(args=["9999"], section="doing")
 
         result = move_handler(parsed, conn, {"sender_id": "U001"})
 
-        assert "Error" in result
+        assert "❌" in result
         assert "not found" in result
 
 
@@ -137,8 +137,8 @@ class TestMovePrivateOwnerOnly:
 
         result = move_handler(parsed, conn, {"sender_id": "UOTHER"})
 
-        assert "Error" in result
-        assert "permission denied" in result
+        assert "❌" in result
+        assert "don't have permission" in result
 
 
 class TestMoveSectionShorthand:
@@ -192,8 +192,8 @@ class TestMoveSectionShorthand:
 
         result = move_handler(parsed, conn, {"sender_id": "U001"})
 
-        assert "Error" in result
-        assert "section required" in result
+        assert "❌" in result
+        assert "Invalid section" in result
 
 
 class TestMoveSharedPermission:
@@ -233,5 +233,5 @@ class TestMoveSharedPermission:
 
         result = move_handler(parsed, conn, {"sender_id": "URANDOM"})
 
-        assert "Error" in result
-        assert "permission denied" in result
+        assert "❌" in result
+        assert "don't have permission" in result

@@ -123,9 +123,9 @@ class TestSetPrivateSharedRejected:
 
         result = set_private_handler(_make_parsed("Backend"), conn, {"sender_id": "U001"})
 
-        assert "cannot make" in result.lower()
+        assert "Cannot set project" in result
         assert f"#{tid}" in result
-        assert "U002" in result
+        assert "<@U002>" in result
 
         # Verify project NOT changed
         row = conn.execute("SELECT visibility FROM projects WHERE name = 'Backend';").fetchone()
@@ -152,10 +152,10 @@ class TestSetPrivateSharedRejected:
 
         result = set_private_handler(_make_parsed("Backend"), conn, {"sender_id": "U001"})
 
-        assert "Cannot make" in result
-        assert "non-owner assignees" in result
-        assert "U002" in result
-        assert "U003" in result
+        assert "Cannot set project" in result
+        assert "non-owner users" in result
+        assert "<@U002>" in result
+        assert "<@U003>" in result
 
     def test_owner_assignees_not_flagged(self, conn):
         """Tasks where the only assignee is the owner should NOT cause rejection."""
@@ -194,9 +194,9 @@ class TestSetPrivateSharedRejected:
         result = set_private_handler(_make_parsed("Backend"), conn, {"sender_id": "U001"})
 
         # Should be rejected because of task2's non-owner assignee
-        assert "cannot make" in result.lower()
+        assert "Cannot set project" in result
         assert f"#{tid2}" in result
-        assert "U099" in result
+        assert "<@U099>" in result
         # task1 should NOT appear since its only assignee is the owner
         assert f"#{tid1}" not in result
 
@@ -234,7 +234,8 @@ class TestSetPrivateEdgeCases:
 
     def test_missing_project_name(self, conn):
         result = set_private_handler(_make_parsed_no_name(), conn, {"sender_id": "U001"})
-        assert "project name required" in result.lower()
+        assert "❌" in result
+        assert "Project name is required" in result
 
     def test_other_users_private_not_affected(self, conn):
         """Setting private for a name that another user has private should create new."""

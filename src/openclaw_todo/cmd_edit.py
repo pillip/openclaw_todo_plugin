@@ -19,12 +19,12 @@ def edit_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
 
     # --- Validate task ID ---
     if not parsed.args:
-        return "Error: task ID required. Usage: todo: edit <id> [title] [options]"
+        return "❌ Task ID is required. Usage: todo: edit <id> [title] [options]"
 
     try:
         task_id = int(parsed.args[0])
     except ValueError:
-        return f"Error: invalid task ID: {parsed.args[0]!r}"
+        return f'❌ Invalid task ID "{parsed.args[0]}". Must be a number.'
 
     # --- Check task exists ---
     row = conn.execute(
@@ -32,13 +32,13 @@ def edit_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
         (task_id,),
     ).fetchone()
     if row is None:
-        return f"Error: task #{task_id} not found."
+        return f"❌ Task #{task_id} not found."
 
     old_title, old_project_id, old_section, old_due, created_by = row
 
     # --- Check permission ---
     if not can_write_task(conn, task_id, sender_id):
-        return f"Error: permission denied for task #{task_id}."
+        return f"❌ You don't have permission to modify task #{task_id}."
 
     # --- Collect changes ---
     changes: dict[str, tuple] = {}  # field -> (old, new)
@@ -76,7 +76,7 @@ def edit_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
         try:
             project = resolve_project(conn, parsed.project, sender_id)
         except ProjectNotFoundError:
-            return f"Error: project {parsed.project!r} not found."
+            return f'❌ Project "{parsed.project}" not found.'
         if project.id != old_project_id:
             # Get old project name for the change log
             old_proj_name = conn.execute("SELECT name FROM projects WHERE id = ?", (old_project_id,)).fetchone()[0]
@@ -103,13 +103,13 @@ def edit_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
             ).fetchone()
             warning = validate_private_assignees(proj_row[0], new_assignees, proj_row[1])
             if warning:
-                return f"Error: {warning}"
+                return warning
 
             changes["assignees"] = (old_assignees, new_assignees)
 
     # --- No changes? ---
     if not changes:
-        return f"No changes for task #{task_id}."
+        return f"ℹ️ No changes specified for #{task_id}."
 
     # --- Apply updates ---
     # Always set updated_at if any changes detected

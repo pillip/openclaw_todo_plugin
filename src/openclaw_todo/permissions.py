@@ -82,4 +82,5 @@ def validate_private_assignees(
     if not non_owner:
         return None
 
-    return f"Private project cannot have non-owner assignees: {', '.join(non_owner)}"
+    formatted = ", ".join(f"<@{uid}>" for uid in non_owner)
+    return f"⚠️ Private 프로젝트에는 owner 외 다른 담당자({formatted})를 지정할 수 없습니다.\n(요청이 적용되지 않았습니다.)"

@@ -117,13 +117,13 @@ def dispatch(text: str, context: dict, db_path: str | None = None) -> str:
     try:
         parsed = parse(text)
     except ParseError as exc:
-        return f"Parse error: {exc}"
+        return f"❌ {exc}"
 
     command = parsed.command
 
     if command not in _VALID_COMMANDS:
         logger.info("Unknown command: %s", command)
-        return f"Unknown command: '{command}'\n{USAGE}"
+        return f'❌ Unknown command "{command}". Available: add, list, board, move, done, drop, edit, project'
 
     if command == "help":
         return HELP_TEXT
@@ -154,7 +154,7 @@ def _dispatch_project(parsed: ParsedCommand, conn: sqlite3.Connection, context: 
     # e.g. "/todo project set-private MyProject"
     if sub not in _VALID_PROJECT_SUBS:
         logger.info("Unknown project subcommand: %s", sub)
-        return f"Unknown project subcommand: '{sub}'\n{PROJECT_USAGE}"
+        return f'❌ Unknown project subcommand "{sub}". Available: list, set-private, set-shared'
 
     logger.info("Dispatching command=project sub=%s", sub)
 

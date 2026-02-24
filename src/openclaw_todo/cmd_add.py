@@ -23,7 +23,7 @@ def add_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) 
     title = " ".join(parsed.title_tokens)
 
     if not title:
-        return "Error: task title is required. Usage: todo: add <title> [options]"
+        return "❌ Title is required. Usage: todo: add <title> [options]"
 
     # --- Resolve project (auto-create as shared if not found) ---
     project_name = parsed.project or "Inbox"
@@ -34,9 +34,9 @@ def add_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) 
         # Validate project name before auto-creating
         stripped = project_name.strip()
         if not stripped or len(stripped) > 128:
-            return "Error: project name must be 1-128 characters."
+            return "❌ Project name must be 1-128 characters."
         if not all(c.isalnum() or c in " _-" for c in stripped):
-            return "Error: project name may only contain letters, digits, spaces, hyphens, and underscores."
+            return "❌ Project name may only contain letters, digits, spaces, hyphens, and underscores."
 
         try:
             conn.execute(
@@ -66,9 +66,9 @@ def add_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) 
         if non_owner:
             formatted = ", ".join(f"<@{uid}>" for uid in non_owner)
             return (
-                f"Warning: private project '{project.name}' belongs to "
-                f"<@{project.owner_user_id}>. Cannot assign to {formatted}. "
-                f"Task was NOT created."
+                f'⚠️ Private 프로젝트("{project.name}")는 owner만 볼 수 있어요. '
+                f"다른 담당자({formatted})를 지정할 수 없습니다.\n"
+                f"(요청이 적용되지 않았습니다.)"
             )
 
     # --- Insert task ---
@@ -118,5 +118,5 @@ def add_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) 
     assignee_str = ", ".join(f"<@{a}>" for a in assignees)
     response = f"✅ Added #{task_id} ({project.name}/{section}) due:{due_str} assignees:{assignee_str} — {title}"
     if project_auto_created:
-        response = f'Project "{project.name}" was created (shared).\n{response}'
+        response = f'{response}\nℹ️ Project "{project.name}" was created (shared).'
     return response

@@ -115,12 +115,12 @@ class TestBoardLimitPerSection:
     def test_invalid_limit(self, conn):
         parsed = _make_parsed(title_tokens=["limitPerSection:abc"])
         result = board_handler(parsed, conn, {"sender_id": "U001"})
-        assert "Error" in result
+        assert "❌" in result
 
     def test_zero_limit(self, conn):
         parsed = _make_parsed(title_tokens=["limitPerSection:0"])
         result = board_handler(parsed, conn, {"sender_id": "U001"})
-        assert "Error" in result
+        assert "❌" in result
 
 
 class TestBoardScopeFilter:

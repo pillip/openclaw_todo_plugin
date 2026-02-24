@@ -23,12 +23,12 @@ def move_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
 
     # --- Validate task ID ---
     if not parsed.args:
-        return "Error: task ID required. Usage: todo: move <id> /s <section>"
+        return "❌ Task ID is required. Usage: todo: move <id> <section>"
 
     try:
         task_id = int(parsed.args[0])
     except ValueError:
-        return f"Error: invalid task ID: {parsed.args[0]!r}"
+        return f'❌ Invalid task ID "{parsed.args[0]}". Must be a number.'
 
     # --- Validate target section (supports both /s and shorthand) ---
     target_section = parsed.section
@@ -36,8 +36,10 @@ def move_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
         token = parsed.title_tokens[0].lower()
         if token in VALID_SECTIONS:
             target_section = token
+        else:
+            return f'❌ Invalid section "{parsed.title_tokens[0]}". Must be one of: backlog, doing, waiting, done, drop'
     if not target_section:
-        return "Error: target section required. Usage: todo: move <id> <section>"
+        return "❌ Target section is required. Usage: todo: move <id> <section>"
 
     # --- Check task exists ---
     row = conn.execute(
@@ -45,16 +47,16 @@ def move_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
         (task_id,),
     ).fetchone()
     if row is None:
-        return f"Error: task #{task_id} not found."
+        return f"❌ Task #{task_id} not found."
 
     title, current_section, project_id = row
 
     if current_section == target_section:
-        return f"Task #{task_id} is already in section '{target_section}'."
+        return f"ℹ️ Task #{task_id} is already in {target_section}."
 
     # --- Check permission ---
     if not can_write_task(conn, task_id, sender_id):
-        return f"Error: permission denied for task #{task_id}."
+        return f"❌ You don't have permission to modify task #{task_id}."
 
     # --- Update task ---
     conn.execute(
