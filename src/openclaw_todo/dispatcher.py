@@ -26,12 +26,46 @@ HandlerFn = Callable[[ParsedCommand, sqlite3.Connection, dict], str]
 
 logger = logging.getLogger(__name__)
 
-USAGE = "Usage: todo: <command> [options]\n" "Commands: add, list, board, move, done, drop, edit, project"
+HELP_TEXT = """\
+📖 OpenClaw TODO — Commands
 
-PROJECT_USAGE = "Usage: todo: project <subcommand>\n" "Subcommands: list, set-private, set-shared"
+todo: add <title> [@user] [/p project] [/s section] [due:date]
+    Create a new task.
+
+todo: list [mine|all|@user] [/p project] [/s section] [open|done|drop] [limit:N]
+    List tasks.
+
+todo: board [mine|all|@user] [/p project] [open|done|drop] [limitPerSection:N]
+    Show kanban board view.
+
+todo: move <id> <section>
+    Move a task to a section (backlog, doing, waiting, done, drop).
+
+todo: done <id>
+    Mark a task as done.
+
+todo: drop <id>
+    Drop (cancel) a task.
+
+todo: edit <id> [title] [@user] [/p project] [/s section] [due:date|due:-]
+    Edit a task. Mentions replace all assignees. due:- clears the date.
+
+todo: project list
+    Show all visible projects.
+
+todo: project set-private <name>
+    Make a project private (owner-only).
+
+todo: project set-shared <name>
+    Make a project shared."""
+
+# Keep short USAGE for backward compatibility (used in "Unknown command" responses)
+USAGE = "Usage: todo: <command> [options]\nCommands: add, list, board, move, done, drop, edit, project, help"
+
+PROJECT_USAGE = "Usage: todo: project <subcommand>\nSubcommands: list, set-private, set-shared"
 
 # Valid top-level command names
-_VALID_COMMANDS = frozenset({"add", "list", "board", "move", "done", "drop", "edit", "project"})
+_VALID_COMMANDS = frozenset({"add", "list", "board", "move", "done", "drop", "edit", "project", "help"})
 
 # Valid project subcommands
 _VALID_PROJECT_SUBS = frozenset({"list", "set-private", "set-shared"})
@@ -90,6 +124,9 @@ def dispatch(text: str, context: dict, db_path: str | None = None) -> str:
     if command not in _VALID_COMMANDS:
         logger.info("Unknown command: %s", command)
         return f"Unknown command: '{command}'\n{USAGE}"
+
+    if command == "help":
+        return HELP_TEXT
 
     logger.info("Dispatching command=%s", command)
 

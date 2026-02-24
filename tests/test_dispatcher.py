@@ -140,6 +140,28 @@ class TestProjectSubRouting:
         assert "foobar" in result
 
 
+class TestHelpCommand:
+    """help command returns detailed usage information."""
+
+    def test_help_returns_detailed_help(self, db_path):
+        result = dispatch("help", {"sender_id": "U1"}, db_path=db_path)
+        assert "📖 OpenClaw TODO" in result
+        assert "todo: add" in result
+        assert "todo: list" in result
+        assert "todo: board" in result
+        assert "todo: move" in result
+        assert "todo: done" in result
+        assert "todo: drop" in result
+        assert "todo: edit" in result
+        assert "todo: project list" in result
+
+    def test_help_does_not_open_db(self, db_path):
+        """help should return immediately without opening a DB connection."""
+        # If this doesn't raise, help didn't try to open DB
+        result = dispatch("help", {"sender_id": "U1"}, db_path=None)
+        assert "📖 OpenClaw TODO" in result
+
+
 class TestUnknownCommandHelp:
     """Unknown commands return a helpful error message."""
 

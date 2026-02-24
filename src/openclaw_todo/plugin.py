@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from openclaw_todo.dispatcher import USAGE, dispatch
+from openclaw_todo.dispatcher import HELP_TEXT, dispatch
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,6 @@ def handle_message(text: str, context: dict, db_path: str | None = None) -> str 
     remainder = stripped[len(_TODO_PREFIX) :].strip()
 
     if not remainder:
-        return USAGE
+        return HELP_TEXT
 
     return dispatch(remainder, context, db_path=db_path)
