@@ -59,6 +59,14 @@ def _seed_tasks(conn):
     )
     conn.execute("INSERT INTO task_assignees (task_id, assignee_user_id) VALUES (5, 'U001');")
 
+    # Dropped task in Inbox, assigned to U001
+    conn.execute(
+        "INSERT INTO tasks (title, project_id, section, due, status, created_by) "
+        "VALUES ('Dropped task', ?, 'drop', NULL, 'dropped', 'U001');",
+        (inbox_id,),
+    )
+    conn.execute("INSERT INTO task_assignees (task_id, assignee_user_id) VALUES (6, 'U001');")
+
     conn.commit()
 
 
@@ -241,6 +249,68 @@ class TestListSectionFilter:
         assert "Task B" in result
         assert "Task A" not in result
         assert "Task C" not in result
+
+
+class TestListStatusToken:
+    """Status filter via title_tokens: open, done, drop."""
+
+    def test_list_done_token(self, conn):
+        _seed_tasks(conn)
+        parsed = _make_parsed(title_tokens=["done"])
+        ctx = {"sender_id": "U001"}
+
+        result = list_handler(parsed, conn, ctx)
+
+        assert "Done task" in result
+        assert "Task A" not in result
+        assert "Task C" not in result
+        assert "/ done)" in result  # header shows status=done
+
+    def test_list_drop_token(self, conn):
+        _seed_tasks(conn)
+        parsed = _make_parsed(title_tokens=["drop"])
+        ctx = {"sender_id": "U001"}
+
+        result = list_handler(parsed, conn, ctx)
+
+        assert "Dropped task" in result
+        assert "Task A" not in result
+        assert "/ dropped)" in result  # header shows status=dropped
+
+    def test_list_open_token(self, conn):
+        _seed_tasks(conn)
+        parsed = _make_parsed(title_tokens=["open"])
+        ctx = {"sender_id": "U001"}
+
+        result = list_handler(parsed, conn, ctx)
+
+        # Same as default — open tasks only
+        assert "Task A" in result
+        assert "Done task" not in result
+        assert "Dropped task" not in result
+        assert "/ open)" in result
+
+    def test_list_done_token_with_all_scope(self, conn):
+        _seed_tasks(conn)
+        parsed = _make_parsed(title_tokens=["all", "done"])
+        ctx = {"sender_id": "U001"}
+
+        result = list_handler(parsed, conn, ctx)
+
+        assert "Done task" in result
+        assert "Task A" not in result
+
+    def test_list_done_token_no_conflict_with_section(self, conn):
+        """done as title_token should not conflict with /s section."""
+        _seed_tasks(conn)
+        # /s done via parsed.section still works
+        parsed = _make_parsed(section="done")
+        ctx = {"sender_id": "U001"}
+
+        result = list_handler(parsed, conn, ctx)
+
+        assert "Done task" in result
+        assert "Task A" not in result
 
 
 class TestListNoResults:

@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - `board` uses em-dash section separators and Unicode emoji header
 
 ### Added
+- `list` and `board` commands now accept `open|done|drop` status filter tokens (e.g., `todo: list done`, `todo: board drop`) (PR #55)
 - `command_prefix` and `bypass_llm` fields in `openclaw.plugin.json` manifest — Gateway can skip LLM pipeline and call plugin handler directly (PR #51)
 
 ### Changed

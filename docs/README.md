@@ -60,8 +60,8 @@ uv run pytest tests/test_parser.py -q
 | Command | Description |
 |---------|-------------|
 | `todo: add <title> [@user] [/p project] [/s section] [due:date]` | Create a task |
-| `todo: list [mine\|all\|@user] [/p project] [/s section]` | List tasks |
-| `todo: board [mine\|all\|@user] [/p project]` | Kanban board view |
+| `todo: list [mine\|all\|@user] [open\|done\|drop] [/p project] [/s section]` | List tasks |
+| `todo: board [mine\|all\|@user] [open\|done\|drop] [/p project]` | Kanban board view |
 | `todo: move <id> <section>` | Move task to section |
 | `todo: done <id>` | Mark task done |
 | `todo: drop <id>` | Drop a task |

@@ -28,10 +28,13 @@ def board_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict
 
     tokens = list(parsed.title_tokens)
 
+    status_token: str | None = None
     for tok in tokens:
         low = tok.lower()
         if low in ("mine", "all"):
             scope = low
+        elif low in ("open", "done", "drop"):
+            status_token = low
         elif low.startswith("limitpersection:"):
             try:
                 limit_per_section = int(low.split(":", 1)[1])
@@ -48,9 +51,11 @@ def board_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict
     conditions: list[str] = []
     params: list[str | int] = []
 
-    # Status filter (default: open)
+    # Status filter: title_token > /s section > default "open"
     status_filter = "open"
-    if parsed.section in ("done", "drop"):
+    if status_token:
+        status_filter = "dropped" if status_token == "drop" else status_token
+    elif parsed.section in ("done", "drop"):
         status_filter = "done" if parsed.section == "done" else "dropped"
 
     conditions.append("t.status = ?")

@@ -201,6 +201,57 @@ class TestBoardTaskLineFormat:
         assert "due:-" in result
 
 
+class TestBoardStatusToken:
+    """Status filter via title_tokens: open, done, drop."""
+
+    def test_board_done_token(self, conn):
+        _seed_task(conn, title="open task", section="doing")
+        # Manually insert a done task
+        inbox_id = conn.execute("SELECT id FROM projects WHERE name = 'Inbox'").fetchone()[0]
+        conn.execute(
+            "INSERT INTO tasks (title, project_id, section, status, created_by) "
+            "VALUES ('finished task', ?, 'done', 'done', 'U001');",
+            (inbox_id,),
+        )
+        task_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        conn.execute("INSERT INTO task_assignees (task_id, assignee_user_id) VALUES (?, 'U001');", (task_id,))
+        conn.commit()
+
+        parsed = _make_parsed(title_tokens=["done"])
+        result = board_handler(parsed, conn, {"sender_id": "U001"})
+
+        assert "finished task" in result
+        assert "open task" not in result
+        assert "/ done)" in result  # header shows status=done
+
+    def test_board_drop_token(self, conn):
+        _seed_task(conn, title="open task", section="doing")
+        inbox_id = conn.execute("SELECT id FROM projects WHERE name = 'Inbox'").fetchone()[0]
+        conn.execute(
+            "INSERT INTO tasks (title, project_id, section, status, created_by) "
+            "VALUES ('cancelled task', ?, 'drop', 'dropped', 'U001');",
+            (inbox_id,),
+        )
+        task_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        conn.execute("INSERT INTO task_assignees (task_id, assignee_user_id) VALUES (?, 'U001');", (task_id,))
+        conn.commit()
+
+        parsed = _make_parsed(title_tokens=["drop"])
+        result = board_handler(parsed, conn, {"sender_id": "U001"})
+
+        assert "cancelled task" in result
+        assert "open task" not in result
+        assert "/ dropped)" in result
+
+    def test_board_open_token_explicit(self, conn):
+        _seed_task(conn, title="active task", section="doing")
+        parsed = _make_parsed(title_tokens=["open"])
+        result = board_handler(parsed, conn, {"sender_id": "U001"})
+
+        assert "active task" in result
+        assert "/ open)" in result
+
+
 class TestBoardEmpty:
     """Board with no matching tasks shows all sections as empty."""
 
