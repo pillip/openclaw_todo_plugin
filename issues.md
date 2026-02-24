@@ -19,7 +19,7 @@
 ## Board
 
 ### Backlog
-- [ ] ISSUE-029: manifest에 command_prefix 및 bypass_llm 필드 추가 _(track: platform, P0, 0.5d)_
+- [x] ISSUE-029: manifest에 command_prefix 및 bypass_llm 필드 추가 _(track: platform, P0, 0.5d)_ → PR #51
 - [ ] ISSUE-030: list/board에서 open|done|drop status 필터 토큰 파싱 지원 _(track: product, P1, 1d)_
 - [ ] ISSUE-031: help 커맨드 및 빈 todo: 입력 시 상세 도움말 출력 _(track: product, P1, 0.5d)_
 - [ ] ISSUE-032: UX 명세에 맞는 응답 메시지 포맷 통일 _(track: product, P0, 1.5d)_
@@ -70,11 +70,11 @@
 - PRD-Ref: PRD#1.2, PRD#2.4, PRD#9 (AC 마지막 항목)
 - Priority: P0
 - Estimate: 0.5d
-- Status: backlog
-- Owner: --
+- Status: done
+- Owner: claude
 - Branch: `issue/ISSUE-029-manifest-bypass-llm`
-- GH-Issue: --
-- PR: --
+- GH-Issue: #50
+- PR: #51
 
 #### Goal
 PRD 1.2/2.4에 따라 `openclaw.plugin.json`에 `command_prefix: "todo:"` 및 `bypass_llm: true` 최상위 필드를 추가하여 Gateway가 LLM 없이 직접 플러그인을 호출하도록 한다.

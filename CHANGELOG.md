@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- `command_prefix` and `bypass_llm` fields in `openclaw.plugin.json` manifest — Gateway can skip LLM pipeline and call plugin handler directly (PR #51)
+
 ### Changed
 - Command prefix changed from `/todo` to `todo:` — avoids both Slack slash-command interception and OpenClaw `!` bash reservation
 - Relax Python version requirement to `>=3.10`

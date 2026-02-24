@@ -4,6 +4,8 @@
   "version": "0.1.0",
   "description": "Bridge plugin that forwards todo: commands to the Python HTTP server",
   "main": "dist/index.js",
+  "command_prefix": "todo:",
+  "bypass_llm": true,
   "configSchema": {
     "type": "object",
     "additionalProperties": false,

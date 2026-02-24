@@ -25,7 +25,7 @@
 
 | # | Title | Priority | Estimate |
 |---|-------|----------|----------|
-| #029 | manifest에 command_prefix 및 bypass_llm 필드 추가 | P0 | 0.5d |
+| ~~#029~~ | ~~manifest에 command_prefix 및 bypass_llm 필드 추가~~ | ~~P0~~ | Done → PR #51 |
 | #030 | list/board에서 open/done/drop status 필터 토큰 파싱 | P1 | 1d |
 | #031 | help 커맨드 및 상세 도움말 출력 | P1 | 0.5d |
 | #032 | UX 명세에 맞는 응답 메시지 포맷 통일 | P0 | 1.5d |
