@@ -265,7 +265,7 @@ PRD 1.2/2.4에 따라 `openclaw.plugin.json`에 `command_prefix: "todo:"` 및 `b
 - Owner: pillip
 - Branch: `issue/ISSUE-033-auto-create-project`
 - GH-Issue: #58
-- PR: --
+- PR: #59
 
 #### Goal
 `todo: add ... /p NewProject`에서 존재하지 않는 프로젝트명을 지정하면 shared 프로젝트를 자동 생성하고 태스크를 추가한다.
