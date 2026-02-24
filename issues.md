@@ -165,7 +165,7 @@ PRD 1.2/2.4에 따라 `openclaw.plugin.json`에 `command_prefix: "todo:"` 및 `b
 - Owner: pillip
 - Branch: `issue/ISSUE-031-help-command`
 - GH-Issue: #56
-- PR: --
+- PR: #57
 
 #### Goal
 `todo:` 빈 입력 또는 `todo: help` 입력 시 UX 명세에 정의된 커맨드별 상세 도움말을 반환한다.
