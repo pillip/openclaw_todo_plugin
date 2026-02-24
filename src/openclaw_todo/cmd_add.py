@@ -31,13 +31,25 @@ def add_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) 
     try:
         project = resolve_project(conn, project_name, sender_id)
     except ProjectNotFoundError:
-        conn.execute(
-            "INSERT INTO projects (name, visibility, owner_user_id) VALUES (?, 'shared', NULL);",
-            (project_name,),
-        )
+        # Validate project name before auto-creating
+        stripped = project_name.strip()
+        if not stripped or len(stripped) > 128:
+            return "Error: project name must be 1-128 characters."
+        if not all(c.isalnum() or c in " _-" for c in stripped):
+            return "Error: project name may only contain letters, digits, spaces, hyphens, and underscores."
+
+        try:
+            conn.execute(
+                "INSERT INTO projects (name, visibility, owner_user_id) VALUES (?, 'shared', NULL);",
+                (stripped,),
+            )
+        except sqlite3.IntegrityError:
+            # Race condition: another concurrent request already created it
+            logger.debug("Concurrent auto-create for project '%s'; falling back to SELECT", stripped)
+
         row = conn.execute(
             "SELECT id, name, visibility, owner_user_id FROM projects WHERE name = ? AND visibility = 'shared';",
-            (project_name,),
+            (stripped,),
         ).fetchone()
         project = Project(id=row[0], name=row[1], visibility=row[2], owner_user_id=row[3])
         project_auto_created = True
