@@ -24,7 +24,7 @@ class TestEditTitle:
         result = edit_handler(parsed, conn, {"sender_id": "U001"})
 
         assert f"#{task_id}" in result
-        assert "title" in result
+        assert "New title" in result
 
         row = conn.execute("SELECT title FROM tasks WHERE id = ?", (task_id,)).fetchone()
         assert row[0] == "New title"
@@ -45,7 +45,7 @@ class TestEditAssignees:
         parsed = _make_parsed(args=[str(task_id)], mentions=["U002", "U003"])
         result = edit_handler(parsed, conn, {"sender_id": "U001"})
 
-        assert "assignees" in result
+        assert "Edited" in result
 
         rows = conn.execute(
             "SELECT assignee_user_id FROM task_assignees WHERE task_id = ? ORDER BY assignee_user_id",
@@ -69,7 +69,7 @@ class TestEditDue:
         parsed = _make_parsed(args=[str(task_id)], due="2026-03-15")
         result = edit_handler(parsed, conn, {"sender_id": "U001"})
 
-        assert "due" in result
+        assert "due:2026-03-15" in result
 
         row = conn.execute("SELECT due FROM tasks WHERE id = ?", (task_id,)).fetchone()
         assert row[0] == "2026-03-15"
@@ -79,7 +79,7 @@ class TestEditDue:
         parsed = _make_parsed(args=[str(task_id)], due="-")
         result = edit_handler(parsed, conn, {"sender_id": "U001"})
 
-        assert "due" in result
+        assert "due:-" in result
 
         row = conn.execute("SELECT due FROM tasks WHERE id = ?", (task_id,)).fetchone()
         assert row[0] is None
@@ -106,7 +106,7 @@ class TestEditProject:
         parsed = _make_parsed(args=[str(task_id)], project="Backend")
         result = edit_handler(parsed, conn, {"sender_id": "U001"})
 
-        assert "project" in result
+        assert "Backend" in result
 
         row = conn.execute(
             "SELECT p.name FROM tasks t JOIN projects p ON t.project_id = p.id WHERE t.id = ?",
@@ -166,7 +166,7 @@ class TestEditSection:
         parsed = _make_parsed(args=[str(task_id)], section="doing")
         result = edit_handler(parsed, conn, {"sender_id": "U001"})
 
-        assert "section" in result
+        assert "doing" in result
 
         row = conn.execute("SELECT section FROM tasks WHERE id = ?", (task_id,)).fetchone()
         assert row[0] == "doing"
@@ -255,9 +255,9 @@ class TestEditEdgeCases:
         result = edit_handler(parsed, conn, {"sender_id": "U001"})
 
         assert "Edited" in result
-        assert "title" in result
-        assert "section" in result
-        assert "due" in result
+        assert "New" in result
+        assert "doing" in result
+        assert "due:2026-06-01" in result
 
         row = conn.execute("SELECT title, section, due FROM tasks WHERE id = ?", (task_id,)).fetchone()
         assert row[0] == "New"

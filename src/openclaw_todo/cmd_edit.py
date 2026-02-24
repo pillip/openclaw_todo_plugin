@@ -141,4 +141,18 @@ def edit_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
     changed_fields = ", ".join(changes.keys())
     logger.info("Task #%d edited by %s: fields=%s", task_id, sender_id, changed_fields)
 
-    return f"Edited #{task_id}: updated {changed_fields}."
+    # --- Format UX response with current task state ---
+    final_row = conn.execute(
+        "SELECT t.title, t.section, t.due, p.name "
+        "FROM tasks t JOIN projects p ON t.project_id = p.id "
+        "WHERE t.id = ?;",
+        (task_id,),
+    ).fetchone()
+    final_title, final_section, final_due, final_project = final_row
+    due_str = final_due if final_due else "-"
+    assignee_rows = conn.execute(
+        "SELECT assignee_user_id FROM task_assignees WHERE task_id = ? ORDER BY assignee_user_id",
+        (task_id,),
+    ).fetchall()
+    assignee_str = ", ".join(f"<@{r[0]}>" for r in assignee_rows)
+    return f"✏️ Edited #{task_id} ({final_project}/{final_section}) due:{due_str} assignees:{assignee_str} — {final_title}"

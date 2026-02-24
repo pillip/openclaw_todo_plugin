@@ -21,7 +21,7 @@ class TestBoardSectionOrder:
         parsed = _make_parsed()
         result = board_handler(parsed, conn, {"sender_id": "U001"})
 
-        sections = [line for line in result.splitlines() if line.startswith("--")]
+        sections = [line for line in result.splitlines() if line.startswith("—")]
         assert len(sections) == 5
         assert "BACKLOG" in sections[0]
         assert "DOING" in sections[1]
@@ -66,7 +66,7 @@ class TestBoardSectionOrder:
         result = board_handler(parsed, conn, {"sender_id": "U001"})
 
         header = result.splitlines()[0]
-        assert ":bar_chart:" in header
+        assert "📊" in header
         assert "mine" in header
         assert "open" in header
 

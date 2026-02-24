@@ -174,9 +174,11 @@ class TestListSortingOrder:
         # Task B (due:2026-02-15) — has due, earliest
         # Task A (due:2026-03-01) — has due, later
         # Task C (due:NULL) — no due, id=4
+        # Extract task IDs from lines starting with "#"
         ids = []
         for line in lines:
-            # Extract #N from each line
+            if not line.startswith("#"):
+                continue
             start = line.index("#") + 1
             end = line.index(" ", start)
             ids.append(int(line[start:end]))
@@ -193,9 +195,10 @@ class TestListLimit:
         ctx = {"sender_id": "U001"}
 
         result = list_handler(parsed, conn, ctx)
-        lines = result.strip().split("\n")
+        # Count task lines (lines starting with "#")
+        task_lines = [line for line in result.strip().split("\n") if line.startswith("#")]
 
-        assert len(lines) == 1
+        assert len(task_lines) == 1
 
     def test_list_invalid_limit(self, conn):
         parsed = _make_parsed(title_tokens=["limit:abc"])
@@ -249,4 +252,5 @@ class TestListNoResults:
 
         result = list_handler(parsed, conn, ctx)
 
-        assert result == "No tasks found."
+        assert "No tasks found." in result
+        assert "0 tasks" in result

@@ -84,4 +84,4 @@ def add_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) 
     # --- Format response ---
     due_str = due if due else "-"
     assignee_str = ", ".join(f"<@{a}>" for a in assignees)
-    return f"Added #{task_id} ({project.name}/{section}) " f"due:{due_str} assignees:{assignee_str} -- {title}"
+    return f"✅ Added #{task_id} ({project.name}/{section}) due:{due_str} assignees:{assignee_str} — {title}"

@@ -26,7 +26,7 @@ class TestDoneSetsFields:
         result = done_handler(parsed, conn, {"sender_id": "U001"})
 
         assert f"#{task_id}" in result
-        assert "done" in result
+        assert "Done" in result
 
         row = conn.execute("SELECT section, status, closed_at FROM tasks WHERE id = ?", (task_id,)).fetchone()
         assert row[0] == "done"
@@ -56,7 +56,7 @@ class TestDropSetsFields:
         result = drop_handler(parsed, conn, {"sender_id": "U001"})
 
         assert f"#{task_id}" in result
-        assert "dropped" in result
+        assert "Dropped" in result
 
         row = conn.execute("SELECT section, status, closed_at FROM tasks WHERE id = ?", (task_id,)).fetchone()
         assert row[0] == "drop"
@@ -88,7 +88,7 @@ class TestPermissionCheck:
             assignees=["UOWNER"],
         )
         result = done_handler(_make_parsed("done", args=[str(task_id)]), conn, {"sender_id": "UOWNER"})
-        assert "done" in result
+        assert "Done" in result
         assert "Error" not in result
 
     def test_done_private_non_owner_rejected(self, conn):
@@ -106,7 +106,7 @@ class TestPermissionCheck:
     def test_drop_shared_assignee_allowed(self, conn):
         task_id = _seed_task(conn, created_by="UCREATOR", assignees=["UASSIGNEE"])
         result = drop_handler(_make_parsed("drop", args=[str(task_id)]), conn, {"sender_id": "UASSIGNEE"})
-        assert "dropped" in result
+        assert "Dropped" in result
 
     def test_drop_shared_unrelated_rejected(self, conn):
         task_id = _seed_task(conn, created_by="UCREATOR", assignees=["UASSIGNEE"])
