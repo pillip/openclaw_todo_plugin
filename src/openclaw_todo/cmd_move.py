@@ -6,7 +6,7 @@ import logging
 import sqlite3
 
 from openclaw_todo.event_logger import log_event
-from openclaw_todo.parser import ParsedCommand
+from openclaw_todo.parser import VALID_SECTIONS, ParsedCommand
 from openclaw_todo.permissions import can_write_task
 
 logger = logging.getLogger(__name__)
@@ -30,10 +30,14 @@ def move_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
     except ValueError:
         return f"Error: invalid task ID: {parsed.args[0]!r}"
 
-    # --- Validate target section ---
+    # --- Validate target section (supports both /s and shorthand) ---
     target_section = parsed.section
+    if not target_section and parsed.title_tokens:
+        token = parsed.title_tokens[0].lower()
+        if token in VALID_SECTIONS:
+            target_section = token
     if not target_section:
-        return "Error: target section required. Usage: todo: move <id> /s <section>"
+        return "Error: target section required. Usage: todo: move <id> <section>"
 
     # --- Check task exists ---
     row = conn.execute(

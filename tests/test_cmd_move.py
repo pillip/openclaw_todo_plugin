@@ -9,11 +9,12 @@ from openclaw_todo.parser import ParsedCommand
 from tests.conftest import seed_task as _seed_task
 
 
-def _make_parsed(*, args=None, section=None) -> ParsedCommand:
+def _make_parsed(*, args=None, section=None, title_tokens=None) -> ParsedCommand:
     return ParsedCommand(
         command="move",
         args=args or [],
         section=section,
+        title_tokens=title_tokens or [],
     )
 
 
@@ -138,6 +139,61 @@ class TestMovePrivateOwnerOnly:
 
         assert "Error" in result
         assert "permission denied" in result
+
+
+class TestMoveSectionShorthand:
+    """Move using shorthand section (no /s flag)."""
+
+    def test_move_shorthand_doing(self, conn):
+        task_id = _seed_task(conn)
+        parsed = _make_parsed(args=[str(task_id)], title_tokens=["doing"])
+
+        result = move_handler(parsed, conn, {"sender_id": "U001"})
+
+        assert f"Moved #{task_id}" in result
+        assert "doing" in result
+
+        row = conn.execute("SELECT section FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        assert row[0] == "doing"
+
+    def test_move_shorthand_waiting(self, conn):
+        task_id = _seed_task(conn)
+        parsed = _make_parsed(args=[str(task_id)], title_tokens=["waiting"])
+
+        result = move_handler(parsed, conn, {"sender_id": "U001"})
+
+        assert f"Moved #{task_id}" in result
+        assert "waiting" in result
+
+    def test_move_shorthand_case_insensitive(self, conn):
+        task_id = _seed_task(conn)
+        parsed = _make_parsed(args=[str(task_id)], title_tokens=["DOING"])
+
+        result = move_handler(parsed, conn, {"sender_id": "U001"})
+
+        assert f"Moved #{task_id}" in result
+        assert "doing" in result
+
+    def test_move_slash_s_takes_priority_over_shorthand(self, conn):
+        task_id = _seed_task(conn)
+        parsed = _make_parsed(args=[str(task_id)], section="waiting", title_tokens=["doing"])
+
+        result = move_handler(parsed, conn, {"sender_id": "U001"})
+
+        assert f"Moved #{task_id}" in result
+        assert "waiting" in result
+
+        row = conn.execute("SELECT section FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        assert row[0] == "waiting"
+
+    def test_move_shorthand_invalid_token_errors(self, conn):
+        task_id = _seed_task(conn)
+        parsed = _make_parsed(args=[str(task_id)], title_tokens=["invalid"])
+
+        result = move_handler(parsed, conn, {"sender_id": "U001"})
+
+        assert "Error" in result
+        assert "section required" in result
 
 
 class TestMoveSharedPermission:
