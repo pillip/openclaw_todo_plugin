@@ -171,6 +171,21 @@ class TestDueYearBoundary:
         with pytest.raises(ParseError, match="Invalid due date"):
             parse("add Task due:2-30")
 
+    def test_due_feb_29_non_leap_year(self):
+        """due:02-29 on a non-leap year (2026) should raise ParseError."""
+        with pytest.raises(ParseError, match="Invalid due date"):
+            parse("add Task due:2026-02-29")
+
+    def test_due_month_zero(self):
+        """due:00-01 (month 0) should raise ParseError."""
+        with pytest.raises(ParseError, match="Invalid due date"):
+            parse("add Task due:00-01")
+
+    def test_due_day_32(self):
+        """due:12-32 (day 32) should raise ParseError."""
+        with pytest.raises(ParseError, match="Invalid due date"):
+            parse("add Task due:12-32")
+
     def test_due_garbage_string(self):
         """due:notadate should raise ParseError."""
         with pytest.raises(ParseError, match="Invalid due date"):
@@ -179,6 +194,13 @@ class TestDueYearBoundary:
 
 class TestEmptyTitleNoCrash:
     """Commands with no title tokens should not crash."""
+
+    def test_add_bare_command(self):
+        """parse("add") with no arguments at all produces empty title_tokens."""
+        result = parse("add")
+        assert result.command == "add"
+        assert result.title_tokens == []
+        assert result.args == []
 
     def test_add_no_title_only_options(self):
         """add with only options and no title tokens produces empty title_tokens."""
