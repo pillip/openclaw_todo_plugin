@@ -46,9 +46,9 @@ def list_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
             try:
                 limit = int(low.split(":", 1)[1])
                 if limit < 1:
-                    return f"Error: limit must be a positive integer, got: {tok!r}"
+                    return f'❌ Invalid limit value "{tok}". Must be a positive integer.'
             except ValueError:
-                return f"Error: invalid limit value: {tok!r}"
+                return f'❌ Invalid limit value "{tok}". Must be a positive integer.'
         else:
             remaining_tokens.append(tok)
 
@@ -86,7 +86,7 @@ def list_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
         try:
             project = resolve_project(conn, parsed.project, sender_id)
         except ProjectNotFoundError:
-            return f"Error: project {parsed.project!r} not found."
+            return f'❌ Project "{parsed.project}" not found.'
         conditions.append("t.project_id = ?")
         params.append(project.id)
 

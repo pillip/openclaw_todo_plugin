@@ -24,7 +24,7 @@ def set_shared_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context:
     # Extract project name from title_tokens (tokens after "set-shared")
     name_tokens = parsed.title_tokens[1:] if len(parsed.title_tokens) > 1 else []
     if not name_tokens:
-        return "Error: project name required. Usage: todo: project set-shared <name>"
+        return "❌ Project name is required. Usage: todo: project set-shared <name>"
     project_name = name_tokens[0]
 
     # Step 1: Check if a shared project with this name already exists
@@ -34,7 +34,7 @@ def set_shared_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context:
     ).fetchone()
     if row is not None:
         logger.info("project set-shared: %s result=already_shared", project_name)
-        return f"Project '{project_name}' is already shared."
+        return f'🌐 Project "{project_name}" is already shared.'
 
     # Step 2: Check if sender has a private project with this name
     private_row = conn.execute(
@@ -54,7 +54,7 @@ def set_shared_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context:
         )
     except sqlite3.IntegrityError:
         # Concurrent request already created the shared project (TOCTOU).
-        return f"Project '{project_name}' is already shared."
+        return f'🌐 Project "{project_name}" is already shared.'
     new_id = cursor.lastrowid
 
     log_event(
@@ -66,7 +66,7 @@ def set_shared_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context:
     conn.commit()
 
     logger.info("project set-shared: %s result=created by %s", project_name, sender_id)
-    return f"Created shared project '{project_name}'."
+    return f'🌐 Created shared project "{project_name}".'
 
 
 def _convert_private_to_shared(
@@ -84,7 +84,7 @@ def _convert_private_to_shared(
         )
     except sqlite3.IntegrityError:
         # A shared project with this name was created concurrently (TOCTOU).
-        return f"Project '{project_name}' is already shared."
+        return f'🌐 Project "{project_name}" is already shared.'
 
     log_event(
         conn,
@@ -99,4 +99,4 @@ def _convert_private_to_shared(
     conn.commit()
 
     logger.info("project set-shared: %s result=converted by %s", project_name, sender_id)
-    return f"Project '{project_name}' is now shared."
+    return f'🌐 Project "{project_name}" is now shared.'

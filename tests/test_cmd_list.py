@@ -162,7 +162,7 @@ class TestListWithProjectFilter:
 
         result = list_handler(parsed, conn, ctx)
 
-        assert "Error" in result
+        assert "❌" in result
         assert "NonExistent" in result
 
 
@@ -214,7 +214,7 @@ class TestListLimit:
 
         result = list_handler(parsed, conn, ctx)
 
-        assert "Error" in result
+        assert "❌" in result
         assert "limit" in result.lower()
 
     def test_list_zero_limit(self, conn):
@@ -223,7 +223,7 @@ class TestListLimit:
 
         result = list_handler(parsed, conn, ctx)
 
-        assert "Error" in result
+        assert "❌" in result
         assert "positive" in result.lower()
 
     def test_list_negative_limit(self, conn):
@@ -232,7 +232,7 @@ class TestListLimit:
 
         result = list_handler(parsed, conn, ctx)
 
-        assert "Error" in result
+        assert "❌" in result
         assert "positive" in result.lower()
 
 

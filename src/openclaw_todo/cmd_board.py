@@ -39,9 +39,9 @@ def board_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict
             try:
                 limit_per_section = int(low.split(":", 1)[1])
                 if limit_per_section < 1:
-                    return f"Error: limitPerSection must be a positive integer, got: {tok!r}"
+                    return f'❌ Invalid limitPerSection value "{tok}". Must be a positive integer.'
             except ValueError:
-                return f"Error: invalid limitPerSection value: {tok!r}"
+                return f'❌ Invalid limitPerSection value "{tok}". Must be a positive integer.'
 
     if parsed.mentions:
         scope = "user"
@@ -66,7 +66,7 @@ def board_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict
         try:
             project = resolve_project(conn, parsed.project, sender_id)
         except ProjectNotFoundError:
-            return f"Error: project {parsed.project!r} not found."
+            return f'❌ Project "{parsed.project}" not found.'
         conditions.append("t.project_id = ?")
         params.append(project.id)
 

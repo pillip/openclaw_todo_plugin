@@ -148,4 +148,5 @@ class TestSetSharedEdgeCases:
 
     def test_missing_project_name(self, conn):
         result = set_shared_handler(_make_parsed_no_name(), conn, {"sender_id": "U001"})
-        assert "project name required" in result.lower()
+        assert "❌" in result
+        assert "Project name is required" in result

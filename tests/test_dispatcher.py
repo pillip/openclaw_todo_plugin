@@ -169,12 +169,12 @@ class TestUnknownCommandHelp:
         result = dispatch("foobar something", {"sender_id": "U1"}, db_path=db_path)
         assert "Unknown command" in result
         assert "foobar" in result
-        assert "Commands:" in result
+        assert "Available:" in result
 
     def test_parse_error_returned(self, db_path):
         """Parser errors are returned as user-facing messages."""
         result = dispatch("add /s invalid_section title", {"sender_id": "U1"}, db_path=db_path)
-        assert "Parse error" in result
+        assert "❌" in result
 
 
 class TestDbInitialization:

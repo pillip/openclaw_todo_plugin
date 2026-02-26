@@ -231,7 +231,8 @@ class TestPrivateProjectIsolation:
 
         # U002 should be denied write access
         edit_result = _msg(f"edit {task_id} hacked", "U002", db_path)
-        assert "denied" in edit_result.lower() or "error" in edit_result.lower()
+        assert "❌" in edit_result
+        assert "permission" in edit_result.lower()
 
 
 # ---------------------------------------------------------------------------
