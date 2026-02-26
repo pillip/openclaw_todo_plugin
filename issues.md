@@ -444,11 +444,11 @@ UX 명세 3.1~3.5에 정의된 에러 메시지 패턴과 현재 코드의 에�
 - PRD-Ref: UX 명세 7.7~7.9
 - Priority: P1
 - Estimate: 1d
-- Status: backlog
-- Owner: --
+- Status: done
+- Owner: claude
 - Branch: `issue/ISSUE-037-parser-test-edge-cases`
-- GH-Issue: --
-- PR: --
+- GH-Issue: #64
+- PR: #65
 
 #### Goal
 UX 명세 7.7~7.9에 정의된 엣지 케이스에 대한 parser 테스트를 보강한다.
