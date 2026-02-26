@@ -149,15 +149,11 @@ class TestDueYearBoundary:
 
     def test_due_dec_31(self):
         """due:12-31 should normalise to current year Dec 31."""
-        from datetime import date
-
         result = parse("add Task due:12-31")
         assert result.due == f"{date.today().year}-12-31"
 
     def test_due_jan_01(self):
         """due:01-01 should normalise to current year Jan 1."""
-        from datetime import date
-
         result = parse("add Task due:1-1")
         assert result.due == f"{date.today().year}-01-01"
 
@@ -171,10 +167,17 @@ class TestDueYearBoundary:
         with pytest.raises(ParseError, match="Invalid due date"):
             parse("add Task due:2-30")
 
-    def test_due_feb_29_non_leap_year(self):
-        """due:02-29 on a non-leap year (2026) should raise ParseError."""
+    def test_due_feb_29_non_leap_year_full(self):
+        """due:2026-02-29 (YYYY-MM-DD, non-leap year) should raise ParseError."""
         with pytest.raises(ParseError, match="Invalid due date"):
             parse("add Task due:2026-02-29")
+
+    def test_due_feb_29_non_leap_year_mmdd(self):
+        """due:02-29 (MM-DD, non-leap year 2026) should raise ParseError via date() constructor."""
+        # This tests the MM-DD code path which uses date(today().year, m, d)
+        # 2026 is not a leap year, so Feb 29 is invalid
+        with pytest.raises(ParseError, match="Invalid due date"):
+            parse("add Task due:02-29")
 
     def test_due_month_zero(self):
         """due:00-01 (month 0) should raise ParseError."""
