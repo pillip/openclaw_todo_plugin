@@ -487,11 +487,11 @@ UX 명세 7.7~7.9에 정의된 엣지 케이스에 대한 parser 테스트를 �
 - PRD-Ref: PRD#5.2 scope, PRD#3.2 이름 충돌
 - Priority: P1
 - Estimate: 1d
-- Status: backlog
-- Owner: --
+- Status: done
+- Owner: claude
 - Branch: `issue/ISSUE-038-e2e-scope-multiuser`
-- GH-Issue: --
-- PR: --
+- GH-Issue: #66
+- PR: #67
 
 #### Goal
 E2E 테스트에 scope 필터 및 다중 사용자 시나리오를 추가하여 커버리지를 높인다.

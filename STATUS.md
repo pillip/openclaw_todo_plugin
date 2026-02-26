@@ -34,7 +34,7 @@
 | ~~#035~~ | ~~에러 메시지 UX 명세 정합~~ | ~~P1~~ | Done |
 | #036 | set-private 에러에 Slack 멘션 포맷 적용 | P2 | 0.5d |
 | ~~#037~~ | ~~parser 단위 테스트 보강 (엣지 케이스)~~ | ~~P1~~ | Done → PR #65 |
-| #038 | E2E 테스트 보강 (scope/다중 사용자) | P1 | 1d |
+| ~~#038~~ | ~~E2E 테스트 보강 (scope/다중 사용자)~~ | ~~P1~~ | Done → PR #67 |
 | #039 | server.py HTTP endpoint 테스트 보강 | P2 | 0.5d |
 | #027 | ruff/black target-version 정합 | P2 | 0.5d |
 | #028 | Bridge serverUrl config 연동 | P2 | 0.5d |

@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - `board` uses em-dash section separators and Unicode emoji header
 
 ### Added
+- E2E tests: scope filter by mention, multi-user shared collaboration, private/shared name collision resolution, status filter (done/drop/board) (PR #67)
 - Parser edge case tests: invalid dates (Feb 29 non-leap year, month zero, day 32), bare `add` command, MM-DD code path coverage (PR #65)
 - `todo: move <id> <section>` shorthand syntax without `/s` flag, case-insensitive, `/s` takes priority when both present (PR #61)
 - `todo: add /p NewProject` auto-creates nonexistent projects as shared with name validation and race-condition handling (PR #59)
