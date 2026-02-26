@@ -311,6 +311,161 @@ class TestProjectSetSharedFlow:
 # ---------------------------------------------------------------------------
 # Scenario 9: full lifecycle
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Scenario 10: list scope filter by mention
+# ---------------------------------------------------------------------------
+class TestListScopeByMention:
+    """list <@UXXXX> filters tasks assigned to the mentioned user."""
+
+    def test_list_mention_shows_only_that_users_tasks(self, db_path):
+        _msg("project set-shared Team", "U001", db_path)
+        _msg("add task for U001 /p Team", "U001", db_path)
+        _msg("add task for U002 /p Team <@U002>", "U001", db_path)
+
+        # list <@U002> should only show U002's task
+        result = _msg("list all <@U002>", "U001", db_path)
+        assert "task for U002" in result
+        assert "task for U001" not in result
+
+    def test_list_mention_respects_private_visibility(self, db_path):
+        """Mentioning a user doesn't reveal private project tasks."""
+        _msg("project set-private Secret", "U001", db_path)
+        _msg("add secret task /p Secret", "U001", db_path)
+
+        # U002 listing <@U001> should not see private project tasks
+        result = _msg("list all <@U001>", "U002", db_path)
+        assert "secret task" not in result
+
+
+# ---------------------------------------------------------------------------
+# Scenario 11: multi-user shared project collaboration
+# ---------------------------------------------------------------------------
+class TestMultiUserSharedCollaboration:
+    """Multiple users can add, edit, and complete tasks in shared projects."""
+
+    def test_two_users_add_to_same_project(self, db_path):
+        _msg("project set-shared SharedBoard", "U001", db_path)
+        _msg("add U001 task /p SharedBoard", "U001", db_path)
+        _msg("add U002 task /p SharedBoard", "U002", db_path)
+
+        listing = _msg("list all /p SharedBoard", "U001", db_path)
+        assert "U001 task" in listing
+        assert "U002 task" in listing
+
+    def test_assignee_can_move_task(self, db_path):
+        """An assigned user can move the task they're assigned to."""
+        _msg("project set-shared Team", "U001", db_path)
+        add_result = _msg("add collaborative task /p Team <@U002>", "U001", db_path)
+        task_id = _extract_task_id(add_result)
+
+        # U002 (assignee) can move the task
+        move_result = _msg(f"move {task_id} /s doing", "U002", db_path)
+        assert "moved" in move_result.lower()
+
+    def test_assignee_can_done_task(self, db_path):
+        """An assigned user can mark the task as done."""
+        _msg("project set-shared Team", "U001", db_path)
+        add_result = _msg("add finish this /p Team <@U002>", "U001", db_path)
+        task_id = _extract_task_id(add_result)
+
+        done_result = _msg(f"done {task_id}", "U002", db_path)
+        assert "done" in done_result.lower()
+
+        row = _query_task(db_path, task_id, "status")
+        assert row[0] == "done"
+
+    def test_unrelated_user_cannot_modify_shared_task(self, db_path):
+        """A user who is neither creator nor assignee cannot modify the task."""
+        _msg("project set-shared Team", "U001", db_path)
+        add_result = _msg("add restricted task /p Team <@U002>", "U001", db_path)
+        task_id = _extract_task_id(add_result)
+
+        # U003 is neither creator (U001) nor assignee (U002)
+        result = _msg(f"edit {task_id} hacked", "U003", db_path)
+        assert "❌" in result
+        assert "permission" in result.lower()
+
+
+# ---------------------------------------------------------------------------
+# Scenario 12: private/shared name collision (private-first resolution)
+# ---------------------------------------------------------------------------
+class TestPrivateSharedNameCollision:
+    """When both private and shared projects share a name, private wins for the owner."""
+
+    def test_owner_resolves_to_private(self, db_path):
+        """Owner's add/list with /p resolves to their private project, not shared."""
+        _msg("project set-shared MyProj", "U001", db_path)
+        _msg("project set-private MyProj", "U001", db_path)
+
+        # U001 adds to MyProj — should resolve to private
+        _msg("add private task /p MyProj", "U001", db_path)
+
+        # U001 can see it
+        u1_list = _msg("list all /p MyProj", "U001", db_path)
+        assert "private task" in u1_list
+
+        # U002 cannot see it (it's in the private project)
+        u2_list = _msg("list all /p MyProj", "U002", db_path)
+        assert "private task" not in u2_list
+
+    def test_non_owner_resolves_to_shared(self, db_path):
+        """Non-owner resolves to the shared project (they can't see private)."""
+        _msg("project set-shared MyProj", "U001", db_path)
+        _msg("project set-private MyProj", "U001", db_path)
+
+        # U002 adds to MyProj — should resolve to shared
+        _msg("add shared task /p MyProj", "U002", db_path)
+
+        # U002 sees it in shared
+        u2_list = _msg("list all /p MyProj", "U002", db_path)
+        assert "shared task" in u2_list
+
+        # U001 listing shared MyProj — would see it only via "all" scope
+        # since private-first resolution means /p MyProj -> private for U001
+        # U001's private project won't have it
+        u1_private_list = _msg("list all /p MyProj", "U001", db_path)
+        # U001 resolves to private, so won't see U002's shared task
+        assert "shared task" not in u1_private_list
+
+
+# ---------------------------------------------------------------------------
+# Scenario 13: status filter scope
+# ---------------------------------------------------------------------------
+class TestStatusFilterE2E:
+    """list/board with status filters (open/done/drop)."""
+
+    def test_list_done_shows_only_done_tasks(self, db_path):
+        _msg("add open task", "U001", db_path)
+        add2 = _msg("add done task", "U001", db_path)
+        task2_id = _extract_task_id(add2)
+        _msg(f"done {task2_id}", "U001", db_path)
+
+        listing = _msg("list done", "U001", db_path)
+        assert "done task" in listing
+        assert "open task" not in listing
+
+    def test_list_drop_shows_only_dropped_tasks(self, db_path):
+        _msg("add active task", "U001", db_path)
+        add2 = _msg("add dropped task", "U001", db_path)
+        task2_id = _extract_task_id(add2)
+        _msg(f"drop {task2_id}", "U001", db_path)
+
+        listing = _msg("list drop", "U001", db_path)
+        assert "dropped task" in listing
+        assert "active task" not in listing
+
+    def test_board_done_shows_done_section(self, db_path):
+        add_result = _msg("add completed work", "U001", db_path)
+        task_id = _extract_task_id(add_result)
+        _msg(f"done {task_id}", "U001", db_path)
+
+        board = _msg("board done", "U001", db_path)
+        assert "completed work" in board
+
+
+# ---------------------------------------------------------------------------
+# Scenario 14: full lifecycle
+# ---------------------------------------------------------------------------
 class TestFullLifecycle:
     """A complete task lifecycle: add -> edit -> move -> done."""
 
