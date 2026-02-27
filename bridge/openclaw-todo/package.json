@@ -1,9 +1,13 @@
 {
   "name": "openclaw-todo",
   "version": "0.1.0",
+  "private": true,
   "description": "OpenClaw bridge plugin for the Python TODO server",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "files": [
     "dist/",
     "openclaw.plugin.json"

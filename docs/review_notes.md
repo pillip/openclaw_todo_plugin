@@ -2145,3 +2145,174 @@ All direct DB queries in tests use parameterized queries (`?` placeholders). No 
 5. SQL construction safety comments
 
 Full details: `docs/review_notes_pr43.md`
+
+---
+
+# PR #70 Review Notes -- ISSUE-040: bridge TypeScript build and npm package configuration
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-02-27
+> Branch: `issue/ISSUE-040-bridge-npm-package`
+
+---
+
+## Code Review
+
+### Summary
+
+PR #70 adds npm package configuration (`files`, `types`, `@types/node`) and TypeScript build settings (`declaration: true`) to the bridge plugin, plus fixes hook commands in `.claude/settings.json` to use absolute paths via `git rev-parse`. The package changes are correct and minimal. The hook path fix has a quoting bug that needs attention.
+
+### Findings
+
+#### [High] Broken JSON quoting in `.claude/settings.json` hook commands
+
+The hook command strings use nested double-quotes which produce malformed shell invocations:
+
+```json
+"command": "python3 "$(git rev-parse --show-toplevel)/.claude/hooks/agent_state.py""
+```
+
+The JSON value contains literal double-quotes around the subshell expression, but those inner double-quotes are not escaped. When the JSON is parsed, the `command` string becomes:
+
+```
+python3 "$(git rev-parse --show-toplevel)/.claude/hooks/agent_state.py"
+```
+
+This actually works correctly because the shell interprets the double-quotes as quoting the path (which is the intended behavior -- protecting against spaces in paths). However, the JSON itself is technically valid here because the inner `"` characters appear to be part of the JSON encoding via the escaped form shown in the diff.
+
+**Re-examination**: Looking at the raw file content, the inner quotes are indeed present and the JSON parses successfully (the file is valid JSON). The shell command `python3 "$(git rev-parse --show-toplevel)/.claude/hooks/agent_state.py"` is correct shell syntax. **This is actually fine.** Downgrading to Info.
+
+**Severity: Info** -- The command works as intended. The JSON uses escaped quotes that produce valid shell quoting.
+
+#### [Info] `rootDir: "."` includes non-source files in compilation scope
+
+In `tsconfig.json`, `rootDir` is set to `"."` which means the root directory for module resolution is the package root. Combined with `include: ["index.ts"]`, only `index.ts` is actually compiled, so this is functionally correct. However, if more `.ts` files are added at the root level later, they would be compiled too. Setting `rootDir: "src"` with a `src/` directory would be more conventional, but for a single-file plugin this is fine.
+
+**Severity: Info** -- No action needed for current scope.
+
+#### [Info] `@types/node` version range `^22.0.0`
+
+The `^22.0.0` range is appropriate for a project targeting Node 18+ (the code uses built-in `fetch`). Node 22 types are a superset. No issues.
+
+**Severity: Info**
+
+#### [Low] No `engines` field in `package.json`
+
+The code relies on `fetch` which requires Node 18+. Adding `"engines": { "node": ">=18.0.0" }` would document this requirement and help consumers catch incompatibilities early.
+
+**Severity: Low**
+
+#### [Info] `openclaw.extensions` still references `./index.ts`
+
+```json
+"openclaw": {
+  "extensions": ["./index.ts"]
+}
+```
+
+This points to the TypeScript source, not the compiled output. If the OpenClaw gateway consumes this field at runtime (post-build), it should reference `./dist/index.js`. However, if the gateway compiles TS on the fly or this is only used during development, the current value is correct. This depends on the gateway's behavior.
+
+**Severity: Info** -- Confirm with gateway documentation.
+
+#### [Info] Build artifacts correctly git-ignored
+
+The root `.gitignore` includes `dist/` which covers `bridge/openclaw-todo/dist/`. The `npm pack --dry-run` confirms the tarball includes only `dist/index.js`, `dist/index.d.ts`, `openclaw.plugin.json`, and `package.json`. Source files (`index.ts`, `tsconfig.json`) are correctly excluded from the package.
+
+#### [Pass] `main` and `types` fields are consistent with `tsconfig.json`
+
+- `tsconfig.json`: `outDir: "dist"`, `declaration: true`, `include: ["index.ts"]`
+- `package.json`: `main: "dist/index.js"`, `types: "dist/index.d.ts"`
+- Build output: `dist/index.js` and `dist/index.d.ts` confirmed present
+
+All three are aligned.
+
+#### [Pass] Build verification
+
+`npm install && npm run build` succeeds with zero warnings. `npm audit` reports 0 vulnerabilities.
+
+---
+
+## Security Findings
+
+#### [Low] No hardcoded secrets or credentials
+
+No API keys, tokens, or secrets found in the diff. The server URL defaults to `localhost` which is appropriate for development.
+
+#### [Low] `.claude/settings.json` hook command -- `git rev-parse` safety
+
+The `git rev-parse --show-toplevel` subshell is safe:
+- It only reads git metadata (no write operations)
+- It runs in the context of the current repo
+- No user-controlled input is interpolated into the command
+- The path is properly quoted to handle spaces
+
+No command injection risk.
+
+#### [Low] `files` field does not expose sensitive content
+
+The `files` array is `["dist/", "openclaw.plugin.json"]`. No source code, configuration secrets, or `.env` files are included. This is correct.
+
+#### [Info] No `npm publish` configuration
+
+There is no `.npmrc` or `publishConfig` in `package.json`, which means accidental `npm publish` would go to the public registry. For an internal/private plugin, consider adding:
+
+```json
+"private": true
+```
+
+This would prevent accidental publication.
+
+**Severity: Low**
+
+---
+
+## Suggested Fixes
+
+### 1. Add `private: true` to prevent accidental npm publish
+
+File: `/Users/pillip/project/practice/openclaw_todo_plugin/bridge/openclaw-todo/package.json`
+
+```json
+{
+  "name": "openclaw-todo",
+  "version": "0.1.0",
++ "private": true,
+  "description": "OpenClaw bridge plugin for the Python TODO server",
+```
+
+### 2. Add `engines` field to document Node version requirement
+
+File: `/Users/pillip/project/practice/openclaw_todo_plugin/bridge/openclaw-todo/package.json`
+
+```json
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0"
+- }
++ },
++ "engines": {
++   "node": ">=18.0.0"
++ }
+```
+
+---
+
+## Follow-ups
+
+1. **Add `"private": true`** to `package.json` to prevent accidental npm publish (Low priority, not blocking)
+2. **Add `"engines"` field** to document Node >=18 requirement (Low priority, not blocking)
+3. **Clarify `openclaw.extensions` reference** -- confirm whether gateway expects `.ts` source or compiled `.js` path
+4. **Add a CI step** for `npm run build` in the bridge directory to catch TypeScript compilation errors in PRs
+5. **Consider adding a smoke test** that imports `dist/index.js` and verifies the `activate` function is exported
+
+---
+
+## Verdict
+
+**Approve** -- The PR correctly accomplishes its goal of configuring the bridge as a buildable npm package. The `files`, `types`, `main`, and `tsconfig` settings are all consistent. Build succeeds cleanly with zero vulnerabilities. No blocking issues found.
+
+## Applied Fixes
+
+1. Added `"private": true` to prevent accidental `npm publish` to the public registry
+2. Added `"engines": { "node": ">=18.0.0" }` to document the Node 18+ requirement (built-in `fetch`)
+3. Build re-verified after fixes: `npm run build` success, 293 pytest tests pass
