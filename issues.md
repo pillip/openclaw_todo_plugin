@@ -30,7 +30,7 @@
 - [ ] ISSUE-037: parser 단위 테스트 보강 -- 엣지 케이스 _(track: platform, P1, 1d)_
 - [ ] ISSUE-038: E2E 테스트 보강 -- scope 필터 및 다중 사용자 시나리오 _(track: platform, P1, 1d)_
 - [ ] ISSUE-039: server.py HTTP endpoint 테스트 보강 _(track: platform, P2, 0.5d)_
-- [ ] ISSUE-040: bridge TypeScript 빌드 및 npm 패키지 구성 _(track: platform, P1, 1d)_
+- [x] ISSUE-040: bridge TypeScript 빌드 및 npm 패키지 구성 _(track: platform, P1, 1d)_
 
 ### Doing
 
@@ -640,10 +640,10 @@ E2E 테스트에 scope 필터 및 다중 사용자 시나리오를 추가하여 
 - PRD-Ref: PRD#10 M6
 - Priority: P1
 - Estimate: 1d
-- Status: backlog
-- Owner: --
+- Status: done
+- Owner: claude
 - Branch: `issue/ISSUE-040-bridge-npm-package`
-- GH-Issue: --
+- GH-Issue: #69
 - PR: --
 
 #### Goal

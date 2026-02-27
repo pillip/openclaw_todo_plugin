@@ -38,7 +38,7 @@
 | #039 | server.py HTTP endpoint 테스트 보강 | P2 | 0.5d |
 | #027 | ruff/black target-version 정합 | P2 | 0.5d |
 | #028 | Bridge serverUrl config 연동 | P2 | 0.5d |
-| #040 | bridge TypeScript 빌드 및 npm 패키지 구성 | P1 | 1d |
+| ~~#040~~ | ~~bridge TypeScript 빌드 및 npm 패키지 구성~~ | ~~P1~~ | Done |
 
 ## Next Steps (권장 순서)
 

@@ -11,7 +11,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/agent_state.py"
+            "command": "python3 "$(git rev-parse --show-toplevel)/.claude/hooks/agent_state.py""
           }
         ]
       }
@@ -22,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/agent_state.py"
+            "command": "python3 "$(git rev-parse --show-toplevel)/.claude/hooks/agent_state.py""
           }
         ]
       }
@@ -33,7 +33,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/agent_state.py"
+            "command": "python3 "$(git rev-parse --show-toplevel)/.claude/hooks/agent_state.py""
           }
         ]
       }
@@ -44,7 +44,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/agent_state.py"
+            "command": "python3 "$(git rev-parse --show-toplevel)/.claude/hooks/agent_state.py""
           }
         ]
       }
@@ -55,7 +55,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/agent_state.py"
+            "command": "python3 "$(git rev-parse --show-toplevel)/.claude/hooks/agent_state.py""
           }
         ]
       }
