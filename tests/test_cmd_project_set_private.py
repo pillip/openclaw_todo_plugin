@@ -229,6 +229,83 @@ class TestSetPrivateCreatesNew:
         assert payload["name"] == "NewProj"
 
 
+class TestSetPrivateMentionFormat:
+    """Verify Slack mention format and grouping in rejection messages (ISSUE-036)."""
+
+    def test_assignee_slack_mention_format(self, conn):
+        """Assignees are displayed as <@UXXXX> Slack mention format."""
+        conn.execute("INSERT INTO projects (name, visibility) VALUES ('Proj', 'shared');")
+        pid = conn.execute("SELECT id FROM projects WHERE name = 'Proj'").fetchone()[0]
+
+        conn.execute(
+            "INSERT INTO tasks (title, project_id, section, status, created_by) "
+            "VALUES ('t1', ?, 'backlog', 'open', 'U001');",
+            (pid,),
+        )
+        tid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        conn.execute(
+            "INSERT INTO task_assignees (task_id, assignee_user_id) VALUES (?, 'U002');",
+            (tid,),
+        )
+        conn.commit()
+
+        result = set_private_handler(_make_parsed("Proj"), conn, {"sender_id": "U001"})
+
+        assert f"#{tid} assignees:<@U002>" in result
+
+    def test_multiple_assignees_grouped_per_task(self, conn):
+        """Multiple non-owner assignees on one task are grouped together."""
+        conn.execute("INSERT INTO projects (name, visibility) VALUES ('Proj', 'shared');")
+        pid = conn.execute("SELECT id FROM projects WHERE name = 'Proj'").fetchone()[0]
+
+        conn.execute(
+            "INSERT INTO tasks (title, project_id, section, status, created_by) "
+            "VALUES ('t1', ?, 'backlog', 'open', 'U001');",
+            (pid,),
+        )
+        tid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        conn.execute("INSERT INTO task_assignees (task_id, assignee_user_id) VALUES (?, 'U002');", (tid,))
+        conn.execute("INSERT INTO task_assignees (task_id, assignee_user_id) VALUES (?, 'U003');", (tid,))
+        conn.commit()
+
+        result = set_private_handler(_make_parsed("Proj"), conn, {"sender_id": "U001"})
+
+        # Both assignees grouped under the same task
+        assert f"#{tid} assignees:<@U002>, <@U003>" in result
+
+    def test_max_violations_limit(self, conn):
+        """Only first 10 violating tasks are shown; remainder gets '... and N more' suffix."""
+        conn.execute("INSERT INTO projects (name, visibility) VALUES ('Big', 'shared');")
+        pid = conn.execute("SELECT id FROM projects WHERE name = 'Big'").fetchone()[0]
+
+        # Create 12 tasks with non-owner assignees
+        tids = []
+        for i in range(12):
+            conn.execute(
+                "INSERT INTO tasks (title, project_id, section, status, created_by) "
+                "VALUES (?, ?, 'backlog', 'open', 'U001');",
+                (f"task{i}", pid),
+            )
+            tid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            tids.append(tid)
+            conn.execute(
+                "INSERT INTO task_assignees (task_id, assignee_user_id) VALUES (?, ?);",
+                (tid, f"U{100 + i:03d}"),
+            )
+        conn.commit()
+
+        result = set_private_handler(_make_parsed("Big"), conn, {"sender_id": "U001"})
+
+        # First 10 tasks shown
+        for tid in tids[:10]:
+            assert f"#{tid}" in result
+        # Last 2 tasks NOT shown
+        for tid in tids[10:]:
+            assert f"#{tid}" not in result
+        # Suffix present
+        assert "... and 2 more tasks" in result
+
+
 class TestSetPrivateEdgeCases:
     """Edge cases and validation."""
 
