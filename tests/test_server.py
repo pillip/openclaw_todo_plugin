@@ -68,7 +68,7 @@ class TestHealthEndpoint:
 
 class TestMessageEndpoint:
     def test_todo_add_returns_response(self, server_url):
-        payload = json.dumps({"text": "todo: add Buy milk", "sender_id": "U001"}).encode()
+        payload = json.dumps({"text": "/todo add Buy milk", "sender_id": "U001"}).encode()
         status, body = _post(f"{server_url}/message", payload)
         assert status == 200
         assert body["response"] is not None
@@ -81,7 +81,7 @@ class TestMessageEndpoint:
         assert body["response"] is None
 
     def test_todo_usage(self, server_url):
-        payload = json.dumps({"text": "todo:", "sender_id": "U001"}).encode()
+        payload = json.dumps({"text": "/todo", "sender_id": "U001"}).encode()
         status, body = _post(f"{server_url}/message", payload)
         assert status == 200
         assert body["response"] is not None
@@ -103,7 +103,7 @@ class TestErrorHandling:
         assert "invalid JSON" in body["error"]
 
     def test_missing_fields_422(self, server_url):
-        payload = json.dumps({"text": "todo: add test"}).encode()
+        payload = json.dumps({"text": "/todo add test"}).encode()
         status, body = _post(f"{server_url}/message", payload)
         assert status == 422
         assert "missing" in body["error"]

@@ -1,7 +1,7 @@
 # OpenClaw TODO Plugin
 
 Slack DM-based team/personal TODO system — an OpenClaw plugin.
-`todo:` 접두사로 LLM 없이 직접 실행되는 결정적(deterministic) TODO 관리 도구.
+`/todo` 접두사로 LLM 없이 직접 실행되는 결정적(deterministic) TODO 관리 도구.
 
 ## Prerequisites
 
@@ -23,8 +23,8 @@ uv sync
 
 ### Native mode (OpenClaw Gateway)
 
-플러그인은 OpenClaw Gateway에 설치되어 `todo:` 접두사 메시지를 LLM 없이 직접 처리합니다.
-manifest의 `command_prefix: "todo:"` 및 `bypass_llm: true` 설정을 통해 Gateway가 LLM 파이프라인을 건너뛰고 플러그인 핸들러를 직접 호출합니다.
+플러그인은 OpenClaw Gateway에 설치되어 `/todo` 슬래시 커맨드를 LLM 없이 직접 처리합니다.
+Gateway의 `registerCommand` API를 통해 LLM 파이프라인을 건너뛰고 플러그인 핸들러를 직접 호출합니다.
 
 ### Bridge mode (HTTP 서버)
 
@@ -59,18 +59,16 @@ uv run pytest tests/test_parser.py -q
 
 | Command | Description |
 |---------|-------------|
-| `todo: add <title> [@user] [/p project] [/s section] [due:date]` | Create a task |
-| `todo: list [mine\|all\|@user] [open\|done\|drop] [/p project] [/s section]` | List tasks |
-| `todo: board [mine\|all\|@user] [open\|done\|drop] [/p project]` | Kanban board view |
-| `todo: move <id> <section>` | Move task to section |
-| `todo: done <id>` | Mark task done |
-| `todo: drop <id>` | Drop a task |
-| `todo: edit <id> [new title] [@user] [/p project] [/s section] [due:date]` | Edit a task |
-| `todo: project list` | List projects |
-| `todo: project set-private <name>` | Make project private |
-| `todo: project set-shared <name>` | Make project shared |
-
-> **Note**: `/todo` 접두사는 지원하지 않습니다. Slack에서 `/`로 시작하는 메시지는 슬래시 커맨드로 오인식되므로 `todo:` 단일 접두사를 사용합니다.
+| `/todo add <title> [@user] [/p project] [/s section] [due:date]` | Create a task |
+| `/todo list [mine\|all\|@user] [open\|done\|drop] [/p project] [/s section]` | List tasks |
+| `/todo board [mine\|all\|@user] [open\|done\|drop] [/p project]` | Kanban board view |
+| `/todo move <id> <section>` | Move task to section |
+| `/todo done <id>` | Mark task done |
+| `/todo drop <id>` | Drop a task |
+| `/todo edit <id> [new title] [@user] [/p project] [/s section] [due:date]` | Edit a task |
+| `/todo project list` | List projects |
+| `/todo project set-private <name>` | Make project private |
+| `/todo project set-shared <name>` | Make project shared |
 
 ## Project Structure
 

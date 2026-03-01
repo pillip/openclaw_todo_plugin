@@ -18,11 +18,11 @@ OpenClaw TODO Plugin은 Slack DM을 통해 팀/개인용 TODO를 관리하는 Op
 +------------------+       +--------------------+       +-------------------------+
 |                  |       |                    |       |   Python Plugin Core    |
 |   Slack User     | DM    |   OpenClaw         |       |   (openclaw_todo)       |
-|   (todo: add ..) +------>+   Gateway          +------>+                         |
+|   (/todo add ..) +------>+   Gateway          +------>+                         |
 |                  |       |                    |       |  plugin.py (entry)      |
 +------------------+       |  command_prefix    |       |  dispatcher.py (route)  |
                            |  matching:         |       |  parser.py (tokenize)   |
-                           |  "todo:" -> bypass |       |  cmd_*.py (handlers)    |
+                           |  "/todo" -> bypass |       |  cmd_*.py (handlers)    |
                            |  LLM pipeline      |       |  db.py + migrations.py  |
                            +--------------------+       |  SQLite3 (WAL mode)     |
                                                         +-------------------------+
@@ -35,7 +35,7 @@ OpenClaw TODO Plugin은 Slack DM을 통해 팀/개인용 TODO를 관리하는 Op
 |                  |       |   Gateway (JS)     |       |  fetch() call    |       |  (server.py:8200)  |
 +------------------+       +--------------------+       +------------------+       +--------------------+
                                                          openclaw.plugin.json      POST /message
-                                                         pattern: ^todo:(\s|$)     GET  /health
+                                                         pattern: ^/todo(\s|$)     GET  /health
 ```
 
 ### 1.2 Two Deployment Modes
@@ -51,14 +51,14 @@ OpenClaw TODO Plugin은 Slack DM을 통해 팀/개인용 TODO를 관리하는 Op
 
 ### 2.1 Direct Execution (LLM Bypass)
 
-Gateway manifest에 `command_prefix: "todo:"`, `bypass_llm: true`가 설정된 경우,
+Gateway manifest에 `command_prefix: "/todo"`, `bypass_llm: true`가 설정된 경우,
 Gateway는 LLM 파이프라인을 완전히 건너뛰고 플러그인 핸들러를 즉시 호출한다.
 
 ```
-1. Slack DM: "todo: add 장보기 due:03-15"
-2. Gateway: prefix "todo:" 매칭 -> LLM 파이프라인 스킵
+1. Slack DM: "/todo add 장보기 due:03-15"
+2. Gateway: prefix "/todo" 매칭 -> LLM 파이프라인 스킵
 3. Gateway: handle_message(text, context) 직접 호출
-4. plugin.py: "todo:" 접두사 strip -> remainder = "add 장보기 due:03-15"
+4. plugin.py: "/todo" 접두사 strip -> remainder = "add 장보기 due:03-15"
 5. dispatcher.py: parse(remainder) -> ParsedCommand(command="add", ...)
 6. dispatcher.py: _init_db() -> migrate() -> cmd_add.add_handler()
 7. cmd_add.py: resolve_project("Inbox") -> INSERT task -> INSERT assignees -> log_event
@@ -70,7 +70,7 @@ Gateway는 LLM 파이프라인을 완전히 건너뛰고 플러그인 핸들러�
 Gateway가 Python entry-point를 직접 지원하지 않는 경우, JS bridge가 HTTP 프록시 역할을 한다.
 
 ```
-1. Slack DM: "todo: add 장보기"
+1. Slack DM: "/todo add 장보기"
 2. Gateway: openclaw.plugin.json의 triggers.dm.pattern 매칭
 3. Bridge index.ts: fetch("http://127.0.0.1:8200/message", {text, sender_id})
 4. server.py: POST /message -> handle_message() -> JSON response
@@ -81,14 +81,13 @@ Gateway가 Python entry-point를 직접 지원하지 않는 경우, JS bridge가
 
 ```python
 # plugin.py -- 접두사 매칭 로직
-_TODO_PREFIX = "todo:"
+_TODO_PREFIX = "/todo"
 
-# 매칭 조건: 정확히 "todo:" 이거나 "todo: " 으로 시작
+# 매칭 조건: 정확히 "/todo" 이거나 "/todo " 으로 시작
 stripped == _TODO_PREFIX or stripped.startswith(_TODO_PREFIX + " ")
 ```
 
-- `/todo`는 의도적으로 미지원 (Slack 슬래시 커맨드 오인식 문제)
-- `todo:` 단일 접두사로 통일하여 bridge 이중 변환 제거
+- `/todo` 단일 접두사로 통일, OpenClaw `registerCommand` API와 정렬
 
 ---
 
@@ -110,15 +109,15 @@ src/openclaw_todo/
   permissions.py           # 쓰기 권한 검증 + private assignee 제약
   scope_builder.py         # list/board 공용 WHERE 절 빌더 (mine/all/user)
   event_logger.py          # events 테이블 INSERT 헬퍼
-  cmd_add.py               # todo: add
-  cmd_list.py              # todo: list
-  cmd_board.py             # todo: board
-  cmd_move.py              # todo: move
-  cmd_done_drop.py         # todo: done / todo: drop (공유 _close_task 로직)
-  cmd_edit.py              # todo: edit (title/assignee/project/section/due 변경)
-  cmd_project_list.py      # todo: project list
-  cmd_project_set_private.py  # todo: project set-private (shared->private 전환 검증 포함)
-  cmd_project_set_shared.py   # todo: project set-shared (private->shared 전환)
+  cmd_add.py               # /todo add
+  cmd_list.py              # /todo list
+  cmd_board.py             # /todo board
+  cmd_move.py              # /todo move
+  cmd_done_drop.py         # /todo done / /todo drop (공유 _close_task 로직)
+  cmd_edit.py              # /todo edit (title/assignee/project/section/due 변경)
+  cmd_project_list.py      # /todo project list
+  cmd_project_set_private.py  # /todo project set-private (shared->private 전환 검증 포함)
+  cmd_project_set_shared.py   # /todo project set-shared (private->shared 전환)
   server.py                # stdlib HTTP 서버 (bridge mode용, 포트 8200)
 
 bridge/openclaw-todo/
@@ -345,14 +344,14 @@ dispatch() 호출
 def handle_message(text: str, context: dict, db_path: str | None = None) -> str | None:
     """Process an incoming Slack DM message.
 
-    Returns a response string for todo: commands, or None if not a TODO command.
+    Returns a response string for /todo commands, or None if not a TODO command.
     """
 ```
 
-- **text**: Slack 메시지 원문 (예: `"todo: add 장보기"`)
+- **text**: Slack 메시지 원문 (예: `"/todo add 장보기"`)
 - **context**: `{"sender_id": "U12345"}` (최소 필수 필드)
 - **db_path**: SQLite 경로 오버라이드 (테스트용)
-- **반환**: 응답 문자열 또는 `None` (todo: 접두사 아닌 경우)
+- **반환**: 응답 문자열 또는 `None` (/todo 접두사 아닌 경우)
 
 Entry-point 등록 (`pyproject.toml`):
 
@@ -372,7 +371,7 @@ todo = "openclaw_todo.plugin:handle_message"
 
 ```json
 {
-  "text": "todo: add 장보기",
+  "text": "/todo add 장보기",
   "sender_id": "U12345"
 }
 ```
@@ -403,7 +402,7 @@ todo = "openclaw_todo.plugin:handle_message"
   "version": "0.1.0",
   "main": "dist/index.js",
   "triggers": {
-    "dm": { "pattern": "^todo:(\\s|$)" }
+    "dm": { "pattern": "^/todo(\\s|$)" }
   },
   "configSchema": {
     "properties": {
@@ -420,16 +419,16 @@ todo = "openclaw_todo.plugin:handle_message"
 
 | 커맨드 | 핸들러 | 설명 |
 |--------|--------|------|
-| `todo: add <title> [@user] [/p P] [/s S] [due:D]` | `cmd_add.py` | 태스크 생성 |
-| `todo: list [mine\|all\|@user] [/p P] [/s S] [open\|done\|drop]` | `cmd_list.py` | 목록 조회 |
-| `todo: board [mine\|all\|@user] [/p P]` | `cmd_board.py` | 칸반 보드 |
-| `todo: move <id> /s <section>` | `cmd_move.py` | 섹션 이동 |
-| `todo: done <id>` | `cmd_done_drop.py` | 완료 처리 |
-| `todo: drop <id>` | `cmd_done_drop.py` | 드롭 처리 |
-| `todo: edit <id> [title] [@user] [/p P] [/s S] [due:D\|-]` | `cmd_edit.py` | 태스크 수정 |
-| `todo: project list` | `cmd_project_list.py` | 프로젝트 목록 |
-| `todo: project set-private <name>` | `cmd_project_set_private.py` | private 전환 |
-| `todo: project set-shared <name>` | `cmd_project_set_shared.py` | shared 전환 |
+| `/todo add <title> [@user] [/p P] [/s S] [due:D]` | `cmd_add.py` | 태스크 생성 |
+| `/todo list [mine\|all\|@user] [/p P] [/s S] [open\|done\|drop]` | `cmd_list.py` | 목록 조회 |
+| `/todo board [mine\|all\|@user] [/p P]` | `cmd_board.py` | 칸반 보드 |
+| `/todo move <id> /s <section>` | `cmd_move.py` | 섹션 이동 |
+| `/todo done <id>` | `cmd_done_drop.py` | 완료 처리 |
+| `/todo drop <id>` | `cmd_done_drop.py` | 드롭 처리 |
+| `/todo edit <id> [title] [@user] [/p P] [/s S] [due:D\|-]` | `cmd_edit.py` | 태스크 수정 |
+| `/todo project list` | `cmd_project_list.py` | 프로젝트 목록 |
+| `/todo project set-private <name>` | `cmd_project_set_private.py` | private 전환 |
+| `/todo project set-shared <name>` | `cmd_project_set_shared.py` | shared 전환 |
 
 ---
 
@@ -630,14 +629,14 @@ cd bridge/openclaw-todo && npm run build
 
 ## 10. Key Design Decisions and Tradeoffs
 
-### 10.1 `todo:` 단일 접두사 + LLM Bypass
+### 10.1 `/todo` 단일 접두사 + LLM Bypass
 
 | 항목 | 내용 |
 |------|------|
-| **결정** | `todo:` 접두사로 LLM 파이프라인 완전 우회 |
+| **결정** | `/todo` 접두사로 LLM 파이프라인 완전 우회 |
 | **이점** | 응답 지연 최소화, LLM 토큰 비용 0, 결정적 동작 보장 |
 | **트레이드오프** | 자연어 입력 불가 (Phase 2로 연기). 사용자가 접두사를 기억해야 함 |
-| **기각된 대안** | `/todo` -- Slack 슬래시 커맨드 오인식 문제로 기각 |
+| **기각된 대안** | `todo:` -- OpenClaw `registerCommand` API와 불일치하여 기각 |
 
 ### 10.2 Private-First 프로젝트 해석 (Option A)
 
@@ -679,7 +678,7 @@ cd bridge/openclaw-todo && npm run build
 
 | 항목 | 내용 |
 |------|------|
-| **결정** | `todo: edit`에서 멘션 지정 시 assignee 목록을 **완전 교체** (append 아님) |
+| **결정** | `/todo edit`에서 멘션 지정 시 assignee 목록을 **완전 교체** (append 아님) |
 | **이점** | 단순한 멘탈 모델: "지금 입력한 사람들이 담당자" |
 | **트레이드오프** | 기존 assignee 유지 + 추가하려면 전체 재지정 필요 |
 

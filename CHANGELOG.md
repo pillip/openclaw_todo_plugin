@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Changed
+- Command prefix unified from `todo:` to `/todo` across all source, tests, bridge, and docs to align with OpenClaw `registerCommand` API
 - Bridge `index.ts` resolves serverUrl from plugin config → env var → default, with source logging on activation (PR #78)
 - Align ruff/black target-version to `py310` matching `requires-python >= 3.10`; exclude `.claude-kit`/`.claude` from lint; fix line-length violations (PR #76)
 - Error/info/warning messages aligned with UX spec 3.1~3.5: ❌ errors, ℹ️ informational, ⚠️ warnings, 🔒 set-private, 🌐 set-shared (PR #63)

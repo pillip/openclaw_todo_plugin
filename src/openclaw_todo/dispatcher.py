@@ -29,40 +29,40 @@ logger = logging.getLogger(__name__)
 HELP_TEXT = """\
 📖 OpenClaw TODO — Commands
 
-todo: add <title> [@user] [/p project] [/s section] [due:date]
+/todo add <title> [@user] [/p project] [/s section] [due:date]
     Create a new task.
 
-todo: list [mine|all|@user] [/p project] [/s section] [open|done|drop] [limit:N]
+/todo list [mine|all|@user] [/p project] [/s section] [open|done|drop] [limit:N]
     List tasks.
 
-todo: board [mine|all|@user] [/p project] [open|done|drop] [limitPerSection:N]
+/todo board [mine|all|@user] [/p project] [open|done|drop] [limitPerSection:N]
     Show kanban board view.
 
-todo: move <id> <section>
+/todo move <id> <section>
     Move a task to a section (backlog, doing, waiting, done, drop).
 
-todo: done <id>
+/todo done <id>
     Mark a task as done.
 
-todo: drop <id>
+/todo drop <id>
     Drop (cancel) a task.
 
-todo: edit <id> [title] [@user] [/p project] [/s section] [due:date|due:-]
+/todo edit <id> [title] [@user] [/p project] [/s section] [due:date|due:-]
     Edit a task. Mentions replace all assignees. due:- clears the date.
 
-todo: project list
+/todo project list
     Show all visible projects.
 
-todo: project set-private <name>
+/todo project set-private <name>
     Make a project private (owner-only).
 
-todo: project set-shared <name>
+/todo project set-shared <name>
     Make a project shared."""
 
 # Keep short USAGE for backward compatibility (used in "Unknown command" responses)
-USAGE = "Usage: todo: <command> [options]\nCommands: add, list, board, move, done, drop, edit, project, help"
+USAGE = "Usage: /todo <command> [options]\nCommands: add, list, board, move, done, drop, edit, project, help"
 
-PROJECT_USAGE = "Usage: todo: project <subcommand>\nSubcommands: list, set-private, set-shared"
+PROJECT_USAGE = "Usage: /todo project <subcommand>\nSubcommands: list, set-private, set-shared"
 
 # Valid top-level command names
 _VALID_COMMANDS = frozenset({"add", "list", "board", "move", "done", "drop", "edit", "project", "help"})

@@ -23,7 +23,7 @@ def move_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
 
     # --- Validate task ID ---
     if not parsed.args:
-        return "❌ Task ID is required. Usage: todo: move <id> <section>"
+        return "❌ Task ID is required. Usage: /todo move <id> <section>"
 
     try:
         task_id = int(parsed.args[0])
@@ -39,7 +39,7 @@ def move_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
         else:
             return f'❌ Invalid section "{parsed.title_tokens[0]}". Must be one of: backlog, doing, waiting, done, drop'
     if not target_section:
-        return "❌ Target section is required. Usage: todo: move <id> <section>"
+        return "❌ Target section is required. Usage: /todo move <id> <section>"
 
     # --- Check task exists ---
     row = conn.execute(

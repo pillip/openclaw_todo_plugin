@@ -20,9 +20,9 @@ def db_path(tmp_path):
 
 
 def _msg(text: str, sender: str, db_path: str) -> str:
-    """Send a todo: command and return the response (asserts non-None)."""
-    result = handle_message(f"todo: {text}", {"sender_id": sender}, db_path=db_path)
-    assert result is not None, f"Expected response for: todo: {text}"
+    """Send a /todo command and return the response (asserts non-None)."""
+    result = handle_message(f"/todo {text}", {"sender_id": sender}, db_path=db_path)
+    assert result is not None, f"Expected response for: /todo {text}"
     return result
 
 

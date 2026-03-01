@@ -41,7 +41,7 @@ export default {
       description: "Manage tasks — add, list, board, move, done, drop, edit, project",
       acceptsArgs: true,
       handler: async (ctx: any) => {
-        const text = `todo: ${ctx.commandBody ?? ctx.args ?? ""}`.trim();
+        const text = `/todo ${ctx.commandBody ?? ctx.args ?? ""}`.trim();
         const senderId = ctx.senderId ?? ctx.channel ?? "unknown";
 
         const res = await fetch(`${todoUrl}/message`, {

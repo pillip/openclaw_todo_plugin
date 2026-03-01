@@ -8,7 +8,7 @@ from openclaw_todo.dispatcher import HELP_TEXT, dispatch
 
 logger = logging.getLogger(__name__)
 
-_TODO_PREFIX = "todo:"
+_TODO_PREFIX = "/todo"
 
 
 def handle_message(text: str, context: dict, db_path: str | None = None) -> str | None:

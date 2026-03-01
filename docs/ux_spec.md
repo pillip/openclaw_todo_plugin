@@ -21,10 +21,10 @@
 
 ### 1.1 진입점
 
-사용자는 OpenClaw Slack 앱(봇)과의 **1:1 DM 채널**에서 `todo:` 접두사로 메시지를 보낸다.
+사용자는 OpenClaw Slack 앱(봇)과의 **1:1 DM 채널**에서 `/todo` 접두사로 메시지를 보낸다.
 
 ```
-사용자 → Slack DM → "todo: add 장보기"
+사용자 → Slack DM → "/todo add 장보기"
                          ↓
               OpenClaw Gateway (command_prefix 매칭)
                          ↓ (LLM 바이패스)
@@ -37,8 +37,7 @@
 
 | 메시지 패턴 | 봇 동작 |
 |---|---|
-| `todo:`로 시작 | 커맨드로 파싱하여 처리 |
-| `/todo`로 시작 | **미지원** — 안내 메시지 반환 (7.1절 참고) |
+| `/todo`로 시작 | 커맨드로 파싱하여 처리 |
 | 그 외 모든 메시지 | 무시 (응답 없음) |
 
 ### 1.3 응답 방식
@@ -58,11 +57,11 @@
 
 ## 2. 커맨드별 예시와 기대 응답
 
-### 2.1 `todo: add` — 태스크 생성
+### 2.1 `/todo add` — 태스크 생성
 
 **문법**:
 ```
-todo: add <title> [<@USER> ...] [/p <project>] [/s <section>] [due:YYYY-MM-DD|MM-DD]
+/todo add <title> [<@USER> ...] [/p <project>] [/s <section>] [due:YYYY-MM-DD|MM-DD]
 ```
 
 **기본값**:
@@ -75,35 +74,35 @@ todo: add <title> [<@USER> ...] [/p <project>] [/s <section>] [due:YYYY-MM-DD|MM
 
 **예시 1 — 최소 입력**:
 ```
-입력:  todo: add 장보기
+입력:  /todo add 장보기
 응답:  ✅ Added #42 (Inbox/backlog) due:- assignees:<@U1234> — 장보기
 ```
 
 **예시 2 — 전체 옵션 사용**:
 ```
-입력:  todo: add 로그인 버그 수정 <@U5678> /p Backend /s doing due:2026-03-15
+입력:  /todo add 로그인 버그 수정 <@U5678> /p Backend /s doing due:2026-03-15
 응답:  ✅ Added #43 (Backend/doing) due:2026-03-15 assignees:<@U5678> — 로그인 버그 수정
 ```
 
 **예시 3 — 다중 담당자**:
 ```
-입력:  todo: add PR 리뷰 <@U5678> <@U9999> /p Frontend
+입력:  /todo add PR 리뷰 <@U5678> <@U9999> /p Frontend
 응답:  ✅ Added #44 (Frontend/backlog) due:- assignees:<@U5678>, <@U9999> — PR 리뷰
 ```
 
 **예시 4 — 연도 생략 due**:
 ```
-입력:  todo: add 보고서 작성 due:03-15
+입력:  /todo add 보고서 작성 due:03-15
 응답:  ✅ Added #45 (Inbox/backlog) due:2026-03-15 assignees:<@U1234> — 보고서 작성
 ```
 
 ---
 
-### 2.2 `todo: list` — 태스크 목록 조회
+### 2.2 `/todo list` — 태스크 목록 조회
 
 **문법**:
 ```
-todo: list [mine|all|<@USER>] [/p <project>] [/s <section>] [open|done|drop] [limit:N]
+/todo list [mine|all|<@USER>] [/p <project>] [/s <section>] [open|done|drop] [limit:N]
 ```
 
 **기본값**:
@@ -115,7 +114,7 @@ todo: list [mine|all|<@USER>] [/p <project>] [/s <section>] [open|done|drop] [li
 
 **예시 1 — 기본 조회 (내 태스크)**:
 ```
-입력:  todo: list
+입력:  /todo list
 응답:
 📋 TODO List (mine / open) — 3 tasks
 
@@ -128,7 +127,7 @@ Showing 3 of 3. Use limit:N to see more.
 
 **예시 2 — 프로젝트 필터링**:
 ```
-입력:  todo: list /p Backend
+입력:  /todo list /p Backend
 응답:
 📋 TODO List (mine / open) /p Backend — 1 task
 
@@ -139,7 +138,7 @@ Showing 1 of 1. Use limit:N to see more.
 
 **예시 3 — 전체 범위 조회**:
 ```
-입력:  todo: list all
+입력:  /todo list all
 응답:
 📋 TODO List (all / open) — 5 tasks
 ...
@@ -147,7 +146,7 @@ Showing 1 of 1. Use limit:N to see more.
 
 **예시 4 — 빈 결과**:
 ```
-입력:  todo: list /p Backend /s waiting
+입력:  /todo list /p Backend /s waiting
 응답:
 📋 TODO List (mine / open) /p Backend /s waiting — 0 tasks
 
@@ -168,11 +167,11 @@ No tasks found.
 
 ---
 
-### 2.3 `todo: board` — 칸반 보드 뷰
+### 2.3 `/todo board` — 칸반 보드 뷰
 
 **문법**:
 ```
-todo: board [mine|all|<@USER>] [/p <project>] [open|done|drop] [limitPerSection:N]
+/todo board [mine|all|<@USER>] [/p <project>] [open|done|drop] [limitPerSection:N]
 ```
 
 **기본값**:
@@ -184,7 +183,7 @@ todo: board [mine|all|<@USER>] [/p <project>] [open|done|drop] [limitPerSection:
 
 **예시**:
 ```
-입력:  todo: board /p Backend
+입력:  /todo board /p Backend
 응답:
 📊 Board (mine / open) /p Backend
 
@@ -213,18 +212,18 @@ todo: board [mine|all|<@USER>] [/p <project>] [open|done|drop] [limitPerSection:
 
 ---
 
-### 2.4 `todo: move` — 태스크 섹션 이동
+### 2.4 `/todo move` — 태스크 섹션 이동
 
 **문법**:
 ```
-todo: move <id> <section>
+/todo move <id> <section>
 ```
 
 **유효 섹션**: `backlog`, `doing`, `waiting`, `done`, `drop`
 
 **예시**:
 ```
-입력:  todo: move 50 doing
+입력:  /todo move 50 doing
 응답:  ➡️ Moved #50 to doing (Backend) — Deploy hotfix
 ```
 
@@ -234,45 +233,45 @@ todo: move <id> <section>
 
 ---
 
-### 2.5 `todo: done` — 태스크 완료 처리
+### 2.5 `/todo done` — 태스크 완료 처리
 
 **문법**:
 ```
-todo: done <id>
+/todo done <id>
 ```
 
 **동작**: section=`done`, status=`done`, `closed_at` 기록
 
 **예시**:
 ```
-입력:  todo: done 50
+입력:  /todo done 50
 응답:  ✅ Done #50 (Backend) — Deploy hotfix
 ```
 
 ---
 
-### 2.6 `todo: drop` — 태스크 드롭(취소)
+### 2.6 `/todo drop` — 태스크 드롭(취소)
 
 **문법**:
 ```
-todo: drop <id>
+/todo drop <id>
 ```
 
 **동작**: section=`drop`, status=`dropped`, `closed_at` 기록
 
 **예시**:
 ```
-입력:  todo: drop 50
+입력:  /todo drop 50
 응답:  🗑️ Dropped #50 (Backend) — Deploy hotfix
 ```
 
 ---
 
-### 2.7 `todo: edit` — 태스크 수정
+### 2.7 `/todo edit` — 태스크 수정
 
 **문법**:
 ```
-todo: edit <id> [<new title>] [<@USER> ...] [/p <project>] [/s <section>] [due:YYYY-MM-DD|MM-DD|due:-]
+/todo edit <id> [<new title>] [<@USER> ...] [/p <project>] [/s <section>] [due:YYYY-MM-DD|MM-DD|due:-]
 ```
 
 **규칙**:
@@ -283,34 +282,34 @@ todo: edit <id> [<new title>] [<@USER> ...] [/p <project>] [/s <section>] [due:Y
 
 **예시 1 — 제목과 due 변경**:
 ```
-입력:  todo: edit 50 Deploy hotfix v2 due:2026-03-01
+입력:  /todo edit 50 Deploy hotfix v2 due:2026-03-01
 응답:  ✏️ Edited #50 (Backend/doing) due:2026-03-01 assignees:<@U1234> — Deploy hotfix v2
 ```
 
 **예시 2 — 담당자 교체**:
 ```
-입력:  todo: edit 50 <@U5678> <@U9999>
+입력:  /todo edit 50 <@U5678> <@U9999>
 응답:  ✏️ Edited #50 (Backend/doing) due:2026-03-01 assignees:<@U5678>, <@U9999> — Deploy hotfix v2
 ```
 
 **예시 3 — due 클리어**:
 ```
-입력:  todo: edit 50 due:-
+입력:  /todo edit 50 due:-
 응답:  ✏️ Edited #50 (Backend/doing) due:- assignees:<@U5678>, <@U9999> — Deploy hotfix v2
 ```
 
 ---
 
-### 2.8 `todo: project list` — 프로젝트 목록 조회
+### 2.8 `/todo project list` — 프로젝트 목록 조회
 
 **문법**:
 ```
-todo: project list
+/todo project list
 ```
 
 **예시 — 프로젝트가 있는 경우**:
 ```
-입력:  todo: project list
+입력:  /todo project list
 응답:
 📁 Projects
 
@@ -326,7 +325,7 @@ Private (yours):
 
 **예시 — private 프로젝트가 없는 경우**:
 ```
-입력:  todo: project list
+입력:  /todo project list
 응답:
 📁 Projects
 
@@ -339,34 +338,34 @@ Private (yours):
 
 ---
 
-### 2.9 `todo: project set-private` — 프로젝트 비공개 전환
+### 2.9 `/todo project set-private` — 프로젝트 비공개 전환
 
 **문법**:
 ```
-todo: project set-private <name>
+/todo project set-private <name>
 ```
 
 **Case A — 프로젝트가 존재하지 않음** (신규 private 생성):
 ```
-입력:  todo: project set-private Personal
+입력:  /todo project set-private Personal
 응답:  🔒 Created private project "Personal".
 ```
 
 **Case B — 이미 sender의 private 프로젝트임**:
 ```
-입력:  todo: project set-private Personal
+입력:  /todo project set-private Personal
 응답:  🔒 Project "Personal" is already private.
 ```
 
 **Case C — shared 프로젝트를 private로 전환 (성공)**:
 ```
-입력:  todo: project set-private MyProject
+입력:  /todo project set-private MyProject
 응답:  🔒 Project "MyProject" is now private.
 ```
 
 **Case D — shared 프로젝트를 private로 전환 (실패 — 비owner assignee 존재)**:
 ```
-입력:  todo: project set-private Biz
+입력:  /todo project set-private Biz
 응답:  ❌ Cannot set project "Biz" to private: found tasks assigned to non-owner users.
        e.g. #12 assignees:<@U2222>, #18 assignees:<@U3333>
        Please reassign or remove these assignees first.
@@ -377,28 +376,28 @@ todo: project set-private <name>
 
 ---
 
-### 2.10 `todo: project set-shared` — 프로젝트 공유 전환
+### 2.10 `/todo project set-shared` — 프로젝트 공유 전환
 
 **문법**:
 ```
-todo: project set-shared <name>
+/todo project set-shared <name>
 ```
 
 **Case A — shared 프로젝트가 이미 존재**:
 ```
-입력:  todo: project set-shared Backend
+입력:  /todo project set-shared Backend
 응답:  🌐 Project "Backend" is already shared.
 ```
 
 **Case B — 신규 shared 프로젝트 생성 또는 private에서 전환 성공**:
 ```
-입력:  todo: project set-shared NewProject
+입력:  /todo project set-shared NewProject
 응답:  🌐 Project "NewProject" is now shared.
 ```
 
 **Case C — shared 이름 충돌**:
 ```
-입력:  todo: project set-shared Backend
+입력:  /todo project set-shared Backend
 응답:  ❌ A shared project named "Backend" already exists.
 ```
 
@@ -411,8 +410,8 @@ todo: project set-shared <name>
 | 상황 | 에러 메시지 |
 |---|---|
 | 알 수 없는 커맨드 | `❌ Unknown command. Available: add, list, board, move, done, drop, edit, project` |
-| add에 제목 누락 | `❌ Title is required. Usage: todo: add <title> [options]` |
-| 태스크 ID 누락 | `❌ Task ID is required. Usage: todo: <command> <id>` |
+| add에 제목 누락 | `❌ Title is required. Usage: /todo add <title> [options]` |
+| 태스크 ID 누락 | `❌ Task ID is required. Usage: /todo <command> <id>` |
 | 태스크 ID가 숫자가 아님 | `❌ Invalid task ID "<input>". Must be a number.` |
 | 태스크를 찾을 수 없음 | `❌ Task #<id> not found.` |
 | 잘못된 섹션 이름 | `❌ Invalid section "<input>". Must be one of: backlog, doing, waiting, done, drop` |
@@ -494,7 +493,7 @@ private 프로젝트에 owner가 아닌 유저를 assignee로 지정하려 할 �
 
 ### 4.4 프로젝트 자동 생성 안내
 
-존재하지 않는 프로젝트명으로 `todo: add`를 실행하면 shared 프로젝트를 자동 생성하고 안내:
+존재하지 않는 프로젝트명으로 `/todo add`를 실행하면 shared 프로젝트를 자동 생성하고 안내:
 ```
 ✅ Added #55 (NewProject/backlog) due:- assignees:<@U1234> — 태스크 제목
 ℹ️ Project "NewProject" was created (shared).
@@ -580,7 +579,7 @@ No tasks found.
 ### 6.4 scope별 필터 예시
 
 ```
-입력:  todo: list all /p Backend done
+입력:  /todo list all /p Backend done
 응답:
 📋 TODO List (all / done) /p Backend — 2 tasks
 
@@ -594,93 +593,81 @@ Showing 2 of 2. Use limit:N to see more.
 
 ## 7. 엣지 케이스 UX
 
-### 7.1 `/todo` 입력 시 (미지원)
+### 7.1 빈 커맨드 (`/todo` 만 입력)
 
-Slack에서 `/`로 시작하는 메시지는 슬래시 커맨드로 오인식될 수 있어 의도적으로 미지원한다.
-
-만약 사용자가 `/todo`로 시작하는 메시지를 보낸 경우 (Slack이 슬래시 커맨드 오류를 표시하지 않고 통과시킨 경우):
+서브커맨드 없이 `/todo` 만 입력하면 도움말을 표시한다:
 ```
-응답:  ℹ️ `/todo`는 지원하지 않습니다. `todo:` 접두사를 사용해 주세요.
-       예: todo: add 장보기
-```
-
-> **참고**: 실제로는 Slack이 `/todo`를 슬래시 커맨드로 해석하여 "명령어를 찾을 수 없습니다" 에러를 표시할 가능성이 높다. 이 경우 봇까지 메시지가 도달하지 않으므로 봇 측 처리는 불필요하다.
-
-### 7.2 빈 커맨드 (`todo:` 만 입력)
-
-서브커맨드 없이 `todo:` 만 입력하면 도움말을 표시한다:
-```
-입력:  todo:
+입력:  /todo
 응답:
 📖 OpenClaw TODO — Commands
 
-todo: add <title> [@user] [/p project] [/s section] [due:date]
+/todo add <title> [@user] [/p project] [/s section] [due:date]
     Create a new task.
 
-todo: list [mine|all|@user] [/p project] [/s section] [open|done|drop] [limit:N]
+/todo list [mine|all|@user] [/p project] [/s section] [open|done|drop] [limit:N]
     List tasks.
 
-todo: board [mine|all|@user] [/p project] [open|done|drop] [limitPerSection:N]
+/todo board [mine|all|@user] [/p project] [open|done|drop] [limitPerSection:N]
     Show kanban board view.
 
-todo: move <id> <section>
+/todo move <id> <section>
     Move a task to a section (backlog, doing, waiting, done, drop).
 
-todo: done <id>
+/todo done <id>
     Mark a task as done.
 
-todo: drop <id>
+/todo drop <id>
     Drop (cancel) a task.
 
-todo: edit <id> [title] [@user] [/p project] [/s section] [due:date|due:-]
+/todo edit <id> [title] [@user] [/p project] [/s section] [due:date|due:-]
     Edit a task. Mentions replace all assignees. due:- clears the date.
 
-todo: project list
+/todo project list
     Show all visible projects.
 
-todo: project set-private <name>
+/todo project set-private <name>
     Make a project private (owner-only).
 
-todo: project set-shared <name>
+/todo project set-shared <name>
     Make a project shared.
 ```
 
-`todo: help`도 동일한 도움말을 표시한다.
+`/todo help`도 동일한 도움말을 표시한다.
 
-### 7.3 알 수 없는 서브커맨드
+### 7.2 알 수 없는 서브커맨드
 
 ```
-입력:  todo: delete 50
+입력:  /todo delete 50
 응답:  ❌ Unknown command "delete". Available: add, list, board, move, done, drop, edit, project
 ```
 
-### 7.4 중복 동작
+### 7.3 중복 동작
 
 | 상황 | 응답 |
 |---|---|
-| `todo: done 50` — 이미 done인 태스크 | `ℹ️ Task #50 is already done.` |
-| `todo: drop 50` — 이미 dropped인 태스크 | `ℹ️ Task #50 is already dropped.` |
-| `todo: move 50 doing` — 이미 doing인 태스크 | `ℹ️ Task #50 is already in doing.` |
+| `/todo done 50` — 이미 done인 태스크 | `ℹ️ Task #50 is already done.` |
+| `/todo drop 50` — 이미 dropped인 태스크 | `ℹ️ Task #50 is already dropped.` |
+| `/todo move 50 doing` — 이미 doing인 태스크 | `ℹ️ Task #50 is already in doing.` |
 
-### 7.5 edit에 변경사항 없음
+### 7.4 edit에 변경사항 없음
 
 ```
-입력:  todo: edit 50
+입력:  /todo edit 50
 응답:  ℹ️ No changes specified for #50.
 ```
 
-### 7.6 프로젝트 자동 생성
+### 7.5 프로젝트 자동 생성
 
-`todo: add ... /p NewProject`에서 존재하지 않는 프로젝트를 참조하면 **shared** 프로젝트로 자동 생성한다:
+`/todo add ... /p NewProject`에서 존재하지 않는 프로젝트를 참조하면 **shared** 프로젝트로 자동 생성한다:
 ```
-입력:  todo: add 새 태스크 /p NewProject
+입력:  /todo add 새 태스크 /p NewProject
 응답:  ✅ Added #55 (NewProject/backlog) due:- assignees:<@U1234> — 새 태스크
        ℹ️ Project "NewProject" was created (shared).
 ```
 
 `Inbox`는 DB 초기화 시 자동 생성되며, 존재하지 않을 경우에도 shared로 자동 생성된다.
 
-### 7.7 대소문자 처리
+### 7.6 대소문자 처리
 
 | 대상 | 규칙 |
 |---|---|
@@ -688,13 +675,13 @@ todo: project set-shared <name>
 | 섹션 이름 (`DOING`, `Doing`, `doing`) | 대소문자 무시 — 저장 시 소문자로 정규화 |
 | 프로젝트 이름 (`Backend` vs `backend`) | **대소문자 구분** — 서로 다른 프로젝트 |
 
-### 7.8 공백 및 제목 정규화
+### 7.7 공백 및 제목 정규화
 
 - 제목의 앞뒤 공백은 제거 (trim)
 - 단어 사이 연속 공백은 단일 공백으로 축약
 - trim 후 빈 제목은 "title required" 에러
 
-### 7.9 Due 날짜 엣지 케이스
+### 7.8 Due 날짜 엣지 케이스
 
 | 입력 | 결과 (현재 연도 2026 기준) |
 |---|---|
@@ -707,7 +694,7 @@ todo: project set-shared <name>
 | `due:-` | due 클리어 (NULL) |
 | `due:yesterday` | 에러 (잘못된 형식) |
 
-### 7.10 제목의 특수 문자
+### 7.9 제목의 특수 문자
 
 - 제목에는 줄바꿈을 제외한 모든 UTF-8 문자 사용 가능
 - Slack mrkdwn 특수 문자(`*`, `_`, `~`, `` ` ``)는 응답 시 이스케이프 처리하여 포맷 깨짐 방지
@@ -735,7 +722,7 @@ todo: project set-shared <name>
 
 파싱 예시:
 ```
-todo: add 로그인 버그 수정 <@U5678> /p Backend due:03-15
+/todo add 로그인 버그 수정 <@U5678> /p Backend due:03-15
 
 파싱 결과:
   command   = add

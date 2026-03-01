@@ -19,7 +19,7 @@ def edit_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
 
     # --- Validate task ID ---
     if not parsed.args:
-        return "❌ Task ID is required. Usage: todo: edit <id> [title] [options]"
+        return "❌ Task ID is required. Usage: /todo edit <id> [title] [options]"
 
     try:
         task_id = int(parsed.args[0])
