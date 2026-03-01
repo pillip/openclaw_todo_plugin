@@ -2,10 +2,8 @@
   "id": "openclaw-todo",
   "name": "openclaw-todo",
   "version": "0.1.0",
-  "description": "Bridge plugin that forwards todo: commands to the Python HTTP server",
-  "main": "dist/index.js",
-  "command_prefix": "todo:",
-  "bypass_llm": true,
+  "description": "Bridge plugin that forwards /todo commands to the Python HTTP server",
+  "main": "index.ts",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
@@ -16,11 +14,6 @@
         "default": "http://127.0.0.1:8200",
         "description": "Python TODO server URL"
       }
-    }
-  },
-  "triggers": {
-    "dm": {
-      "pattern": "^todo:(\\s|$)"
     }
   }
 }

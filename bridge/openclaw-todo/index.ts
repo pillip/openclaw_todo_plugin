@@ -1,5 +1,5 @@
 /**
- * OpenClaw bridge plugin — forwards todo: messages to the Python HTTP server.
+ * OpenClaw bridge plugin — forwards /todo commands to the Python HTTP server.
  *
  * Uses Node built-in `fetch` (Node 18+). Zero npm runtime dependencies.
  *
