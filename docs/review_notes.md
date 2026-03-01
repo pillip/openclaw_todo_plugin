@@ -2316,3 +2316,77 @@ File: `/Users/pillip/project/practice/openclaw_todo_plugin/bridge/openclaw-todo/
 1. Added `"private": true` to prevent accidental `npm publish` to the public registry
 2. Added `"engines": { "node": ">=18.0.0" }` to document the Node 18+ requirement (built-in `fetch`)
 3. Build re-verified after fixes: `npm run build` success, 293 pytest tests pass
+
+---
+
+# PR #72 Review Notes -- ISSUE-036: set-private Slack mention format
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-03-01
+> Branch: `issue/ISSUE-036-set-private-mention-format`
+
+## Summary
+
+Clean, test-only PR that adds three new test cases for the Slack mention format in `set-private` rejection messages. The tests verify `<@UXXXX>` mention format, per-task assignee grouping, and the 10-task violation display limit. All 14 tests pass. No production code was modified, and the existing production code already conforms to the UX spec (section 3.3). No security concerns.
+
+## Code Review Findings
+
+### Low: Test assertion for "... and N more" suffix is less precise than it could be
+
+**File:** `tests/test_cmd_project_set_private.py`, line 306
+
+The test asserts `"... and 2 more tasks" in result`, but the production code actually outputs `"... and 2 more tasks with external assignees."`. While the substring check passes, a more precise assertion would catch future regressions if the suffix text changes partially:
+
+```python
+# Current (passes but imprecise)
+assert "... and 2 more tasks" in result
+
+# Suggested (matches full suffix from UX spec 3.3)
+assert "... and 2 more tasks with external assignees." in result
+```
+
+### Low: No ORDER BY in violation query creates implicit ordering dependency
+
+**File:** `src/openclaw_todo/cmd_project_set_private.py`, lines 83-89
+
+The SQL query selecting violations has no `ORDER BY` clause. The tests (particularly `test_multiple_assignees_grouped_per_task` at line 274 and `test_max_violations_limit` at lines 300-304) depend on SQLite returning rows in insertion order. While this is reliable for SQLite's default behavior, it is undocumented and could break if the database engine changes or if indexes are added.
+
+This is a pre-existing condition in the production code, not introduced by this PR. However, it affects test reliability.
+
+### Low: No test for single-task multiple-task-lines format alignment with UX spec
+
+The UX spec (section 3.3) shows the rejection message as a comma-separated list of task violations:
+```
+e.g. #12 assignees:<@U2222>, #18 assignees:<@U3333>, #21 assignees:<@U4444>
+```
+
+When a task has multiple assignees, the format becomes `#12 assignees:<@U2222>, <@U3333>`, using the same comma separator as between tasks. There is no test verifying that a multi-task scenario with multi-assignee tasks renders unambiguously. This is an edge case in the UX spec itself rather than a code defect.
+
+### Info: Test quality is good overall
+
+- Tests are clearly named with descriptive docstrings
+- Each test is independent (uses fresh DB state via the `conn` fixture)
+- The `test_max_violations_limit` correctly creates 12 tasks (exceeding the 10-task limit by 2) and verifies both the shown and hidden sets
+- Grouping by `TestSetPrivateMentionFormat` class keeps ISSUE-036 tests logically separated
+
+## Security Findings
+
+### No issues found
+
+- **Test-only changes confirmed:** Only `tests/test_cmd_project_set_private.py`, `STATUS.md`, and `issues.md` were modified. No production code changes.
+- **No secrets or sensitive data:** Test fixtures use synthetic user IDs (`U001`, `U002`, `U003`, `U100`-`U111`) with no real credentials.
+- **No injection vectors:** All SQL in tests uses parameterized queries.
+
+## Suggested Fixes
+
+No Critical or High issues found. No fixes required for merge.
+
+## Follow-ups
+
+1. **[Low] Add `ORDER BY t.id` to the violations query** in `cmd_project_set_private.py` line 83-89 to make task ordering deterministic. This would also make the "first 10 shown" behavior predictable for users.
+2. **[Low] Tighten the suffix assertion** in `test_max_violations_limit` to match the full UX spec text.
+3. **[Low] Consider a test for the combined format** where multiple tasks each have multiple assignees, to validate that the comma-separated output remains readable.
+
+## Verdict
+
+**Approve.** The PR meets its acceptance criteria, tests are well-structured, and no security issues were found. The low-severity items above are non-blocking suggestions for future improvement.
