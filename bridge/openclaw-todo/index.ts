@@ -41,24 +41,36 @@ export default {
       description: "Manage tasks — add, list, board, move, done, drop, edit, project",
       acceptsArgs: true,
       handler: async (ctx: any) => {
-        const text = `/todo ${ctx.commandBody ?? ctx.args ?? ""}`.trim();
-        const senderId = ctx.senderId ?? ctx.channel ?? "unknown";
+        // (A) Use ctx.args — gateway already strips the "/todo" prefix.
+        //     ctx.commandBody contains the full normalized body (e.g. "/todo add ...")
+        //     which would cause a double-prefix when prepended with "/todo".
+        const text = `/todo ${ctx.args ?? ""}`.trim();
+        // (D) Prefer senderId, fall back to ctx.from (channel-scoped sender id),
+        //     not ctx.channel which is just a surface name like "slack".
+        const senderId = ctx.senderId ?? ctx.from ?? "unknown";
 
-        const res = await fetch(`${todoUrl}/message`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, sender_id: senderId }),
-        });
+        try {
+          const res = await fetch(`${todoUrl}/message`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text, sender_id: senderId }),
+          });
 
-        if (!res.ok) {
-          const errorBody = await res.text();
+          if (!res.ok) {
+            // (C) Do not leak internal error details to the user.
+            return {
+              text: `⚠️ TODO server returned an error (${res.status}). Please try again later.`,
+            };
+          }
+
+          const data: PluginResponse = await res.json();
+          return { text: data.response ?? "No response from TODO server." };
+        } catch {
+          // (E) Handle network errors (server down, timeout, DNS failure, etc.)
           return {
-            text: `openclaw-todo server error: ${res.status} ${errorBody}`,
+            text: "⚠️ Could not reach the TODO server. Is it running?",
           };
         }
-
-        const data: PluginResponse = await res.json();
-        return { text: data.response ?? "No response from TODO server." };
       },
     });
   },
