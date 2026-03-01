@@ -606,10 +606,10 @@ E2E 테스트에 scope 필터 및 다중 사용자 시나리오를 추가하여 
 - PRD-Ref: PR #49 review follow-up
 - Priority: P2
 - Estimate: 0.5d
-- Status: backlog
-- Owner: --
+- Status: done
+- Owner: claude
 - Branch: `issue/ISSUE-028-bridge-config`
-- GH-Issue: --
+- GH-Issue: #77
 - PR: --
 
 #### Goal

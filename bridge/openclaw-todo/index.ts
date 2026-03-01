@@ -3,24 +3,42 @@
  *
  * Uses Node built-in `fetch` (Node 18+). Zero npm runtime dependencies.
  *
- * Environment:
- *   OPENCLAW_TODO_URL  Base URL of the Python server (default http://127.0.0.1:8200)
+ * URL resolution order:
+ *   1. Plugin config `serverUrl` (from openclaw.plugin.json / gateway config)
+ *   2. Environment variable `OPENCLAW_TODO_URL`
+ *   3. Default: http://127.0.0.1:8200
  */
 
-const TODO_URL = process.env.OPENCLAW_TODO_URL ?? "http://127.0.0.1:8200";
+const DEFAULT_URL = "http://127.0.0.1:8200";
 
 interface PluginResponse {
   response: string | null;
 }
 
+function resolveServerUrl(config?: { serverUrl?: string }): {
+  url: string;
+  source: string;
+} {
+  if (config?.serverUrl) {
+    return { url: config.serverUrl, source: "config" };
+  }
+  if (process.env.OPENCLAW_TODO_URL) {
+    return { url: process.env.OPENCLAW_TODO_URL, source: "env" };
+  }
+  return { url: DEFAULT_URL, source: "default" };
+}
+
 export default function activate(api: any) {
+  const { url: todoUrl, source } = resolveServerUrl(api.config);
+  console.log(`[openclaw-todo] server URL: ${todoUrl} (source: ${source})`);
+
   api.registerMessageHandler({
     pattern: /^todo:\s*/,
     handler: async (message: any, context: any) => {
       const text = message.text;
       const senderId = context.sender_id ?? context.userId ?? message.user;
 
-      const res = await fetch(`${TODO_URL}/message`, {
+      const res = await fetch(`${todoUrl}/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, sender_id: senderId }),
