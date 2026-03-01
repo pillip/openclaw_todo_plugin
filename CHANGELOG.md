@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- Bridge handler: use `ctx.args` instead of `ctx.commandBody` to prevent double `/todo` prefix when forwarding to Python server (PR #80)
+- Bridge handler: stop leaking internal server error details to end users (PR #80)
+- Bridge handler: fall back to `ctx.from` instead of `ctx.channel` for senderId (PR #80)
+- Bridge handler: add try/catch around fetch for network error handling (PR #80)
+
 ### Changed
 - Command prefix unified from `todo:` to `/todo` across all source, tests, bridge, and docs to align with OpenClaw `registerCommand` API
 - Bridge `index.ts` resolves serverUrl from plugin config → env var → default, with source logging on activation (PR #78)
