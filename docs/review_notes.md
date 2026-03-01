@@ -2390,3 +2390,85 @@ No Critical or High issues found. No fixes required for merge.
 ## Verdict
 
 **Approve.** The PR meets its acceptance criteria, tests are well-structured, and no security issues were found. The low-severity items above are non-blocking suggestions for future improvement.
+
+---
+
+# PR #74 Review Notes -- ISSUE-039: server.py HTTP endpoint test coverage
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-03-01
+> Branch: `issue/ISSUE-039-server-test-coverage`
+
+## Summary
+
+This PR adds four new test cases to `tests/test_server.py` covering previously untested error-handling branches in `server.py`: missing `text` field (422), non-dict JSON body (400), invalid `Content-Length` header (400), and an unknown POST path (was already present but the three others are new). All 13 tests pass. The changes are test-only; no production code was modified. Overall this is a clean, well-scoped PR.
+
+## Code Review Findings
+
+### Positive observations
+
+1. **Good branch coverage improvement.** The three new tests (`test_missing_text_field_422`, `test_non_dict_json_body_400`, `test_invalid_content_length_400`) each target a distinct branch in `do_POST` that was previously untested.
+
+2. **Tests are deterministic and independent.** Each test starts with a fresh `tmp_path` database via the fixture, so there is no shared state between tests.
+
+3. **Clear naming and docstrings.** Each new test has a descriptive docstring explaining the scenario.
+
+### [Low] `test_invalid_content_length_400` -- urllib header normalization risk
+
+The test manually sets `Content-Length: not-a-number` via `req.add_header`. I verified that CPython's `urllib.request` does **not** normalize or override this header when `data` is provided -- the custom value is preserved on the wire. The test passes reliably on CPython 3.11. However, this behavior is an implementation detail of urllib; future Python versions or alternative HTTP clients could behave differently.
+
+**Recommendation (non-blocking):** Add a brief comment in the test noting that urllib preserves the manually set Content-Length, or consider using a raw socket for absolute certainty. Current behavior is fine for now.
+
+### [Low] `test_invalid_content_length_400` duplicates boilerplate from `test_oversized_body_413`
+
+Both tests manually construct a `urllib.request.Request` with custom headers and duplicate the try/except pattern already encapsulated in the `_post` helper. The `_post` helper does not support custom headers, so this duplication is unavoidable without extending the helper.
+
+**Recommendation (non-blocking):** Consider adding an optional `headers` parameter to `_post()` to reduce duplication. Example:
+
+```python
+def _post(url, body=None, content_type="application/json", extra_headers=None):
+    req = urllib.request.Request(url, data=body, method="POST")
+    if content_type:
+        req.add_header("Content-Type", content_type)
+    for k, v in (extra_headers or {}).items():
+        req.add_header(k, v)
+    ...
+```
+
+### [Info] Remaining uncovered lines in server.py (70% coverage)
+
+Lines 35-42 (`_get_config`) and 126-152 (`run()`) are not covered. These are the server startup/configuration functions that involve environment variables, signal handlers, and blocking `serve_forever()`. Testing them would require integration-level tests or mocking `os.environ` and `signal.signal`.
+
+**Recommendation (follow-up issue):** Consider adding unit tests for `_get_config()` (easy to test with `monkeypatch.setenv`) to cover the `ValueError` fallback path (line 39). The `run()` function is harder to test and may not be worth the effort for a thin HTTP wrapper.
+
+## Security Findings
+
+### Production code unchanged -- Confirmed
+
+The diff modifies only `tests/test_server.py`, `STATUS.md`, and `issues.md`. No changes to any production source files in `src/`.
+
+### No secrets or sensitive data in test fixtures -- Confirmed
+
+Test fixtures use only synthetic data (`"U001"`, `"Buy milk"`, etc.). No API keys, tokens, or credentials appear anywhere in the test file.
+
+### [Info] Test server binds to localhost only
+
+The test fixture correctly binds the server to `127.0.0.1` on an OS-assigned port, preventing any network exposure during test runs.
+
+**No security issues found. All findings are informational or low severity.**
+
+## Suggested Fixes
+
+No Critical or High issues found. No fixes required.
+
+## Follow-ups (non-blocking)
+
+1. **Add unit tests for `_get_config()`** -- easy coverage win for the `OPENCLAW_TODO_PORT` invalid-value fallback path (line 39). Use `monkeypatch.setenv("OPENCLAW_TODO_PORT", "abc")` and assert the function returns `DEFAULT_PORT`.
+
+2. **Extend `_post` helper with `extra_headers` parameter** to reduce boilerplate in tests that need custom headers (`test_invalid_content_length_400`, `test_oversized_body_413`).
+
+3. **Consider a test for unsupported HTTP methods** (e.g., PUT, DELETE) to verify the server returns 501 or 405. Currently `BaseHTTPRequestHandler` returns 501 by default for unimplemented methods, but an explicit test documents this behavior.
+
+## Verdict
+
+**Approve.** The PR delivers meaningful test coverage improvements for `server.py` error-handling branches. All 13 tests pass, no production code was modified, and no security issues were found. The low-severity and follow-up items are non-blocking suggestions for future improvement.

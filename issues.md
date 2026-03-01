@@ -29,7 +29,7 @@
 - [x] ISSUE-036: set-private 에러 메시지에 Slack 멘션 포맷 적용 _(track: product, P2, 0.5d)_ → PR #72
 - [ ] ISSUE-037: parser 단위 테스트 보강 -- 엣지 케이스 _(track: platform, P1, 1d)_
 - [ ] ISSUE-038: E2E 테스트 보강 -- scope 필터 및 다중 사용자 시나리오 _(track: platform, P1, 1d)_
-- [ ] ISSUE-039: server.py HTTP endpoint 테스트 보강 _(track: platform, P2, 0.5d)_
+- [x] ISSUE-039: server.py HTTP endpoint 테스트 보강 _(track: platform, P2, 0.5d)_ → PR #74
 - [x] ISSUE-040: bridge TypeScript 빌드 및 npm 패키지 구성 _(track: platform, P1, 1d)_ → PR #70
 
 ### Doing
@@ -528,11 +528,11 @@ E2E 테스트에 scope 필터 및 다중 사용자 시나리오를 추가하여 
 - PRD-Ref: N/A (품질 향상)
 - Priority: P2
 - Estimate: 0.5d
-- Status: backlog
-- Owner: --
+- Status: done
+- Owner: claude
 - Branch: `issue/ISSUE-039-server-test-coverage`
-- GH-Issue: --
-- PR: --
+- GH-Issue: #73
+- PR: #74
 
 #### Goal
 `test_server.py`의 커버리지를 확인하고 누락된 시나리오를 추가한다.
