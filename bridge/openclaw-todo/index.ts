@@ -28,34 +28,38 @@ function resolveServerUrl(config?: { serverUrl?: string }): {
   return { url: DEFAULT_URL, source: "default" };
 }
 
-export default function activate(api: any) {
-  const { url: todoUrl, source } = resolveServerUrl(api.config);
-  console.log(`[openclaw-todo] server URL: ${todoUrl} (source: ${source})`);
+export default {
+  id: "openclaw-todo",
+  name: "OpenClaw TODO",
 
-  api.registerMessageHandler({
-    pattern: /^todo:\s*/,
-    handler: async (message: any, context: any) => {
-      const text = message.text;
-      const senderId = context.sender_id ?? context.userId ?? message.user;
+  register(api: any) {
+    const { url: todoUrl, source } = resolveServerUrl(api.config);
+    api.logger?.info?.(`server URL: ${todoUrl} (source: ${source})`);
 
-      const res = await fetch(`${todoUrl}/message`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, sender_id: senderId }),
-      });
+    api.registerCommand({
+      name: "todo",
+      description: "Manage tasks — add, list, board, move, done, drop, edit, project",
+      acceptsArgs: true,
+      handler: async (ctx: any) => {
+        const text = `todo: ${ctx.commandBody ?? ctx.args ?? ""}`.trim();
+        const senderId = ctx.senderId ?? ctx.channel ?? "unknown";
 
-      if (!res.ok) {
-        const errorBody = await res.text();
-        throw new Error(
-          `openclaw-todo server error: ${res.status} ${errorBody}`,
-        );
-      }
+        const res = await fetch(`${todoUrl}/message`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, sender_id: senderId }),
+        });
 
-      const data: PluginResponse = await res.json();
-      if (data.response) {
-        return { text: data.response };
-      }
-      return null;
-    },
-  });
-}
+        if (!res.ok) {
+          const errorBody = await res.text();
+          return {
+            text: `openclaw-todo server error: ${res.status} ${errorBody}`,
+          };
+        }
+
+        const data: PluginResponse = await res.json();
+        return { text: data.response ?? "No response from TODO server." };
+      },
+    });
+  },
+};
