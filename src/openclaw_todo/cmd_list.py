@@ -98,12 +98,7 @@ def list_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
     where_clause = " AND ".join(conditions)
 
     # --- Count total matching rows ---
-    count_query = (
-        "SELECT COUNT(*) "
-        "FROM tasks t "
-        "JOIN projects p ON t.project_id = p.id "
-        f"WHERE {where_clause}"
-    )
+    count_query = "SELECT COUNT(*) " "FROM tasks t " "JOIN projects p ON t.project_id = p.id " f"WHERE {where_clause}"
     total_count = conn.execute(count_query, params).fetchone()[0]
 
     # --- Fetch limited rows ---

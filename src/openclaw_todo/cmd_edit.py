@@ -155,4 +155,7 @@ def edit_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
         (task_id,),
     ).fetchall()
     assignee_str = ", ".join(f"<@{r[0]}>" for r in assignee_rows)
-    return f"✏️ Edited #{task_id} ({final_project}/{final_section}) due:{due_str} assignees:{assignee_str} — {final_title}"
+    return (
+        f"✏️ Edited #{task_id} ({final_project}/{final_section})"
+        f" due:{due_str} assignees:{assignee_str} — {final_title}"
+    )
