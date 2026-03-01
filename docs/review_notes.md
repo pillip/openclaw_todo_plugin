@@ -2555,3 +2555,157 @@ No Critical or High severity issues were identified. No fixes required.
 ## Verdict
 
 **Approve.** The PR correctly aligns ruff/black target-version to `py310` matching `requires-python >= 3.10`, adds appropriate exclude patterns for generated directories, and applies clean Black reformats. All 299 tests pass, ruff and black report no issues, and no security concerns were found. The follow-up items are non-blocking style improvements.
+
+---
+
+# PR #78 Review Notes -- ISSUE-028: Bridge serverUrl config integration
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-03-01
+> Branch: `issue/ISSUE-028-bridge-config`
+
+---
+
+## Summary
+
+Clean, focused PR that adds a three-tier URL resolution (config -> env -> default) to the bridge plugin. The implementation is correct and well-structured with one medium-severity edge case around empty-string config values and one medium-severity security consideration around URL logging.
+
+---
+
+## Code Review Findings
+
+### Medium -- Empty string `serverUrl` bypasses config priority
+
+**File:** `/Users/pillip/project/practice/openclaw_todo_plugin/bridge/openclaw-todo/index.ts`, line 22
+
+```typescript
+if (config?.serverUrl) {
+```
+
+The truthiness check means an empty string `""` in the config will be treated as falsy, silently falling through to the env var or default. This is arguably correct behavior (empty = not set), but it should be an intentional decision. If the gateway schema allows `""` through validation (the `configSchema` has no `minLength` constraint), an operator might set `serverUrl: ""` expecting an error and instead silently get the default URL.
+
+**Recommendation:** Either add `"minLength": 1` to the `configSchema` in `openclaw.plugin.json`, or add an explicit check with a warning log when the value is an empty string.
+
+### Low -- `api` parameter typed as `any`
+
+**File:** `/Users/pillip/project/practice/openclaw_todo_plugin/bridge/openclaw-todo/index.ts`, line 31
+
+```typescript
+export default function activate(api: any) {
+```
+
+The `api` parameter is typed as `any`, which defeats TypeScript's type safety. If the OpenClaw gateway SDK provides type definitions, those should be used. If not, a minimal local interface would improve safety:
+
+```typescript
+interface PluginApi {
+  config?: { serverUrl?: string };
+  registerMessageHandler(handler: { pattern: RegExp; handler: Function }): void;
+}
+```
+
+This is a pre-existing issue, not introduced by this PR.
+
+### Low -- `resolveServerUrl` return type uses bare `string` for `source`
+
+**File:** `/Users/pillip/project/practice/openclaw_todo_plugin/bridge/openclaw-todo/index.ts`, line 20
+
+```typescript
+source: string;
+```
+
+A union type `"config" | "env" | "default"` would be more precise and prevent typos if the function is extended.
+
+### Info -- Documentation and resolution order
+
+The module-level JSDoc correctly documents the three-tier resolution order, and the `configSchema` in `openclaw.plugin.json` correctly declares `serverUrl` with a default. The AC is satisfied: config takes priority over env, which takes priority over the hardcoded default.
+
+---
+
+## Security Findings
+
+### Medium -- URL value logged to stdout (potential SSRF reconnaissance aid)
+
+**File:** `/Users/pillip/project/practice/openclaw_todo_plugin/bridge/openclaw-todo/index.ts`, line 33
+
+```typescript
+console.log(`[openclaw-todo] server URL: ${todoUrl} (source: ${source})`);
+```
+
+The full URL is logged at startup. In typical deployments this is useful for debugging. However, if the URL contains embedded credentials (e.g., `http://user:pass@host/`) or internal hostnames, this could leak sensitive information to log aggregators. The risk is **Medium** because:
+- The URL is operator-configured (not user-supplied at runtime), limiting attacker control.
+- Standard log practices should already handle sensitive data, but defense-in-depth suggests sanitizing or at minimum not logging credentials embedded in URLs.
+
+**Recommendation:** Consider stripping userinfo from the URL before logging, or document that credentials must not be embedded in the URL.
+
+### Medium -- No URL validation enables potential SSRF
+
+**File:** `/Users/pillip/project/practice/openclaw_todo_plugin/bridge/openclaw-todo/index.ts`, lines 22-28
+
+The `resolveServerUrl` function accepts any string as a URL without validation. A malicious or misconfigured `serverUrl` value like `http://169.254.169.254/latest/meta-data/` (AWS metadata endpoint) or `file:///etc/passwd` could cause the bridge to make unintended requests. Since the value comes from operator config (not end-user input), the risk is reduced, but a basic `URL` constructor validation would add defense-in-depth:
+
+```typescript
+function resolveServerUrl(config?: { serverUrl?: string }): { url: string; source: string } {
+  let raw: string | undefined;
+  let source = "default";
+
+  if (config?.serverUrl) {
+    raw = config.serverUrl;
+    source = "config";
+  } else if (process.env.OPENCLAW_TODO_URL) {
+    raw = process.env.OPENCLAW_TODO_URL;
+    source = "env";
+  }
+
+  const resolved = raw ?? DEFAULT_URL;
+  try {
+    const parsed = new URL(resolved);
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new Error(`unsupported protocol: ${parsed.protocol}`);
+    }
+  } catch (e) {
+    throw new Error(`[openclaw-todo] invalid serverUrl (${source}): ${resolved} -- ${e}`);
+  }
+  return { url: resolved, source };
+}
+```
+
+### Low -- No hardcoded secrets
+
+No API keys, tokens, or credentials were found in the diff. The default URL `http://127.0.0.1:8200` is a localhost address, which is appropriate for development defaults.
+
+---
+
+## Suggested Fixes
+
+No Critical or High severity issues were identified. The two Medium items (URL validation and empty-string handling) are recommended but not blocking.
+
+**Minimal safe fix for `configSchema`** (non-blocking):
+
+In `/Users/pillip/project/practice/openclaw_todo_plugin/bridge/openclaw-todo/openclaw.plugin.json`, add `minLength` to the `serverUrl` property:
+
+```json
+"serverUrl": {
+  "type": "string",
+  "minLength": 1,
+  "default": "http://127.0.0.1:8200",
+  "description": "Python TODO server URL"
+}
+```
+
+---
+
+## Follow-ups (non-blocking)
+
+1. **URL validation in `resolveServerUrl`**: Add a `new URL()` parse check and protocol allowlist (`http:`, `https:`) to prevent misconfigured URLs from causing silent failures or SSRF. See the code snippet in Security Findings above.
+
+2. **Type the `api` parameter**: Replace `any` with a minimal interface or import gateway SDK types when available. This is a pre-existing issue across the bridge plugin.
+
+3. **Narrow `source` return type**: Change `source: string` to `source: "config" | "env" | "default"` for better type safety.
+
+4. **Sanitize URL in log output**: Strip any embedded `userinfo` (credentials) from the URL before logging, e.g., by parsing with `new URL()` and reconstructing without the password.
+
+---
+
+## Verdict
+
+**Approve.** The PR correctly implements the three-tier URL resolution order (config -> env -> default) as specified in the AC. The code is clean, well-documented, and the `resolveServerUrl` function is properly structured. The Medium-severity findings around URL validation and log sanitization are defense-in-depth improvements that can be addressed in a follow-up without blocking this merge.

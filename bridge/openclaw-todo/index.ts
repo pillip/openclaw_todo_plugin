@@ -17,7 +17,7 @@ interface PluginResponse {
 
 function resolveServerUrl(config?: { serverUrl?: string }): {
   url: string;
-  source: string;
+  source: "config" | "env" | "default";
 } {
   if (config?.serverUrl) {
     return { url: config.serverUrl, source: "config" };
