@@ -2472,3 +2472,86 @@ No Critical or High issues found. No fixes required.
 ## Verdict
 
 **Approve.** The PR delivers meaningful test coverage improvements for `server.py` error-handling branches. All 13 tests pass, no production code was modified, and no security issues were found. The low-severity and follow-up items are non-blocking suggestions for future improvement.
+
+---
+
+# PR #76 Review Notes -- ISSUE-027: ruff/black target-version alignment
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-03-01
+> Branch: `issue/ISSUE-027-lint-target-version`
+
+## Summary
+
+This PR aligns ruff and black `target-version` from `py311` to `py310` to match `requires-python = ">=3.10"` in `pyproject.toml`, adds exclude patterns for `.claude-kit` and `.claude` directories, and applies the resulting Black reformats. All 299 tests pass, and both ruff and black report clean.
+
+## Code Review Findings
+
+### Correctness: target-version alignment -- OK
+
+- `requires-python = ">=3.10"` means Python 3.10 is the minimum supported version.
+- `target-version = "py310"` (ruff) and `target-version = ["py310"]` (black) correctly match this constraint.
+- **Minor note (Low):** The `classifiers` list in `pyproject.toml` (lines 15-16) includes `Python :: 3.11` and `Python :: 3.12` but omits `Python :: 3.10`. This is not a blocking issue, but adding `"Programming Language :: Python :: 3.10"` would be more consistent with the `requires-python` field.
+
+### Exclude patterns -- OK
+
+- **ruff**: `exclude = [".claude-kit", ".claude"]` uses the correct list-of-strings syntax.
+- **black**: `extend-exclude` uses the regex-in-TOML-multiline-string format, which is the documented approach for Black. The regex `/(\.claude-kit|\.claude)/` is correct.
+
+### Line-length fixes -- OK with one style concern
+
+**`src/openclaw_todo/cmd_edit.py` (line 158-161):**
+The f-string was split into two adjacent f-strings within parentheses. The second string begins with a space (`f" due:..."`), so the concatenated output is identical to the original single-line string. Correct.
+
+**`src/openclaw_todo/permissions.py` (line 86-89):**
+The f-string was split at the `\n` boundary. The first part ends with `\n` and the second part is a plain string `"(...)"`). Concatenation is identical to the original. Correct.
+
+**`src/openclaw_todo/cmd_list.py` (line 101) -- Low severity:**
+Black collapsed the previously multi-line implicit string concatenation into a single 113-character line:
+```python
+count_query = "SELECT COUNT(*) " "FROM tasks t " "JOIN projects p ON t.project_id = p.id " f"WHERE {where_clause}"
+```
+This is functionally correct and within the 120-char limit, but:
+1. It creates a style inconsistency with `query` (lines 105-112) which uses parenthesized multi-line format for the same pattern.
+2. It triggers `ISC001` (implicit string concatenation on one line) if the `ISC` rule set is ever enabled in ruff.
+3. The original multi-line format was more readable for SQL queries.
+
+This is a Black formatting decision, not a code error. Non-blocking.
+
+### Black reformats -- Pure formatting, no behavioral changes
+
+| File | Change | Behavioral impact |
+|------|--------|-------------------|
+| `src/openclaw_todo/cmd_list.py` | Multi-line implicit concat collapsed to single line | None |
+| `tests/test_cmd_add.py` | Multi-line `conn.execute(...)` collapsed to single line | None |
+| `tests/test_e2e.py` | `frozenset({...})` reformatted to vertical style | None |
+| `tests/test_plugin_install_e2e.py` | Same `frozenset({...})` reformat | None |
+| `tests/test_server.py` | `b'[1, 2, 3]'` changed to `b"[1, 2, 3]"` (quote style) | None |
+
+All changes are whitespace/quote-style only. No logic, imports, or control flow was modified.
+
+## Security Findings
+
+| Severity | Finding |
+|----------|---------|
+| None | No secrets, credentials, or API keys are exposed in this diff. |
+| None | No unexpected code changes hidden in formatting commits. All changes are verifiably formatting-only or config-only. |
+| None | No new dependencies added. No security-relevant configuration changed. |
+
+**No security issues found.**
+
+## Suggested Fixes
+
+No Critical or High severity issues were identified. No fixes required.
+
+## Follow-ups (non-blocking)
+
+1. **Add `Python :: 3.10` classifier** in `pyproject.toml` classifiers list to match `requires-python = ">=3.10"`. This is a metadata-only change.
+
+2. **Consider enabling `ISC` rule** in ruff lint select (or at least `ISC001`) to catch implicit string concatenation on single lines. If enabled, the `cmd_list.py` line 101 would need to be refactored to either a single combined string or a parenthesized multi-line form.
+
+3. **Style consistency for SQL strings**: The `count_query` on line 101 of `cmd_list.py` could be refactored to use the same parenthesized multi-line format as the `query` variable on lines 105-112 for consistency. This would require wrapping it in parentheses so Black preserves the multi-line layout.
+
+## Verdict
+
+**Approve.** The PR correctly aligns ruff/black target-version to `py310` matching `requires-python >= 3.10`, adds appropriate exclude patterns for generated directories, and applies clean Black reformats. All 299 tests pass, ruff and black report no issues, and no security concerns were found. The follow-up items are non-blocking style improvements.

@@ -117,7 +117,7 @@ class TestErrorHandling:
 
     def test_non_dict_json_body_400(self, server_url):
         """JSON array body (not a dict) returns 400."""
-        status, body = _post(f"{server_url}/message", b'[1, 2, 3]')
+        status, body = _post(f"{server_url}/message", b"[1, 2, 3]")
         assert status == 400
         assert "invalid JSON" in body["error"]
 

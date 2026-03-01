@@ -31,10 +31,21 @@ def _extract_task_id(add_result: str) -> str:
     return add_result.split("#")[1].split(" ")[0]
 
 
-_ALLOWED_COLUMNS = frozenset({
-    "*", "id", "title", "status", "section", "due",
-    "project_id", "created_by", "closed_at", "created_at", "updated_at",
-})
+_ALLOWED_COLUMNS = frozenset(
+    {
+        "*",
+        "id",
+        "title",
+        "status",
+        "section",
+        "due",
+        "project_id",
+        "created_by",
+        "closed_at",
+        "created_at",
+        "updated_at",
+    }
+)
 
 
 def _query_task(db_path: str, task_id: str, columns: str = "*") -> tuple | None:

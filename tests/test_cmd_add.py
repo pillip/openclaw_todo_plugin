@@ -242,9 +242,7 @@ class TestAddEdgeCases:
 
     def test_add_auto_create_private_takes_priority(self, conn):
         """If a private project with same name exists, it should be used (no auto-create)."""
-        conn.execute(
-            "INSERT INTO projects (name, visibility, owner_user_id) VALUES ('MyProj', 'private', 'U001');"
-        )
+        conn.execute("INSERT INTO projects (name, visibility, owner_user_id) VALUES ('MyProj', 'private', 'U001');")
         conn.commit()
 
         parsed = _make_parsed(title_tokens=["Task"], project="MyProj")
