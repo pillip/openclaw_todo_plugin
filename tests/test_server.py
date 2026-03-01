@@ -108,10 +108,37 @@ class TestErrorHandling:
         assert status == 422
         assert "missing" in body["error"]
 
+    def test_missing_text_field_422(self, server_url):
+        """Missing 'text' field (only sender_id provided) returns 422."""
+        payload = json.dumps({"sender_id": "U001"}).encode()
+        status, body = _post(f"{server_url}/message", payload)
+        assert status == 422
+        assert "missing" in body["error"]
+
+    def test_non_dict_json_body_400(self, server_url):
+        """JSON array body (not a dict) returns 400."""
+        status, body = _post(f"{server_url}/message", b'[1, 2, 3]')
+        assert status == 400
+        assert "invalid JSON" in body["error"]
+
     def test_unknown_post_path_404(self, server_url):
         payload = json.dumps({"text": "hi", "sender_id": "U001"}).encode()
         status, _body = _post(f"{server_url}/other", payload)
         assert status == 404
+
+    def test_invalid_content_length_400(self, server_url):
+        """Non-numeric Content-Length returns 400."""
+        url = f"{server_url}/message"
+        req = urllib.request.Request(url, data=b'{"x":1}', method="POST")
+        req.add_header("Content-Type", "application/json")
+        req.add_header("Content-Length", "not-a-number")
+        try:
+            resp = urllib.request.urlopen(req)
+            status, body = resp.status, json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            status, body = e.code, json.loads(e.read())
+        assert status == 400
+        assert "Content-Length" in body["error"]
 
     def test_oversized_body_413(self, server_url):
         """Content-Length exceeding MAX_BODY_BYTES is rejected with 413."""
