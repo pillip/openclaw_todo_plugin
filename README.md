@@ -142,5 +142,5 @@ make build
 
 ## Requirements
 
-- Python >= 3.11
+- Python >= 3.10
 - No runtime dependencies (SQLite is in the Python stdlib)

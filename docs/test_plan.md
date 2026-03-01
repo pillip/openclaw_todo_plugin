@@ -36,7 +36,7 @@
 - 파서 정확성 (멘션, `/p`, `/s`, `due:` 토큰 처리)을 보장한다.
 - DB 스키마 생성, 마이그레이션, CRUD 무결성을 확인한다.
 - private/shared 프로젝트 접근 제어 규칙을 검증한다.
-- `todo:` 단일 접두사 정책 및 `/todo` 미지원 정책을 확인한다.
+- `/todo` 단일 접두사 정책을 확인한다.
 - LLM 바이패스 구조가 유지되는지 확인한다.
 
 ### 1.2 테스트 계층
@@ -45,7 +45,7 @@
 |------|------|------|------------|
 | **단위 테스트** | `pytest` | 파서, 개별 커맨드 핸들러, 권한 검증, 프로젝트 리졸버 | 60% |
 | **통합 테스트** | `pytest` + SQLite (tmp_path) | 커맨드 핸들러 + DB 연동, 디스패처 라우팅, 마이그레이션 | 25% |
-| **E2E 테스트** | `pytest` + `handle_message()` 전체 경로 | `todo: ...` 입력부터 응답 문자열까지 전 경로 | 15% |
+| **E2E 테스트** | `pytest` + `handle_message()` 전체 경로 | `/todo ...` 입력부터 응답 문자열까지 전 경로 | 15% |
 
 ### 1.3 원칙
 
@@ -108,7 +108,7 @@ tests/
 ### CF-01: Task 생성 -> 조회 라운드트립
 
 ```
-todo: add <title> -> Added #N 응답 -> todo: list -> 해당 task 표시
+/todo add <title> -> Added #N 응답 -> /todo list -> 해당 task 표시
 ```
 - 검증 포인트: DB 삽입, default project(Inbox)/section(backlog)/assignee(sender), 응답 포맷
 
@@ -155,7 +155,7 @@ add task /p Work -> private "Work"에 생성됨 (private 우선)
 ### CF-07: DB 초기화 + 마이그레이션
 
 ```
-DB 파일 미존재 상태 -> 첫 todo: 커맨드 -> DB 생성 + 스키마 적용 + Inbox 프로젝트 생성
+DB 파일 미존재 상태 -> 첫 /todo 커맨드 -> DB 생성 + 스키마 적용 + Inbox 프로젝트 생성
 ```
 - 검증 포인트: 파일 생성, 테이블 존재, schema_version, Inbox 존재
 
@@ -191,7 +191,7 @@ seed_task(
 | 픽스처/헬퍼 | 용도 |
 |-------------|------|
 | `db_path(tmp_path)` | `str(tmp_path / "e2e.sqlite3")` 경로 문자열을 반환한다. |
-| `_msg(text, sender, db_path)` | `handle_message("todo: " + text, ...)` 호출 후 응답을 반환하는 헬퍼이다. |
+| `_msg(text, sender, db_path)` | `handle_message("/todo " + text, ...)` 호출 후 응답을 반환하는 헬퍼이다. |
 | `_extract_task_id(result)` | `"Added #N"` 응답에서 task ID를 추출한다. |
 | `_query_task(db_path, task_id, columns)` | SQL injection 방지 화이트리스트 기반 직접 DB 조회 헬퍼이다. |
 
@@ -239,44 +239,44 @@ def private_project(conn):
 > 대상 모듈: `src/openclaw_todo/plugin.py` (`handle_message`, `_TODO_PREFIX`)
 > 테스트 파일: `tests/test_plugin.py`
 
-### TC-01: `todo:` 접두사 정상 인식
+### TC-01: `/todo` 접두사 정상 인식
 
 | 항목 | 내용 |
 |------|------|
 | **ID** | TC-01 |
-| **설명** | `todo: add buy milk` 메시지가 정상 처리되어 응답을 반환한다 |
+| **설명** | `/todo add buy milk` 메시지가 정상 처리되어 응답을 반환한다 |
 | **사전 조건** | DB 경로 준비 (tmp_path) |
-| **단계** | `handle_message("todo: add buy milk", {"sender_id": "U1"}, db_path)` 호출 |
+| **단계** | `handle_message("/todo add buy milk", {"sender_id": "U1"}, db_path)` 호출 |
 | **기대 결과** | 문자열 응답 반환 (None이 아님), `isinstance(result, str)` |
 
-### TC-02: `todo:` 뒤에 공백 없이 문자가 이어지면 무시
+### TC-02: `/todo` 뒤에 공백 없이 문자가 이어지면 무시
 
 | 항목 | 내용 |
 |------|------|
 | **ID** | TC-02 |
-| **설명** | `todo:x something` 같은 메시지는 TODO 커맨드로 인식하지 않는다 |
+| **설명** | `/todox something` 같은 메시지는 TODO 커맨드로 인식하지 않는다 |
 | **사전 조건** | 없음 |
-| **단계** | `handle_message("todo:x something", {"sender_id": "U1"}, db_path)` 호출 |
+| **단계** | `handle_message("/todox something", {"sender_id": "U1"}, db_path)` 호출 |
 | **기대 결과** | `None` 반환 |
 
-### TC-03: `/todo` 접두사 미지원
+### TC-03: 일반 텍스트 무시
 
 | 항목 | 내용 |
 |------|------|
 | **ID** | TC-03 |
-| **설명** | `/todo add task` 메시지는 무시한다. Slack 슬래시 커맨드 미사용 정책에 따라 `/todo`는 지원하지 않는다 |
+| **설명** | `/todo` 접두사가 없는 일반 메시지는 무시한다 |
 | **사전 조건** | 없음 |
-| **단계** | `handle_message("/todo add task", {"sender_id": "U1"}, db_path)` 호출 |
+| **단계** | `handle_message("hello world", {"sender_id": "U1"}, db_path)` 호출 |
 | **기대 결과** | `None` 반환 |
 
-### TC-04: `/todo:` 접두사 미지원
+### TC-04: 빈 문자열 무시
 
 | 항목 | 내용 |
 |------|------|
 | **ID** | TC-04 |
-| **설명** | `/todo: add task` 메시지도 무시한다 |
+| **설명** | 빈 메시지도 무시한다 |
 | **사전 조건** | 없음 |
-| **단계** | `handle_message("/todo: add task", {"sender_id": "U1"}, db_path)` 호출 |
+| **단계** | `handle_message("", {"sender_id": "U1"}, db_path)` 호출 |
 | **기대 결과** | `None` 반환 |
 
 ### TC-05: 일반 텍스트 무시
@@ -284,19 +284,19 @@ def private_project(conn):
 | 항목 | 내용 |
 |------|------|
 | **ID** | TC-05 |
-| **설명** | `todo:` 접두사가 없는 일반 메시지는 무시한다 |
+| **설명** | `/todo` 접두사가 없는 일반 메시지는 무시한다 |
 | **사전 조건** | 없음 |
 | **단계** | `handle_message("hello world", ...)`, `handle_message("", ...)`, `handle_message("some random text", ...)` 각각 호출 |
 | **기대 결과** | 모두 `None` 반환 |
 
-### TC-06: `todo:` 만 입력 시 Usage 반환
+### TC-06: `/todo` 만 입력 시 Usage 반환
 
 | 항목 | 내용 |
 |------|------|
 | **ID** | TC-06 |
-| **설명** | 커맨드 없이 `todo:` 만 입력하면 사용법 안내 메시지를 반환한다 |
+| **설명** | 커맨드 없이 `/todo` 만 입력하면 사용법 안내 메시지를 반환한다 |
 | **사전 조건** | 없음 |
-| **단계** | `handle_message("todo:", {"sender_id": "U1"}, db_path)` 호출 |
+| **단계** | `handle_message("/todo", {"sender_id": "U1"}, db_path)` 호출 |
 | **기대 결과** | `"Usage"` 포함된 문자열 반환 |
 
 ### TC-07: 선행/후행 공백 허용
@@ -304,9 +304,9 @@ def private_project(conn):
 | 항목 | 내용 |
 |------|------|
 | **ID** | TC-07 |
-| **설명** | `"  todo: add task  "` 처럼 공백이 있어도 정상 인식한다 |
+| **설명** | `"  /todo add task  "` 처럼 공백이 있어도 정상 인식한다 |
 | **사전 조건** | 없음 |
-| **단계** | `handle_message("  todo: add task  ", {"sender_id": "U1"}, db_path)` 호출 |
+| **단계** | `handle_message("  /todo add task  ", {"sender_id": "U1"}, db_path)` 호출 |
 | **기대 결과** | 문자열 응답 반환 (None이 아님) |
 
 ### TC-08: 알 수 없는 커맨드 시 도움말 반환
@@ -314,7 +314,7 @@ def private_project(conn):
 | 항목 | 내용 |
 |------|------|
 | **ID** | TC-08 |
-| **설명** | `todo: foobar`처럼 알 수 없는 커맨드 입력 시 "Unknown command"와 도움말을 반환한다 |
+| **설명** | `/todo foobar`처럼 알 수 없는 커맨드 입력 시 "Unknown command"와 도움말을 반환한다 |
 | **사전 조건** | 없음 |
 | **단계** | dispatcher를 통해 `"foobar something"` 디스패치 |
 | **기대 결과** | 응답에 `"Unknown command"`, `"foobar"`, `"Commands:"` 포함 |
@@ -538,13 +538,13 @@ def private_project(conn):
 
 ## 13. 테스트 케이스 -- LLM 바이패스 검증
 
-> PRD v1.2 핵심 요구사항: manifest에 `command_prefix: "todo:"`, `bypass_llm: true` 등록 시 Gateway가 LLM 없이 직접 플러그인을 호출한다
+> PRD v1.2 핵심 요구사항: manifest에 `command_prefix: "/todo"`, `bypass_llm: true` 등록 시 Gateway가 LLM 없이 직접 플러그인을 호출한다
 
 | ID | 설명 | 검증 방식 |
 |----|------|-----------|
 | TC-89 | 코드 경로에 LLM 의존성 없음 | `plugin.py` -> `dispatcher.py` 경로에 LLM import/호출 없음 확인 |
-| TC-90 | manifest 설정 검증 | manifest 파일에 `command_prefix="todo:"`, `bypass_llm=true` 존재 |
-| TC-91 | Gateway 통합 검증 (수동) | 스테이징에서 `todo: add test` 전송 시 LLM 호출 로그 미발생 확인 |
+| TC-90 | manifest 설정 검증 | manifest 파일에 `command_prefix="/todo"`, `bypass_llm=true` 존재 |
+| TC-91 | Gateway 통합 검증 (수동) | 스테이징에서 `/todo add test` 전송 시 LLM 호출 로그 미발생 확인 |
 
 ---
 
@@ -638,10 +638,9 @@ PRD Section 9의 각 수용 기준과 테스트 케이스의 매핑이다.
 | private 프로젝트에 타 assignee 지정 시 경고 + 미생성/미수정 | TC-37, TC-38, TC-66, TC-67 |
 | due `MM-DD` 입력 시 올해로 보정 | TC-13, TC-14 |
 | DB 최초 실행 시 파일 생성 + schema + Inbox | TC-92, TC-93, TC-98 |
-| `todo:` 접두사로 커맨드 정상 인식 | TC-01, TC-07 |
-| `/todo` 접두사 미인식 | TC-03, TC-04 |
-| manifest `command_prefix`/`bypass_llm` 설정 시 LLM 바이패스 | TC-89, TC-90, TC-91 |
-| bridge `/todo` -> `todo:` 이중 변환 로직 제거 | TC-03, TC-04 (간접 검증) |
+| `/todo` 접두사로 커맨드 정상 인식 | TC-01, TC-07 |
+| 비-todo 메시지 무시 | TC-03, TC-04, TC-05 |
+| LLM 바이패스 (registerCommand API) | TC-89, TC-90, TC-91 |
 
 ---
 
@@ -698,16 +697,16 @@ markers = [
 
 | # | 항목 | 관련 TC | 확인 |
 |---|------|---------|------|
-| S-01 | `todo: add 테스트 항목` -> `"Added #N"` 응답 | TC-33 | [ ] |
-| S-02 | `todo: list` -> 방금 추가한 항목 표시 | TC-43 | [ ] |
-| S-03 | `todo: board` -> BACKLOG 헤더 아래에 항목 표시 | TC-49 | [ ] |
-| S-04 | `todo: move <id> /s doing` -> `"moved"` 응답, board DOING 확인 | TC-53 | [ ] |
-| S-05 | `todo: done <id>` -> `list`에서 미표시 | TC-57, TC-58 | [ ] |
-| S-06 | `todo: drop <id>` -> status=dropped 확인 | TC-59 | [ ] |
-| S-07 | `todo: edit <id> 새 제목` -> title 변경 확인 | TC-61 | [ ] |
-| S-08 | `todo: project list` -> Inbox 포함 표시 | TC-70 | [ ] |
-| S-09 | `todo: project set-private MyProj` -> private 생성/전환 확인 | TC-78 | [ ] |
-| S-10 | `todo: project set-shared TeamProj` -> shared 생성 확인 | TC-82 | [ ] |
+| S-01 | `/todo add 테스트 항목` -> `"Added #N"` 응답 | TC-33 | [ ] |
+| S-02 | `/todo list` -> 방금 추가한 항목 표시 | TC-43 | [ ] |
+| S-03 | `/todo board` -> BACKLOG 헤더 아래에 항목 표시 | TC-49 | [ ] |
+| S-04 | `/todo move <id> /s doing` -> `"moved"` 응답, board DOING 확인 | TC-53 | [ ] |
+| S-05 | `/todo done <id>` -> `list`에서 미표시 | TC-57, TC-58 | [ ] |
+| S-06 | `/todo drop <id>` -> status=dropped 확인 | TC-59 | [ ] |
+| S-07 | `/todo edit <id> 새 제목` -> title 변경 확인 | TC-61 | [ ] |
+| S-08 | `/todo project list` -> Inbox 포함 표시 | TC-70 | [ ] |
+| S-09 | `/todo project set-private MyProj` -> private 생성/전환 확인 | TC-78 | [ ] |
+| S-10 | `/todo project set-shared TeamProj` -> shared 생성 확인 | TC-82 | [ ] |
 | S-11 | `/todo add task` -> **무시** (None 반환) | TC-03 | [ ] |
 | S-12 | 일반 텍스트 -> **무시** | TC-05 | [ ] |
 | S-13 | private project에 타인 assignee -> **경고 후 거부** | TC-37 | [ ] |
