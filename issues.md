@@ -31,6 +31,7 @@
 - [ ] ISSUE-038: E2E 테스트 보강 -- scope 필터 및 다중 사용자 시나리오 _(track: platform, P1, 1d)_
 - [x] ISSUE-039: server.py HTTP endpoint 테스트 보강 _(track: platform, P2, 0.5d)_ → PR #74
 - [x] ISSUE-040: bridge TypeScript 빌드 및 npm 패키지 구성 _(track: platform, P1, 1d)_ → PR #70
+- [ ] ISSUE-041: bridge handler 버그 수정 (ctx.commandBody 중복, 에러 노출, senderId 폴백, 네트워크 에러) _(track: platform, P0, 0.5d)_ → PR #80
 
 ### Doing
 
@@ -675,6 +676,45 @@ bridge 디렉토리의 TypeScript 코드를 빌드 가능한 npm 패키지로 �
 
 #### Dependencies / Blockers
 - ISSUE-029, ISSUE-028 이후 권장
+
+---
+
+### ISSUE-041: bridge handler 버그 수정 (ctx.commandBody 중복, 에러 노출, senderId 폴백, 네트워크 에러)
+- Track: platform
+- PRD-Ref: PRD#2.4, OpenClaw Gateway BP
+- Priority: P0
+- Estimate: 0.5d
+- Status: done
+- Owner: claude
+- Branch: `issue/ISSUE-041-bridge-handler-fixes`
+- GH-Issue: #79
+- PR: #80
+
+#### Goal
+OpenClaw 게이트웨이 BP 분석 결과 발견된 bridge handler의 4가지 이슈를 수정한다.
+
+#### Scope
+- In:
+  - `bridge/openclaw-todo/index.ts` -- 4건 수정
+- Out:
+  - Python 서버/플러그인 코드 변경 없음
+  - 게이트웨이 측 코드 변경 없음
+
+#### Acceptance Criteria (DoD)
+- [ ] (A/Critical) `ctx.commandBody` → `ctx.args` 사용으로 `/todo` 접두사 중복 방지
+- [ ] (C/Medium) 서버 에러 바디를 사용자에게 그대로 노출하지 않고 안전한 메시지 반환
+- [ ] (D/Low) senderId 폴백을 `ctx.channel` → `ctx.from`으로 변경
+- [ ] (E/Low) fetch 네트워크 에러 try/catch 추가, 서버 다운 시 유의미한 메시지 반환
+
+#### Tests
+- [ ] Smoke: TypeScript 빌드 성공 (`npm run build`)
+- Test Command: `cd bridge/openclaw-todo && npm run build`
+
+#### Rollback
+- git revert로 원복
+
+#### Dependencies / Blockers
+- ISSUE-028, ISSUE-040 이후 (bridge 구성 완료 후)
 
 ---
 

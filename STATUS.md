@@ -1,6 +1,6 @@
 # Project Status — OpenClaw TODO Plugin
 
-**Last updated:** 2026-02-24
+**Last updated:** 2026-03-01
 **PRD version:** v1.2
 
 ## Current Phase
@@ -39,6 +39,7 @@
 | ~~#027~~ | ~~ruff/black target-version 정합~~ | ~~P2~~ | Done |
 | ~~#028~~ | ~~Bridge serverUrl config 연동~~ | ~~P2~~ | Done |
 | ~~#040~~ | ~~bridge TypeScript 빌드 및 npm 패키지 구성~~ | ~~P1~~ | Done |
+| ~~#041~~ | ~~bridge handler 버그 수정 (ctx.commandBody 중복 등 4건)~~ | ~~P0~~ | Done → PR #80 |
 
 ## Next Steps (권장 순서)
 
@@ -65,4 +66,4 @@
 - [x] `docs/ux_spec.md` — v2.0, 전체 커맨드 UX 흐름 및 응답 포맷
 - [x] `docs/architecture.md` — v2.1, 13개 섹션 시스템 아키텍처
 - [x] `docs/test_plan.md` — 101개 테스트 케이스 + 16개 스모크 체크리스트
-- [x] `issues.md` — 40개 이슈 (26 Done, 14 Open)
+- [x] `issues.md` — 41개 이슈 (27 Done, 14 Open)
