@@ -65,8 +65,9 @@ export default {
 
           const data: PluginResponse = await res.json();
           return { text: data.response ?? "No response from TODO server." };
-        } catch {
+        } catch (err) {
           // (E) Handle network errors (server down, timeout, DNS failure, etc.)
+          api.logger?.error?.(`fetch failed: ${err instanceof Error ? err.message : String(err)}`);
           return {
             text: "⚠️ Could not reach the TODO server. Is it running?",
           };

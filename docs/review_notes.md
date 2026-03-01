@@ -2709,3 +2709,61 @@ In `/Users/pillip/project/practice/openclaw_todo_plugin/bridge/openclaw-todo/ope
 ## Verdict
 
 **Approve.** The PR correctly implements the three-tier URL resolution order (config -> env -> default) as specified in the AC. The code is clean, well-documented, and the `resolveServerUrl` function is properly structured. The Medium-severity findings around URL validation and log sanitization are defense-in-depth improvements that can be addressed in a follow-up without blocking this merge.
+
+---
+
+# PR #80 Review Notes -- ISSUE-041: Fix bridge handler bugs
+
+> Reviewer: Claude Opus 4.6 (automated review)
+> Date: 2026-03-01
+> Branch: `issue/ISSUE-041-bridge-handler-fixes`
+
+---
+
+## Code Review
+
+### Findings
+
+| # | Fix | Verdict | Notes |
+|---|-----|---------|-------|
+| A (Critical) | `ctx.commandBody` → `ctx.args` | ✅ Correct | Gateway strips `/todo` prefix; `commandBody` contains full body causing double-prefix (`/todo /todo add ...`) |
+| C (Medium) | Error body suppression | ✅ Correct | Only HTTP status code exposed, no internal details leaked |
+| D (Low) | senderId fallback `ctx.channel` → `ctx.from` | ✅ Correct | `ctx.channel` is surface name ("slack"), `ctx.from` is channel-scoped sender id |
+| E (Low) | Network error try/catch | ✅ Correct | Prevents unhandled rejections when server unreachable |
+
+### Edge Cases Verified
+
+- **Bare `/todo` (no args)**: `ctx.args` is `undefined` → `"/todo "`.trim() → `"/todo"` — correctly triggers HELP_TEXT ✅
+- **`ctx.from` also undefined**: falls back to `"unknown"` ✅
+- **`res.json()` parse failure**: covered by the outer try/catch (fix E) ✅
+
+### Changes Applied During Review
+
+- Added `api.logger?.error?.(...)` in catch block for operational visibility (reviewer recommendation)
+
+---
+
+## Security Findings
+
+| Severity | Finding | Status |
+|----------|---------|--------|
+| Medium | SSRF via configurable `serverUrl` | Pre-existing, admin-only config surface. Not introduced by this PR. |
+| Low | No authentication on fetch to TODO server | Pre-existing, localhost default |
+| Low | No input sanitization on `ctx.args`/`ctx.from` | Not needed — `JSON.stringify()` serializes safely, Python uses parameterized SQL |
+| Info | Error messages now safe — no internal details leaked | **Fixed in this PR** |
+
+**No new security vulnerabilities introduced.**
+
+---
+
+## Follow-ups
+
+- [ ] Add unit tests for bridge handler with mocked `fetch`
+- [ ] Type `ctx` parameter as `PluginCommandContext` instead of `any`
+- [ ] Validate `serverUrl` scheme/host in `resolveServerUrl()` (low priority)
+
+---
+
+## Verdict
+
+**Approve.** All four fixes are correct and well-motivated. The critical double-prefix bug (A) is properly resolved by using `ctx.args` per the OpenClaw `PluginCommandContext` type. No new security issues introduced; error handling is improved.
