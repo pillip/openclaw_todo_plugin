@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - `board` uses em-dash section separators and Unicode emoji header
 
 ### Added
+- HTTP server endpoint tests: missing text field (422), non-dict JSON body (400), invalid Content-Length (400) (PR #74)
 - set-private Slack mention format tests: `<@UXXXX>` format, multi-assignee grouping, 10-task violation limit (PR #72)
 - Bridge npm package configuration: `files`, `types`, `engines` fields; `@types/node` devDependency; `private: true` to prevent accidental publish (PR #70)
 - E2E tests: scope filter by mention, multi-user shared collaboration, private/shared name collision resolution, status filter (done/drop/board) (PR #67)
