@@ -32,7 +32,7 @@
 | ~~#033~~ | ~~add 시 존재하지 않는 프로젝트 자동 생성 (shared)~~ | ~~P1~~ | Done |
 | ~~#034~~ | ~~move 커맨드에서 /s 없이 section 직접 지정~~ | ~~P1~~ | Done |
 | ~~#035~~ | ~~에러 메시지 UX 명세 정합~~ | ~~P1~~ | Done |
-| #036 | set-private 에러에 Slack 멘션 포맷 적용 | P2 | 0.5d |
+| ~~#036~~ | ~~set-private 에러에 Slack 멘션 포맷 적용~~ | ~~P2~~ | Done |
 | ~~#037~~ | ~~parser 단위 테스트 보강 (엣지 케이스)~~ | ~~P1~~ | Done → PR #65 |
 | ~~#038~~ | ~~E2E 테스트 보강 (scope/다중 사용자)~~ | ~~P1~~ | Done → PR #67 |
 | #039 | server.py HTTP endpoint 테스트 보강 | P2 | 0.5d |

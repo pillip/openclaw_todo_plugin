@@ -26,7 +26,7 @@
 - [ ] ISSUE-033: add 시 존재하지 않는 프로젝트 자동 생성 (shared) _(track: product, P1, 1d)_
 - [ ] ISSUE-034: move 커맨드에서 /s 없이 section 직접 지정 지원 _(track: product, P1, 0.5d)_
 - [ ] ISSUE-035: 에러 메시지 UX 명세 정합 _(track: product, P1, 1d)_
-- [ ] ISSUE-036: set-private 에러 메시지에 Slack 멘션 포맷 적용 _(track: product, P2, 0.5d)_
+- [x] ISSUE-036: set-private 에러 메시지에 Slack 멘션 포맷 적용 _(track: product, P2, 0.5d)_
 - [ ] ISSUE-037: parser 단위 테스트 보강 -- 엣지 케이스 _(track: platform, P1, 1d)_
 - [ ] ISSUE-038: E2E 테스트 보강 -- scope 필터 및 다중 사용자 시나리오 _(track: platform, P1, 1d)_
 - [ ] ISSUE-039: server.py HTTP endpoint 테스트 보강 _(track: platform, P2, 0.5d)_
@@ -403,10 +403,10 @@ UX 명세 3.1~3.5에 정의된 에러 메시지 패턴과 현재 코드의 에�
 - PRD-Ref: PRD#3.4, UX 명세 3.3
 - Priority: P2
 - Estimate: 0.5d
-- Status: backlog
-- Owner: --
+- Status: done
+- Owner: claude
 - Branch: `issue/ISSUE-036-set-private-mention-format`
-- GH-Issue: --
+- GH-Issue: #71
 - PR: --
 
 #### Goal
