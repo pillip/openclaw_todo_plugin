@@ -575,7 +575,7 @@ E2E 테스트에 scope 필터 및 다중 사용자 시나리오를 추가하여 
 - Owner: claude
 - Branch: `issue/ISSUE-027-lint-target-version`
 - GH-Issue: #75
-- PR: --
+- PR: #76
 
 #### Goal
 `pyproject.toml`의 `requires-python >= 3.10`과 ruff/black target-version을 `py310`으로 통일한다.
