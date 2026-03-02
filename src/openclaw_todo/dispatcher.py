@@ -16,6 +16,7 @@ from openclaw_todo.cmd_list import list_handler as _list_handler  # noqa: E402
 from openclaw_todo.cmd_move import move_handler as _move_handler  # noqa: E402
 from openclaw_todo.cmd_project_create import create_handler as _project_create_handler  # noqa: E402
 from openclaw_todo.cmd_project_list import project_list_handler as _project_list_handler  # noqa: E402
+from openclaw_todo.cmd_project_rename import rename_handler as _project_rename_handler  # noqa: E402
 from openclaw_todo.cmd_project_set_private import set_private_handler as _set_private_handler  # noqa: E402
 from openclaw_todo.cmd_project_set_shared import set_shared_handler as _set_shared_handler  # noqa: E402
 from openclaw_todo.db import get_connection
@@ -57,6 +58,9 @@ HELP_TEXT = """\
 /todo project create <name> [shared|private]
     Create a project (default: shared).
 
+/todo project rename <old> <new>
+    Rename a project.
+
 /todo project set-private <name>
     Make a project private (owner-only).
 
@@ -66,13 +70,13 @@ HELP_TEXT = """\
 # Keep short USAGE for backward compatibility (used in "Unknown command" responses)
 USAGE = "Usage: /todo <command> [options]\nCommands: add, list, board, move, done, drop, edit, project, help"
 
-PROJECT_USAGE = "Usage: /todo project <subcommand>\nSubcommands: list, create, set-private, set-shared"
+PROJECT_USAGE = "Usage: /todo project <subcommand>\nSubcommands: list, create, rename, set-private, set-shared"
 
 # Valid top-level command names
 _VALID_COMMANDS = frozenset({"add", "list", "board", "move", "done", "drop", "edit", "project", "help"})
 
 # Valid project subcommands
-_VALID_PROJECT_SUBS = frozenset({"list", "create", "set-private", "set-shared"})
+_VALID_PROJECT_SUBS = frozenset({"list", "create", "rename", "set-private", "set-shared"})
 
 
 def _init_db(db_path: str | None = None) -> sqlite3.Connection:
@@ -98,6 +102,7 @@ _handlers: dict[str, HandlerFn] = {
     "edit": _edit_handler,
     "project_create": _project_create_handler,
     "project_list": _project_list_handler,
+    "project_rename": _project_rename_handler,
     "project_set_private": _set_private_handler,
     "project_set_shared": _set_shared_handler,
 }
@@ -159,7 +164,7 @@ def _dispatch_project(parsed: ParsedCommand, conn: sqlite3.Connection, context: 
     # e.g. "/todo project set-private MyProject"
     if sub not in _VALID_PROJECT_SUBS:
         logger.info("Unknown project subcommand: %s", sub)
-        return f'❌ Unknown project subcommand "{sub}". Available: list, create, set-private, set-shared'
+        return f'❌ Unknown project subcommand "{sub}". Available: list, create, rename, set-private, set-shared'
 
     logger.info("Dispatching command=project sub=%s", sub)
 
