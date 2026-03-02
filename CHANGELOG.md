@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- `/todo project create <name> [shared|private]` command for explicit project creation with visibility control; default shared, DB-constraint duplicate detection (PR #82)
+
 ### Fixed
 - Bridge handler: use `ctx.args` instead of `ctx.commandBody` to prevent double `/todo` prefix when forwarding to Python server (PR #80)
 - Bridge handler: stop leaking internal server error details to end users (PR #80)
