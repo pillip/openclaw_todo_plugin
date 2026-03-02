@@ -26,7 +26,9 @@ def create_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dic
     if not tokens:
         return "❌ Project name is required. Usage: /todo project create <name> [shared|private]"
 
-    project_name = tokens[0]
+    project_name = tokens[0].strip()
+    if not project_name:
+        return "❌ Project name is required. Usage: /todo project create <name> [shared|private]"
 
     # Parse optional visibility (default: shared)
     visibility = "shared"
