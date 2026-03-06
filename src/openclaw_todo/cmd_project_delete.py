@@ -28,8 +28,8 @@ def delete_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dic
     if not project_name:
         return "❌ Project name is required. Usage: /todo project delete <name>"
 
-    # Block deletion of Inbox (system project)
-    if project_name == "Inbox":
+    # Block deletion of Inbox (system project) — case-insensitive guard
+    if project_name.lower() == "inbox":
         return '❌ Cannot delete the system project "Inbox".'
 
     # Resolve project (Option A: private-first)
