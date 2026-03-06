@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 - `/todo project create <name> [shared|private]` command for explicit project creation with visibility control; default shared, DB-constraint duplicate detection (PR #82)
 - `/todo project rename <old> <new>` command with Option A resolution (private-first), owner-only permission for private projects, DB-constraint duplicate blocking (PR #84)
+- `/todo project delete <name>` command: deletes empty projects, blocks deletion when tasks remain (shows count), blocks Inbox deletion, private owner-only with privacy-by-obscurity (PR #86)
 
 ### Fixed
 - Bridge handler: use `ctx.args` instead of `ctx.commandBody` to prevent double `/todo` prefix when forwarding to Python server (PR #80)
