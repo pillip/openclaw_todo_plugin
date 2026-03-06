@@ -22,11 +22,11 @@
 _(없음)_
 
 ### Doing
-- [ ] ISSUE-044: /todo project delete 커맨드 구현 (태스크 존재 시 삭제 차단) _(track: product, P0, 1d)_
 
 ### Waiting
 
 ### Done
+- [x] ISSUE-044: /todo project delete 커맨드 구현 (태스크 존재 시 삭제 차단) _(track: product, P0, 1d)_ → PR #86
 - [x] ISSUE-001 ~ ISSUE-026: M0~M5 핵심 구현 완료 (상세 내역은 하단 참조)
 - [x] ISSUE-027: ruff/black target-version 정합성 수정 _(track: platform, P2, 0.5d)_ → PR #76
 - [x] ISSUE-028: Bridge serverUrl config 연동 _(track: platform, P2, 0.5d)_ → PR #78
@@ -831,11 +831,11 @@ PRD 5.12에 따라 `/todo project rename <old> <new>` 커맨드를 구현한다.
 - PRD-Ref: PRD#5 (project 관리), PRD#3.1
 - Priority: P0
 - Estimate: 1d
-- Status: doing
+- Status: done
 - Owner: claude
 - Branch: `issue/ISSUE-044-project-delete`
 - GH-Issue: #85
-- PR:
+- PR: #86
 
 #### Goal
 `/todo project delete <name>` 커맨드를 구현한다. 프로젝트 내에 태스크가 남아있으면 삭제를 거부하고 에러를 반환한다. 프로젝트 resolve는 옵션 A(sender private 우선 -> shared) 정책을 따른다.
@@ -919,4 +919,4 @@ Phase 4 (패키징/정리 -- P2):
 | M4 | 6 | 6 | 0 |
 | M5 | 8 | 8 | 0 |
 | M6 | 8 | 8 | 0 |
-| **Total** | **43** | **42** | **1** |
+| **Total** | **43** | **43** | **0** |

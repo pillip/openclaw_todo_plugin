@@ -67,6 +67,9 @@ uv run pytest tests/test_parser.py -q
 | `/todo drop <id>` | Drop a task |
 | `/todo edit <id> [new title] [@user] [/p project] [/s section] [due:date]` | Edit a task |
 | `/todo project list` | List projects |
+| `/todo project create <name> [shared\|private]` | Create a project (default: shared) |
+| `/todo project rename <old> <new>` | Rename a project |
+| `/todo project delete <name>` | Delete a project (must have no tasks) |
 | `/todo project set-private <name>` | Make project private |
 | `/todo project set-shared <name>` | Make project shared |
 
@@ -94,6 +97,9 @@ openclaw_todo_plugin/
 │       ├── cmd_done_drop.py       # done/drop handler
 │       ├── cmd_edit.py            # edit handler
 │       ├── cmd_project_list.py    # project list handler
+│       ├── cmd_project_create.py       # project create handler
+│       ├── cmd_project_rename.py       # project rename handler
+│       ├── cmd_project_delete.py       # project delete handler
 │       ├── cmd_project_set_private.py  # set-private handler
 │       └── cmd_project_set_shared.py   # set-shared handler
 ├── bridge/openclaw-todo/          # JS/TS bridge for Gateway
