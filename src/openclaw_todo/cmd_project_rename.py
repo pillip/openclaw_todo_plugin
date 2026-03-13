@@ -7,7 +7,7 @@ import sqlite3
 
 from openclaw_todo.event_logger import log_event
 from openclaw_todo.parser import ParsedCommand
-from openclaw_todo.project_resolver import ProjectNotFoundError, resolve_project
+from openclaw_todo.project_resolver import AmbiguousProjectError, ProjectNotFoundError, resolve_project
 
 logger = logging.getLogger(__name__)
 
@@ -22,16 +22,21 @@ def rename_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dic
     """
     sender_id: str = context["sender_id"]
 
-    # Extract tokens after "rename": [old_name, new_name]
+    # Extract tokens after "rename": [old_name, new_name, ?qualifier]
     tokens = parsed.title_tokens[1:] if len(parsed.title_tokens) > 1 else []
     if len(tokens) < 2:
-        return "❌ Both old and new names are required. Usage: /todo project rename <old> <new>"
+        return "❌ Both old and new names are required. Usage: /todo project rename <old> <new> [shared|private]"
 
     old_name = tokens[0].strip()
     new_name = tokens[1].strip()
 
+    # Optional visibility qualifier (3rd token)
+    vis_qualifier: str | None = None
+    if len(tokens) >= 3 and tokens[2].strip().lower() in ("shared", "private"):
+        vis_qualifier = tokens[2].strip().lower()
+
     if not old_name or not new_name:
-        return "❌ Both old and new names are required. Usage: /todo project rename <old> <new>"
+        return "❌ Both old and new names are required. Usage: /todo project rename <old> <new> [shared|private]"
 
     # Same-name noop
     if old_name == new_name:
@@ -39,7 +44,12 @@ def rename_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dic
 
     # Resolve old project using Option A
     try:
-        project = resolve_project(conn, old_name, sender_id)
+        project = resolve_project(conn, old_name, sender_id, visibility=vis_qualifier)
+    except AmbiguousProjectError:
+        return (
+            f'❌ Ambiguous project name "{old_name}": both shared and private projects exist. '
+            f'Append "shared" or "private" to disambiguate.'
+        )
     except ProjectNotFoundError:
         return f'❌ Project "{old_name}" not found.'
 

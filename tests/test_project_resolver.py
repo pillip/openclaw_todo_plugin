@@ -3,22 +3,20 @@
 import pytest
 
 from openclaw_todo.project_resolver import (
+    AmbiguousProjectError,
     ProjectNotFoundError,
     resolve_project,
 )
 
 
-def test_private_takes_priority(conn):
-    """Sender's private project should be matched before shared."""
-    # Create shared and private with same name
+def test_ambiguous_raises_when_both_exist(conn):
+    """When both shared and private exist, AmbiguousProjectError is raised."""
     conn.execute("INSERT INTO projects (name, visibility) VALUES ('Work', 'shared');")
-    conn.execute("INSERT INTO projects (name, visibility, owner_user_id) " "VALUES ('Work', 'private', 'U1');")
+    conn.execute("INSERT INTO projects (name, visibility, owner_user_id) VALUES ('Work', 'private', 'U1');")
     conn.commit()
 
-    result = resolve_project(conn, "Work", "U1")
-    assert result.visibility == "private"
-    assert result.owner_user_id == "U1"
-    assert result.name == "Work"
+    with pytest.raises(AmbiguousProjectError, match="Ambiguous"):
+        resolve_project(conn, "Work", "U1")
 
 
 def test_falls_back_to_shared(conn):
@@ -63,3 +61,61 @@ def test_private_different_owner_not_matched(conn):
 
     with pytest.raises(ProjectNotFoundError):
         resolve_project(conn, "Secret", "U1")
+
+
+def test_visibility_shared_resolves_shared(conn):
+    """Explicit visibility='shared' resolves the shared project."""
+    conn.execute("INSERT INTO projects (name, visibility) VALUES ('Work', 'shared');")
+    conn.execute("INSERT INTO projects (name, visibility, owner_user_id) VALUES ('Work', 'private', 'U1');")
+    conn.commit()
+
+    result = resolve_project(conn, "Work", "U1", visibility="shared")
+    assert result.visibility == "shared"
+    assert result.name == "Work"
+
+
+def test_visibility_private_resolves_private(conn):
+    """Explicit visibility='private' resolves the private project."""
+    conn.execute("INSERT INTO projects (name, visibility) VALUES ('Work', 'shared');")
+    conn.execute("INSERT INTO projects (name, visibility, owner_user_id) VALUES ('Work', 'private', 'U1');")
+    conn.commit()
+
+    result = resolve_project(conn, "Work", "U1", visibility="private")
+    assert result.visibility == "private"
+    assert result.owner_user_id == "U1"
+
+
+def test_no_ambiguity_when_only_private(conn):
+    """No ambiguity error when only private project exists."""
+    conn.execute("INSERT INTO projects (name, visibility, owner_user_id) VALUES ('Solo', 'private', 'U1');")
+    conn.commit()
+
+    result = resolve_project(conn, "Solo", "U1")
+    assert result.visibility == "private"
+
+
+def test_no_ambiguity_when_only_shared(conn):
+    """No ambiguity error when only shared project exists."""
+    conn.execute("INSERT INTO projects (name, visibility) VALUES ('Solo', 'shared');")
+    conn.commit()
+
+    result = resolve_project(conn, "Solo", "U1")
+    assert result.visibility == "shared"
+
+
+def test_visibility_private_not_found(conn):
+    """Explicit visibility='private' raises when no private project exists."""
+    conn.execute("INSERT INTO projects (name, visibility) VALUES ('OnlyShared', 'shared');")
+    conn.commit()
+
+    with pytest.raises(ProjectNotFoundError):
+        resolve_project(conn, "OnlyShared", "U1", visibility="private")
+
+
+def test_visibility_shared_not_found(conn):
+    """Explicit visibility='shared' raises when no shared project exists."""
+    conn.execute("INSERT INTO projects (name, visibility, owner_user_id) VALUES ('OnlyPriv', 'private', 'U1');")
+    conn.commit()
+
+    with pytest.raises(ProjectNotFoundError):
+        resolve_project(conn, "OnlyPriv", "U1", visibility="shared")

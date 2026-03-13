@@ -165,8 +165,8 @@ class TestDeleteValidation:
         assert "❌" in result
         assert "Project name is required" in result
 
-    def test_option_a_private_first(self, conn):
-        """When both private and shared exist with same name, private is resolved first."""
+    def test_ambiguous_name_returns_error(self, conn):
+        """When both private and shared exist with same name, ambiguity error is returned."""
         conn.execute("INSERT INTO projects (name, visibility) VALUES ('Work', 'shared');")
         conn.execute(
             "INSERT INTO projects (name, visibility, owner_user_id) "
@@ -176,11 +176,59 @@ class TestDeleteValidation:
 
         result = delete_handler(_make_parsed("Work"), conn, {"sender_id": "U001"})
 
+        assert "❌" in result
+        assert "Ambiguous" in result
+        assert "disambiguate" in result
+
+        # Both projects should still exist
+        assert conn.execute(
+            "SELECT id FROM projects WHERE name = 'Work' AND visibility = 'shared';"
+        ).fetchone() is not None
+        assert conn.execute(
+            "SELECT id FROM projects WHERE name = 'Work' AND visibility = 'private';"
+        ).fetchone() is not None
+
+
+class TestDeleteAmbiguity:
+    """Disambiguate same-name shared/private projects with qualifier."""
+
+    def _seed_both(self, conn):
+        conn.execute("INSERT INTO projects (name, visibility) VALUES ('Work', 'shared');")
+        conn.execute(
+            "INSERT INTO projects (name, visibility, owner_user_id) "
+            "VALUES ('Work', 'private', 'U001');"
+        )
+        conn.commit()
+
+    def test_delete_shared_qualifier(self, conn):
+        self._seed_both(conn)
+
+        result = delete_handler(_make_parsed("Work", "shared"), conn, {"sender_id": "U001"})
+
+        assert "Deleted project" in result
+        assert "(shared)" in result
+        # Private still exists
+        assert conn.execute(
+            "SELECT id FROM projects WHERE name = 'Work' AND visibility = 'private';"
+        ).fetchone() is not None
+
+    def test_delete_private_qualifier(self, conn):
+        self._seed_both(conn)
+
+        result = delete_handler(_make_parsed("Work", "private"), conn, {"sender_id": "U001"})
+
         assert "Deleted project" in result
         assert "(private)" in result
-
-        # Shared project should still exist
-        row = conn.execute(
+        # Shared still exists
+        assert conn.execute(
             "SELECT id FROM projects WHERE name = 'Work' AND visibility = 'shared';"
-        ).fetchone()
-        assert row is not None
+        ).fetchone() is not None
+
+    def test_no_qualifier_returns_ambiguity_error(self, conn):
+        self._seed_both(conn)
+
+        result = delete_handler(_make_parsed("Work"), conn, {"sender_id": "U001"})
+
+        assert "❌" in result
+        assert "Ambiguous" in result
+        assert "disambiguate" in result

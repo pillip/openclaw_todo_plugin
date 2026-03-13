@@ -6,7 +6,7 @@ import logging
 import sqlite3
 
 from openclaw_todo.parser import ParsedCommand
-from openclaw_todo.project_resolver import ProjectNotFoundError, resolve_project
+from openclaw_todo.project_resolver import AmbiguousProjectError, ProjectNotFoundError, resolve_project
 from openclaw_todo.scope_builder import build_scope_conditions, format_assignees
 
 logger = logging.getLogger(__name__)
@@ -85,6 +85,11 @@ def list_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
     if parsed.project:
         try:
             project = resolve_project(conn, parsed.project, sender_id)
+        except AmbiguousProjectError:
+            return (
+                f'❌ Ambiguous project name "{parsed.project}": both shared and private projects exist. '
+                f'Append "shared" or "private" to disambiguate.'
+            )
         except ProjectNotFoundError:
             return f'❌ Project "{parsed.project}" not found.'
         conditions.append("t.project_id = ?")

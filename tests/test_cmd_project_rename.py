@@ -182,8 +182,8 @@ class TestRenameEdgeCases:
 
         assert "already has that name" in result
 
-    def test_option_a_private_first_resolution(self, conn):
-        """When both private and shared exist, private is resolved first."""
+    def test_ambiguous_name_returns_error(self, conn):
+        """When both private and shared exist, ambiguity error is returned."""
         conn.execute("INSERT INTO projects (name, visibility) VALUES ('Ambiguous', 'shared');")
         conn.execute(
             "INSERT INTO projects (name, visibility, owner_user_id) "
@@ -195,12 +195,9 @@ class TestRenameEdgeCases:
             _make_parsed("Ambiguous", "Renamed"), conn, {"sender_id": "U001"}
         )
 
-        assert "(private)" in result
-        # Shared still exists with original name
-        shared = conn.execute(
-            "SELECT name FROM projects WHERE name = 'Ambiguous' AND visibility = 'shared';"
-        ).fetchone()
-        assert shared is not None
+        assert "❌" in result
+        assert "Ambiguous" in result
+        assert "disambiguate" in result
 
     def test_tasks_remain_associated_after_rename(self, conn):
         """Tasks reference project_id FK, so rename doesn't break association."""
@@ -222,3 +219,56 @@ class TestRenameEdgeCases:
             "WHERE t.title = 'My task';"
         ).fetchone()
         assert task[1] == "Office"
+
+
+class TestRenameAmbiguity:
+    """Disambiguate same-name shared/private projects with qualifier."""
+
+    def _seed_both(self, conn):
+        conn.execute("INSERT INTO projects (name, visibility) VALUES ('Work', 'shared');")
+        conn.execute(
+            "INSERT INTO projects (name, visibility, owner_user_id) "
+            "VALUES ('Work', 'private', 'U001');"
+        )
+        conn.commit()
+
+    def test_rename_shared_qualifier(self, conn):
+        self._seed_both(conn)
+
+        result = rename_handler(
+            _make_parsed("Work", "NewWork", "shared"), conn, {"sender_id": "U001"}
+        )
+
+        assert "Renamed project" in result
+        assert "(shared)" in result
+        # Private still has old name
+        priv = conn.execute(
+            "SELECT name FROM projects WHERE name = 'Work' AND visibility = 'private';"
+        ).fetchone()
+        assert priv is not None
+
+    def test_rename_private_qualifier(self, conn):
+        self._seed_both(conn)
+
+        result = rename_handler(
+            _make_parsed("Work", "NewWork", "private"), conn, {"sender_id": "U001"}
+        )
+
+        assert "Renamed project" in result
+        assert "(private)" in result
+        # Shared still has old name
+        shared = conn.execute(
+            "SELECT name FROM projects WHERE name = 'Work' AND visibility = 'shared';"
+        ).fetchone()
+        assert shared is not None
+
+    def test_no_qualifier_returns_ambiguity_error(self, conn):
+        self._seed_both(conn)
+
+        result = rename_handler(
+            _make_parsed("Work", "NewWork"), conn, {"sender_id": "U001"}
+        )
+
+        assert "❌" in result
+        assert "Ambiguous" in result
+        assert "disambiguate" in result

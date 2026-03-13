@@ -59,11 +59,11 @@ HELP_TEXT = """\
 /todo project create <name> [shared|private]
     Create a project (default: shared).
 
-/todo project rename <old> <new>
-    Rename a project.
+/todo project rename <old> <new> [shared|private]
+    Rename a project. Append shared/private to disambiguate same-name projects.
 
-/todo project delete <name>
-    Delete a project (must have no tasks).
+/todo project delete <name> [shared|private]
+    Delete a project (must have no tasks). Append shared/private to disambiguate.
 
 /todo project set-private <name>
     Make a project private (owner-only).

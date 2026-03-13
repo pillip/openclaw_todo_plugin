@@ -8,7 +8,7 @@ import sqlite3
 from openclaw_todo.event_logger import log_event
 from openclaw_todo.parser import DUE_CLEAR, ParsedCommand
 from openclaw_todo.permissions import can_write_task, validate_private_assignees
-from openclaw_todo.project_resolver import ProjectNotFoundError, resolve_project
+from openclaw_todo.project_resolver import AmbiguousProjectError, ProjectNotFoundError, resolve_project
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +75,11 @@ def edit_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
     if parsed.project:
         try:
             project = resolve_project(conn, parsed.project, sender_id)
+        except AmbiguousProjectError:
+            return (
+                f'❌ Ambiguous project name "{parsed.project}": both shared and private projects exist. '
+                f'Append "shared" or "private" to disambiguate.'
+            )
         except ProjectNotFoundError:
             return f'❌ Project "{parsed.project}" not found.'
         if project.id != old_project_id:

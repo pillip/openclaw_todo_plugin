@@ -7,7 +7,7 @@ import sqlite3
 
 from openclaw_todo.event_logger import log_event
 from openclaw_todo.parser import ParsedCommand
-from openclaw_todo.project_resolver import ProjectNotFoundError, resolve_project
+from openclaw_todo.project_resolver import AmbiguousProjectError, ProjectNotFoundError, resolve_project
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +19,19 @@ def delete_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dic
     """
     sender_id: str = context["sender_id"]
 
-    # Extract project name from tokens after "delete"
+    # Extract project name and optional visibility qualifier from tokens after "delete"
     tokens = parsed.title_tokens[1:] if len(parsed.title_tokens) > 1 else []
     if not tokens:
-        return "❌ Project name is required. Usage: /todo project delete <name>"
+        return "❌ Project name is required. Usage: /todo project delete <name> [shared|private]"
 
     project_name = tokens[0].strip()
     if not project_name:
-        return "❌ Project name is required. Usage: /todo project delete <name>"
+        return "❌ Project name is required. Usage: /todo project delete <name> [shared|private]"
+
+    # Optional visibility qualifier (2nd token)
+    vis_qualifier: str | None = None
+    if len(tokens) >= 2 and tokens[1].strip().lower() in ("shared", "private"):
+        vis_qualifier = tokens[1].strip().lower()
 
     # Block deletion of Inbox (system project) — case-insensitive guard
     if project_name.lower() == "inbox":
@@ -34,7 +39,12 @@ def delete_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dic
 
     # Resolve project (Option A: private-first)
     try:
-        project = resolve_project(conn, project_name, sender_id)
+        project = resolve_project(conn, project_name, sender_id, visibility=vis_qualifier)
+    except AmbiguousProjectError:
+        return (
+            f'❌ Ambiguous project name "{project_name}": both shared and private projects exist. '
+            f'Append "shared" or "private" to disambiguate.'
+        )
     except ProjectNotFoundError:
         return f'❌ Project "{project_name}" not found.'
 
