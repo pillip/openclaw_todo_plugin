@@ -32,13 +32,13 @@ logger = logging.getLogger(__name__)
 HELP_TEXT = """\
 📖 OpenClaw TODO — Commands
 
-/todo add <title> [@user] [/p project] [/s section] [due:date]
+/todo add <title> [@user] [/p project [shared|private]] [/s section] [due:date]
     Create a new task.
 
-/todo list [mine|all|@user] [/p project] [/s section] [open|done|drop] [limit:N]
+/todo list [mine|all|@user] [/p project [shared|private]] [/s section] [open|done|drop] [limit:N]
     List tasks.
 
-/todo board [mine|all|@user] [/p project] [open|done|drop] [limitPerSection:N]
+/todo board [mine|all|@user] [/p project [shared|private]] [open|done|drop] [limitPerSection:N]
     Show kanban board view.
 
 /todo move <id> <section>
@@ -50,7 +50,7 @@ HELP_TEXT = """\
 /todo drop <id>
     Drop (cancel) a task.
 
-/todo edit <id> [title] [@user] [/p project] [/s section] [due:date|due:-]
+/todo edit <id> [title] [@user] [/p project [shared|private]] [/s section] [due:date|due:-]
     Edit a task. Mentions replace all assignees. due:- clears the date.
 
 /todo project list

@@ -8,7 +8,7 @@ from tests.conftest import seed_task as _seed_task
 
 
 def _make_parsed(**kwargs) -> ParsedCommand:
-    defaults = {"command": "board", "title_tokens": [], "args": []}
+    defaults = {"command": "board", "title_tokens": [], "args": [], "project_visibility": None}
     defaults.update(kwargs)
     return ParsedCommand(**defaults)
 
@@ -260,3 +260,54 @@ class TestBoardEmpty:
         result = board_handler(parsed, conn, {"sender_id": "U001"})
 
         assert result.count("(empty)") == 5
+
+
+class TestBoardAmbiguousProjectDisambiguation:
+    """Visibility qualifier resolves ambiguous project names in board."""
+
+    def _seed_ambiguous(self, conn):
+        conn.execute("INSERT INTO projects (name, visibility, owner_user_id) VALUES ('Work', 'shared', NULL);")
+        conn.execute("INSERT INTO projects (name, visibility, owner_user_id) VALUES ('Work', 'private', 'U001');")
+        shared_id = conn.execute(
+            "SELECT id FROM projects WHERE name = 'Work' AND visibility = 'shared'"
+        ).fetchone()[0]
+        private_id = conn.execute(
+            "SELECT id FROM projects WHERE name = 'Work' AND visibility = 'private'"
+        ).fetchone()[0]
+        _seed_task(conn, title="Shared task", project_name="Inbox")  # dummy, we'll insert directly
+        # Insert tasks directly to target exact project ids
+        conn.execute(
+            "INSERT INTO tasks (title, project_id, section, status, created_by) "
+            "VALUES ('Shared board task', ?, 'backlog', 'open', 'U001');",
+            (shared_id,),
+        )
+        tid1 = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        conn.execute("INSERT INTO task_assignees (task_id, assignee_user_id) VALUES (?, 'U001');", (tid1,))
+        conn.execute(
+            "INSERT INTO tasks (title, project_id, section, status, created_by) "
+            "VALUES ('Private board task', ?, 'doing', 'open', 'U001');",
+            (private_id,),
+        )
+        tid2 = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        conn.execute("INSERT INTO task_assignees (task_id, assignee_user_id) VALUES (?, 'U001');", (tid2,))
+        conn.commit()
+
+    def test_ambiguous_without_qualifier(self, conn):
+        self._seed_ambiguous(conn)
+        parsed = _make_parsed(project="Work")
+        result = board_handler(parsed, conn, {"sender_id": "U001"})
+        assert "Ambiguous" in result
+
+    def test_disambiguate_shared(self, conn):
+        self._seed_ambiguous(conn)
+        parsed = _make_parsed(project="Work", project_visibility="shared")
+        result = board_handler(parsed, conn, {"sender_id": "U001"})
+        assert "Shared board task" in result
+        assert "Private board task" not in result
+
+    def test_disambiguate_private(self, conn):
+        self._seed_ambiguous(conn)
+        parsed = _make_parsed(project="Work", project_visibility="private")
+        result = board_handler(parsed, conn, {"sender_id": "U001"})
+        assert "Private board task" in result
+        assert "Shared board task" not in result

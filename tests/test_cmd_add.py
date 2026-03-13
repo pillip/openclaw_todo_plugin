@@ -12,6 +12,7 @@ def _make_parsed(
     *,
     title_tokens: list[str] | None = None,
     project: str | None = None,
+    project_visibility: str | None = None,
     section: str | None = None,
     due: str | None = None,
     mentions: list[str] | None = None,
@@ -21,6 +22,7 @@ def _make_parsed(
         command="add",
         args=[],
         project=project,
+        project_visibility=project_visibility,
         section=section,
         due=due,
         mentions=mentions or [],
@@ -265,3 +267,41 @@ class TestAddEdgeCases:
 
         row = conn.execute("SELECT due FROM tasks WHERE id = 1").fetchone()
         assert row[0] is None
+
+
+class TestAddAmbiguousProjectDisambiguation:
+    """Visibility qualifier resolves ambiguous project names."""
+
+    def _seed_ambiguous(self, conn):
+        """Create shared + private projects with same name."""
+        conn.execute("INSERT INTO projects (name, visibility, owner_user_id) VALUES ('Work', 'shared', NULL);")
+        conn.execute("INSERT INTO projects (name, visibility, owner_user_id) VALUES ('Work', 'private', 'U001');")
+        conn.commit()
+
+    def test_ambiguous_without_qualifier(self, conn):
+        self._seed_ambiguous(conn)
+        parsed = _make_parsed(title_tokens=["Task"], project="Work")
+        result = add_handler(parsed, conn, {"sender_id": "U001"})
+        assert "Ambiguous" in result
+
+    def test_disambiguate_shared(self, conn):
+        self._seed_ambiguous(conn)
+        parsed = _make_parsed(title_tokens=["Task"], project="Work", project_visibility="shared")
+        result = add_handler(parsed, conn, {"sender_id": "U001"})
+        assert "Added #" in result
+        assert "(Work/" in result
+        # Verify task landed in the shared project
+        row = conn.execute(
+            "SELECT p.visibility FROM tasks t JOIN projects p ON t.project_id = p.id WHERE t.id = 1",
+        ).fetchone()
+        assert row[0] == "shared"
+
+    def test_disambiguate_private(self, conn):
+        self._seed_ambiguous(conn)
+        parsed = _make_parsed(title_tokens=["Task"], project="Work", project_visibility="private")
+        result = add_handler(parsed, conn, {"sender_id": "U001"})
+        assert "Added #" in result
+        row = conn.execute(
+            "SELECT p.visibility FROM tasks t JOIN projects p ON t.project_id = p.id WHERE t.id = 1",
+        ).fetchone()
+        assert row[0] == "private"

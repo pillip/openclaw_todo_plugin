@@ -10,7 +10,7 @@ from tests.conftest import seed_task as _seed_task
 
 
 def _make_parsed(**kwargs) -> ParsedCommand:
-    defaults = {"command": "edit", "args": []}
+    defaults = {"command": "edit", "args": [], "project_visibility": None}
     defaults.update(kwargs)
     return ParsedCommand(**defaults)
 
@@ -264,3 +264,43 @@ class TestEditEdgeCases:
         assert row[0] == "New"
         assert row[1] == "doing"
         assert row[2] == "2026-06-01"
+
+
+class TestEditAmbiguousProjectDisambiguation:
+    """Visibility qualifier resolves ambiguous project names in edit."""
+
+    def _seed_ambiguous(self, conn):
+        conn.execute("INSERT INTO projects (name, visibility, owner_user_id) VALUES ('Work', 'shared', NULL);")
+        conn.execute("INSERT INTO projects (name, visibility, owner_user_id) VALUES ('Work', 'private', 'U001');")
+        conn.commit()
+
+    def test_ambiguous_without_qualifier(self, conn):
+        self._seed_ambiguous(conn)
+        task_id = _seed_task(conn, title="Task")
+        parsed = _make_parsed(args=[str(task_id)], project="Work")
+        result = edit_handler(parsed, conn, {"sender_id": "U001"})
+        assert "Ambiguous" in result
+
+    def test_disambiguate_shared(self, conn):
+        self._seed_ambiguous(conn)
+        task_id = _seed_task(conn, title="Task")
+        parsed = _make_parsed(args=[str(task_id)], project="Work", project_visibility="shared")
+        result = edit_handler(parsed, conn, {"sender_id": "U001"})
+        assert "Edited" in result
+        row = conn.execute(
+            "SELECT p.visibility FROM tasks t JOIN projects p ON t.project_id = p.id WHERE t.id = ?",
+            (task_id,),
+        ).fetchone()
+        assert row[0] == "shared"
+
+    def test_disambiguate_private(self, conn):
+        self._seed_ambiguous(conn)
+        task_id = _seed_task(conn, title="Task")
+        parsed = _make_parsed(args=[str(task_id)], project="Work", project_visibility="private")
+        result = edit_handler(parsed, conn, {"sender_id": "U001"})
+        assert "Edited" in result
+        row = conn.execute(
+            "SELECT p.visibility FROM tasks t JOIN projects p ON t.project_id = p.id WHERE t.id = ?",
+            (task_id,),
+        ).fetchone()
+        assert row[0] == "private"

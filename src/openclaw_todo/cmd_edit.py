@@ -74,7 +74,7 @@ def edit_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict)
     new_project_id = old_project_id
     if parsed.project:
         try:
-            project = resolve_project(conn, parsed.project, sender_id)
+            project = resolve_project(conn, parsed.project, sender_id, visibility=parsed.project_visibility)
         except AmbiguousProjectError:
             return (
                 f'❌ Ambiguous project name "{parsed.project}": both shared and private projects exist. '

@@ -29,7 +29,7 @@ def add_handler(parsed: ParsedCommand, conn: sqlite3.Connection, context: dict) 
     project_name = parsed.project or "Inbox"
     project_auto_created = False
     try:
-        project = resolve_project(conn, project_name, sender_id)
+        project = resolve_project(conn, project_name, sender_id, visibility=parsed.project_visibility)
     except AmbiguousProjectError:
         return (
             f'❌ Ambiguous project name "{project_name}": both shared and private projects exist. '

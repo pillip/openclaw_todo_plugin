@@ -29,6 +29,7 @@ class ParsedCommand:
     command: str
     args: list[str] = field(default_factory=list)
     project: str | None = None
+    project_visibility: str | None = None
     section: str | None = None
     due: str | None = None  # YYYY-MM-DD or DUE_CLEAR sentinel
     mentions: list[str] = field(default_factory=list)
@@ -77,6 +78,7 @@ def parse(text: str) -> ParsedCommand:
     remaining = tokens[1:]
 
     project: str | None = None
+    project_visibility: str | None = None
     section: str | None = None
     due: str | None = None
     mentions: list[str] = []
@@ -87,12 +89,15 @@ def parse(text: str) -> ParsedCommand:
     while i < len(remaining):
         tok = remaining[i]
 
-        # /p <project>
+        # /p <project> [shared|private]
         if tok == "/p":
             if i + 1 >= len(remaining):
                 raise ParseError("/p requires a project name")
             project = remaining[i + 1]
             i += 2
+            if i < len(remaining) and remaining[i].lower() in ("shared", "private"):
+                project_visibility = remaining[i].lower()
+                i += 1
             continue
 
         # /s <section>
@@ -133,6 +138,7 @@ def parse(text: str) -> ParsedCommand:
         command=command,
         args=args,
         project=project,
+        project_visibility=project_visibility,
         section=section,
         due=due,
         mentions=mentions,

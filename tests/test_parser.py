@@ -372,3 +372,57 @@ class TestAllSections:
         """Each valid section name is accepted."""
         result = parse(f"add Task /s {section}")
         assert result.section == section
+
+
+class TestProjectVisibilityQualifier:
+    """Visibility qualifier (shared/private) after /p <name>."""
+
+    def test_shared_qualifier(self):
+        result = parse("add Task /p Work shared")
+        assert result.project == "Work"
+        assert result.project_visibility == "shared"
+
+    def test_private_qualifier(self):
+        result = parse("add Task /p Work private")
+        assert result.project == "Work"
+        assert result.project_visibility == "private"
+
+    def test_no_qualifier(self):
+        result = parse("add Task /p Work")
+        assert result.project == "Work"
+        assert result.project_visibility is None
+
+    def test_qualifier_case_insensitive(self):
+        result = parse("add Task /p Work SHARED")
+        assert result.project_visibility == "shared"
+
+    def test_qualifier_with_section(self):
+        """/p Work shared /s doing — qualifier should not eat the /s token."""
+        result = parse("add Task /p Work shared /s doing")
+        assert result.project == "Work"
+        assert result.project_visibility == "shared"
+        assert result.section == "doing"
+
+    def test_non_qualifier_stays_as_title(self):
+        """A word after /p name that isn't shared/private remains a title token."""
+        result = parse("add /p Work urgent task")
+        assert result.project == "Work"
+        assert result.project_visibility is None
+        assert "urgent" in result.title_tokens
+        assert "task" in result.title_tokens
+
+    def test_qualifier_with_list_command(self):
+        result = parse("list /p Work private")
+        assert result.project == "Work"
+        assert result.project_visibility == "private"
+
+    def test_qualifier_with_board_command(self):
+        result = parse("board /p Work shared")
+        assert result.project == "Work"
+        assert result.project_visibility == "shared"
+
+    def test_qualifier_with_edit_command(self):
+        result = parse("edit 3 /p Work private")
+        assert result.project == "Work"
+        assert result.project_visibility == "private"
+        assert result.args == ["3"]

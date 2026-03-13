@@ -74,6 +74,7 @@ def _make_parsed(
     *,
     title_tokens: list[str] | None = None,
     project: str | None = None,
+    project_visibility: str | None = None,
     section: str | None = None,
     mentions: list[str] | None = None,
 ) -> ParsedCommand:
@@ -81,6 +82,7 @@ def _make_parsed(
         command="list",
         args=[],
         project=project,
+        project_visibility=project_visibility,
         section=section,
         due=None,
         mentions=mentions or [],
@@ -324,3 +326,50 @@ class TestListNoResults:
 
         assert "No tasks found." in result
         assert "0 tasks" in result
+
+
+class TestListAmbiguousProjectDisambiguation:
+    """Visibility qualifier resolves ambiguous project names in list."""
+
+    def _seed_ambiguous(self, conn):
+        conn.execute("INSERT INTO projects (name, visibility, owner_user_id) VALUES ('Work', 'shared', NULL);")
+        conn.execute("INSERT INTO projects (name, visibility, owner_user_id) VALUES ('Work', 'private', 'U001');")
+        shared_id = conn.execute(
+            "SELECT id FROM projects WHERE name = 'Work' AND visibility = 'shared'"
+        ).fetchone()[0]
+        private_id = conn.execute(
+            "SELECT id FROM projects WHERE name = 'Work' AND visibility = 'private'"
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO tasks (title, project_id, section, status, created_by) "
+            "VALUES ('Shared task', ?, 'backlog', 'open', 'U001');",
+            (shared_id,),
+        )
+        conn.execute("INSERT INTO task_assignees (task_id, assignee_user_id) VALUES (1, 'U001');")
+        conn.execute(
+            "INSERT INTO tasks (title, project_id, section, status, created_by) "
+            "VALUES ('Private task', ?, 'backlog', 'open', 'U001');",
+            (private_id,),
+        )
+        conn.execute("INSERT INTO task_assignees (task_id, assignee_user_id) VALUES (2, 'U001');")
+        conn.commit()
+
+    def test_ambiguous_without_qualifier(self, conn):
+        self._seed_ambiguous(conn)
+        parsed = _make_parsed(project="Work")
+        result = list_handler(parsed, conn, {"sender_id": "U001"})
+        assert "Ambiguous" in result
+
+    def test_disambiguate_shared(self, conn):
+        self._seed_ambiguous(conn)
+        parsed = _make_parsed(project="Work", project_visibility="shared")
+        result = list_handler(parsed, conn, {"sender_id": "U001"})
+        assert "Shared task" in result
+        assert "Private task" not in result
+
+    def test_disambiguate_private(self, conn):
+        self._seed_ambiguous(conn)
+        parsed = _make_parsed(project="Work", project_visibility="private")
+        result = list_handler(parsed, conn, {"sender_id": "U001"})
+        assert "Private task" in result
+        assert "Shared task" not in result
